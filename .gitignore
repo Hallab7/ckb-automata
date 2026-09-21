@@ -1,2 +1,6 @@
 node_modules/
 target/
+.env
+.env.*
+!.env.example
+!**/.env.example
