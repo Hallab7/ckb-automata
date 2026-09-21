@@ -15,6 +15,13 @@ export {
 } from "./job-identity.ts";
 
 export {
+  POLICY_PAYLOAD_DOMAIN,
+  deriveRecurringPayloadHash,
+  isValidRecurringSchedule,
+  type RecurringSchedule,
+} from "./recurring.ts";
+
+export {
   ERROR_CATALOG,
   INVALID_TRANSITION_DIAGNOSTICS,
   getErrorDefinition,

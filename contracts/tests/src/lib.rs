@@ -48,6 +48,22 @@ pub mod deadline_payload {
     include!("../../shared/deadline_payload.rs");
 }
 
+#[allow(
+    clippy::clone_on_copy,
+    clippy::derivable_impls,
+    clippy::if_same_then_else,
+    clippy::manual_is_multiple_of,
+    clippy::needless_borrow,
+    clippy::write_literal
+)]
+pub mod generated_recurring {
+    include!("../../generated/recurring_v1.rs");
+}
+
+pub mod recurring {
+    include!("../../shared/recurring.rs");
+}
+
 #[cfg(test)]
 mod execution_mode;
 
@@ -71,6 +87,9 @@ mod campaign_creation;
 
 #[cfg(test)]
 mod campaign_success;
+
+#[cfg(test)]
+mod recurring_payload;
 
 #[cfg(test)]
 mod tests {

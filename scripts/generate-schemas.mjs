@@ -14,6 +14,7 @@ const root = new URL("../", import.meta.url);
 const schemaSpecs = [
   { file: "job_v1", hashConstant: "JOB_V1_SCHEMA_SHA256" },
   { file: "campaign_v1", hashConstant: "CAMPAIGN_V1_SCHEMA_SHA256" },
+  { file: "recurring_v1", hashConstant: "RECURRING_V1_SCHEMA_SHA256" },
 ];
 
 const compilerOutput = execFileSync("moleculec", ["--version"], {

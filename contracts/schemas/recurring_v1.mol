@@ -1,0 +1,37 @@
+// Canonical immutable intent for a recurring native-CKB distribution.
+//
+// Integer byte arrays are unsigned little-endian values. amount and reward are
+// shannons. interval_blocks and first_not_before use block-number units.
+//
+// version: 1 is RecurringPayloadV1; every other value is reserved.
+// owner_lock_hash: full CKB Script hash and must equal JobDataV1.cancel_lock_hash.
+// recipient_lock_hash: full CKB Script hash of the only payout recipient.
+// amount: exact non-zero native CKB payout for every run.
+// interval_blocks: exact non-zero distance between scheduled lower bounds.
+// first_not_before: non-zero absolute block-number since for run zero.
+// total_runs: exact non-zero payout count and initial JobDataV1.remaining_runs.
+// reward: exact executor reward per run and must equal JobDataV1.reward.
+// final_refund_kind: 0 = RETURN_RESIDUAL_TO_OWNER; 1..255 are reserved.
+//
+// The immutable fields above are committed by JobDataV1.payload_hash using
+// H("ckb-automata/policy-payload/v1", policy_script_hash || molecule_bytes).
+// JobDataV1 sequence, trigger_params_hash, not_before, remaining_runs, and
+// remaining_budget are mutable progress fields. All other JobDataV1 and payload
+// fields remain immutable across successors.
+
+array Uint16 [byte; 2];
+array Uint32 [byte; 4];
+array Uint64 [byte; 8];
+array Byte32 [byte; 32];
+
+table RecurringPayloadV1 {
+  version: Uint16,
+  owner_lock_hash: Byte32,
+  recipient_lock_hash: Byte32,
+  amount: Uint64,
+  interval_blocks: Uint64,
+  first_not_before: Uint64,
+  total_runs: Uint32,
+  reward: Uint64,
+  final_refund_kind: byte,
+}
