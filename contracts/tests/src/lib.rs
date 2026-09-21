@@ -63,6 +63,9 @@ mod top_up;
 mod campaign_state;
 
 #[cfg(test)]
+mod campaign_creation;
+
+#[cfg(test)]
 mod tests {
     use molecule::prelude::{Builder, Entity};
     use serde::Deserialize;

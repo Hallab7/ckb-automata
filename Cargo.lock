@@ -50,6 +50,11 @@ version = "0.0.0"
 [[package]]
 name = "automata-demo-campaign-type"
 version = "0.0.0"
+dependencies = [
+ "ckb-hash",
+ "ckb-std",
+ "molecule",
+]
 
 [[package]]
 name = "automata-job-lock"
