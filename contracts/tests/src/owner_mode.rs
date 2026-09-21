@@ -12,6 +12,9 @@ use ckb_testtool::{
     },
     context::Context,
 };
+use molecule::prelude::{Builder, Entity};
+
+use crate::generated::JobDataV1;
 
 const MAX_CYCLES: u64 = 20_000_000;
 const JOB_CAPACITY: u64 = 200_000_000_000;
@@ -25,6 +28,14 @@ enum OwnerOperation {
     Unsupported,
     Cancel,
     Recover,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum JobMutation {
+    None,
+    UnsupportedVersion,
+    InvalidState,
+    ZeroRuns,
 }
 
 impl OwnerOperation {
@@ -68,6 +79,26 @@ fn build_owner_case_with_job(
     remaining_runs: u32,
     commit_wrong_policy: bool,
 ) -> OwnerCase {
+    build_owner_case_with_mutation(
+        operation,
+        include_owner_input,
+        commit_wrong_owner,
+        alter_refund,
+        remaining_runs,
+        commit_wrong_policy,
+        JobMutation::None,
+    )
+}
+
+fn build_owner_case_with_mutation(
+    operation: OwnerOperation,
+    include_owner_input: bool,
+    commit_wrong_owner: bool,
+    alter_refund: bool,
+    remaining_runs: u32,
+    commit_wrong_policy: bool,
+    mutation: JobMutation,
+) -> OwnerCase {
     let mut context = Context::new_with_deterministic_rng();
     let job_lock = deployed_contract(&mut context, "job-lock");
     let owner = secp_wallet(&mut context, 1);
@@ -95,19 +126,29 @@ fn build_owner_case_with_job(
         policy.calc_script_hash().unpack()
     };
 
+    let mut job_bytes = job_data(
+        cancel_lock_hash,
+        policy_hash,
+        REWARD,
+        REMAINING_BUDGET,
+        remaining_runs,
+    );
+    let job = JobDataV1::from_slice(&job_bytes).expect("fixture job data");
+    job_bytes = match mutation {
+        JobMutation::None => job,
+        JobMutation::UnsupportedVersion => job.as_builder().version(2_u16.to_le_bytes()).build(),
+        JobMutation::InvalidState => job.as_builder().state(1).build(),
+        JobMutation::ZeroRuns => job.as_builder().remaining_runs(0_u32.to_le_bytes()).build(),
+    }
+    .as_bytes();
+
     let job_cell = context.create_cell(
         CellOutput::new_builder()
             .capacity(JOB_CAPACITY)
             .lock(job_lock.clone())
             .type_(Some(policy).pack())
             .build(),
-        job_data(
-            cancel_lock_hash,
-            policy_hash,
-            REWARD,
-            REMAINING_BUDGET,
-            remaining_runs,
-        ),
+        job_bytes,
     );
 
     let mut builder = TransactionBuilder::default()
@@ -216,6 +257,139 @@ fn owner_can_recover_without_automata_services() {
         ..owner_case
     })
     .expect("standalone owner recovery");
+}
+
+#[test]
+fn recovery_covers_unsupported_and_invalid_funded_jobs() {
+    for mutation in [
+        JobMutation::UnsupportedVersion,
+        JobMutation::InvalidState,
+        JobMutation::ZeroRuns,
+    ] {
+        let owner_case = build_owner_case_with_mutation(
+            OwnerOperation::Recover,
+            true,
+            false,
+            false,
+            1,
+            false,
+            mutation,
+        );
+        let transaction = sign_single_secp_input(owner_case.transaction, 1, &owner_case.owner_key);
+        verify_owner_case(OwnerCase {
+            transaction,
+            ..owner_case
+        })
+        .unwrap_or_else(|error| panic!("recovery for {mutation:?} failed: {error}"));
+    }
+
+    let owner_case =
+        build_owner_case_with_job(OwnerOperation::Recover, true, false, false, 1, true);
+    let transaction = sign_single_secp_input(owner_case.transaction, 1, &owner_case.owner_key);
+    verify_owner_case(OwnerCase {
+        transaction,
+        ..owner_case
+    })
+    .expect("recovery for unsupported policy commitment");
+}
+
+#[test]
+fn normal_cancellation_does_not_bypass_recovery_only_states() {
+    for (mutation, code) in [
+        (JobMutation::UnsupportedVersion, 11),
+        (JobMutation::InvalidState, 13),
+        (JobMutation::ZeroRuns, 10),
+    ] {
+        let owner_case = build_owner_case_with_mutation(
+            OwnerOperation::Cancel,
+            true,
+            false,
+            false,
+            1,
+            false,
+            mutation,
+        );
+        let transaction = sign_single_secp_input(owner_case.transaction, 1, &owner_case.owner_key);
+        let error = verify_owner_case(OwnerCase {
+            transaction,
+            ..owner_case
+        })
+        .expect_err("normal cancellation must reject recovery-only state");
+        assert!(
+            error.contains(&code.to_string()),
+            "unexpected error: {error}"
+        );
+    }
+}
+
+#[test]
+fn recovery_requires_the_committed_owner() {
+    let missing_owner = build_owner_case(OwnerOperation::Recover, false, false, false);
+    let error = verify_owner_case(missing_owner).expect_err("missing recovery owner must fail");
+    assert!(error.contains("16"), "unexpected error: {error}");
+
+    let wrong_owner = build_owner_case(OwnerOperation::Recover, true, true, false);
+    let transaction = sign_single_secp_input(wrong_owner.transaction, 1, &wrong_owner.owner_key);
+    let error = verify_owner_case(OwnerCase {
+        transaction,
+        ..wrong_owner
+    })
+    .expect_err("wrong recovery owner must fail");
+    assert!(error.contains("16"), "unexpected error: {error}");
+}
+
+#[test]
+fn recovery_cannot_redirect_job_capacity() {
+    let owner_case = build_owner_case(OwnerOperation::Recover, true, false, true);
+    let transaction = sign_single_secp_input(owner_case.transaction, 1, &owner_case.owner_key);
+    let error = verify_owner_case(OwnerCase {
+        transaction,
+        ..owner_case
+    })
+    .expect_err("redirected recovery refund must fail");
+    assert!(error.contains("28"), "unexpected error: {error}");
+}
+
+#[test]
+fn recovery_cannot_bypass_a_protected_application_input() {
+    let OwnerCase {
+        mut context,
+        transaction,
+        owner_key,
+        ..
+    } = build_owner_case(OwnerOperation::Recover, true, false, false);
+    let protected_owner = secp_wallet(&mut context, 9);
+    let protected_capacity = 20_000_000_000;
+    let protected_cell = context.create_cell(
+        CellOutput::new_builder()
+            .capacity(protected_capacity)
+            .lock(protected_owner.lock)
+            .build(),
+        Bytes::new(),
+    );
+    let redirect_lock = transaction.outputs().get(0).expect("owner refund").lock();
+    let transaction = transaction
+        .as_advanced_builder()
+        .input(
+            CellInput::new_builder()
+                .previous_output(protected_cell)
+                .build(),
+        )
+        .output(
+            CellOutput::new_builder()
+                .capacity(protected_capacity)
+                .lock(redirect_lock)
+                .build(),
+        )
+        .output_data(Bytes::new().pack())
+        .witness(WitnessArgs::default().as_bytes().pack())
+        .cell_dep(protected_owner.data_dep)
+        .build();
+    let transaction = context.complete_tx(transaction);
+    let transaction = sign_single_secp_input(transaction, 1, &owner_key);
+    context
+        .verify_tx(&transaction, MAX_CYCLES)
+        .expect_err("recovery cannot suppress the protected input lock");
 }
 
 #[test]

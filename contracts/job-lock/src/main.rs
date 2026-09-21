@@ -139,21 +139,25 @@ fn validate_cancellation() -> Result<(), ScriptError> {
     validate_supported_live_job(&job)?;
     validate_policy_commitment(&job)?;
     let cancel_lock_hash = validate_owner_authorization(&job)?;
-
-    let job_lock_hash = load_script_hash().map_err(|_| ScriptError::InvalidData)?;
-    if QueryIter::new(load_cell_lock_hash, Source::Output)
-        .any(|lock_hash| lock_hash == job_lock_hash)
-    {
-        return Err(ScriptError::SuccessorCountMismatch);
-    }
-
+    validate_no_successor()?;
     validate_refund(cancel_lock_hash)
 }
 
 fn validate_recovery() -> Result<(), ScriptError> {
     let job = load_job()?;
     let cancel_lock_hash = validate_owner_authorization(&job)?;
+    validate_no_successor()?;
     validate_refund(cancel_lock_hash)
+}
+
+fn validate_no_successor() -> Result<(), ScriptError> {
+    let job_lock_hash = load_script_hash().map_err(|_| ScriptError::InvalidData)?;
+    if QueryIter::new(load_cell_lock_hash, Source::Output)
+        .any(|lock_hash| lock_hash == job_lock_hash)
+    {
+        return Err(ScriptError::SuccessorCountMismatch);
+    }
+    Ok(())
 }
 
 fn validate_owner_authorization(job: &JobDataV1) -> Result<[u8; 32], ScriptError> {
@@ -208,6 +212,7 @@ fn validate_execution(
     controlled_output_indices: &[usize],
 ) -> Result<(), ScriptError> {
     let job = load_job()?;
+    validate_supported_live_job(&job)?;
     let trigger_kind = read_u16(job.trigger_kind().as_slice());
     let committed_since = read_u64(job.not_before().as_slice());
     let actual_since =

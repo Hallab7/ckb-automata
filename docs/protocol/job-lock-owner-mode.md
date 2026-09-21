@@ -55,6 +55,38 @@ Execution and cancellation spend the same Job Cell outpoint. CKB's single-spend
 rule therefore resolves a race atomically: one transaction can commit, and the
 other becomes conflicted without creating a second lifecycle transition.
 
+## Recovery
+
+Recovery uses witness mode `2` and the same owner authorization, complete Job
+Cell refund, and no-successor rules as cancellation. It deliberately does not
+require the normal-exit schema checks or a matching policy commitment. This
+allows an owner to exit a structurally decodable Job Cell when any of these
+conditions applies:
+
+- its schema or policy version is no longer supported;
+- its application state or run counter is invalid; or
+- a supported live job has reached a terminal operational failure and the
+  owner chooses the documented escape path.
+
+Using recovery for a supported job does not grant more authority than normal
+cancellation: both require the same wallet lock, return exactly the same Job
+Cell value to the committed owner, pay no job-funded reward, and create no
+successor. Recovery never disables other CKB scripts. Any application input
+co-spent by the transaction must still satisfy its own lock and type script, so
+the Job Lock recovery witness cannot redirect protected application funds.
+
+The Job Cell data must remain structurally decodable because
+`cancel_lock_hash` is stored there. Creation policies must reject malformed
+Molecule data; recovery covers supported-width fields with unsupported values,
+not arbitrary bytes from a cell that bypassed creation validation.
+
+| Funded state                             | Owner exit                                                                       |
+| ---------------------------------------- | -------------------------------------------------------------------------------- |
+| Supported live one-shot or recurring job | Cancel normally; recover after terminal operational failure                      |
+| Unsupported schema or policy commitment  | Recover with mode `2`                                                            |
+| Invalid application state or run counter | Recover with mode `2`                                                            |
+| Separate application cell                | Use its own lock/type-script recovery path in the same or a separate transaction |
+
 ## Verification status
 
 - Fixture-backed CKB-VM: verified with the compiled Job Lock and bundled
@@ -63,5 +95,9 @@ other becomes conflicted without creating a second lifecycle transition.
   substitution, diverted Job Cell capacity, attempted recurrence, and malformed
   execution input. A valid cancellation and a valid execution are also built
   against the same outpoint to prove the atomic race boundary.
+- Recovery vectors cover supported jobs, unsupported schema and policy
+  commitments, invalid state, invalid run count, missing and incorrect owner
+  authorization, redirected Job Cell capacity, and a co-spent application input
+  protected by a separate wallet lock.
 - Local chain: not exercised in this implementation unit.
 - Public testnet: not exercised or claimed in this implementation unit.

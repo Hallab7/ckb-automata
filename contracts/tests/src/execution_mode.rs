@@ -8,10 +8,12 @@ use ckb_testtool::{
     },
     context::Context,
 };
+use molecule::prelude::{Builder, Entity};
 
 use crate::fixtures::{
     deployed_contract, execution_witness, job_data, secp_wallet, sign_single_secp_input,
 };
+use crate::generated::JobDataV1;
 
 const MAX_CYCLES: u64 = 20_000_000;
 const JOB_CAPACITY: u64 = 200_000_000_000;
@@ -43,6 +45,8 @@ enum Mutation {
     Mode,
     Identity,
     SinceMismatch,
+    UnsupportedVersion,
+    InvalidState,
 }
 
 struct ExecutionCase {
@@ -87,13 +91,25 @@ fn build_execution_case(mutation: Mutation) -> ExecutionCase {
     } else {
         1
     };
-    let canonical_job_data = job_data(
+    let mut canonical_job_data = job_data(
         owner_hash,
         committed_policy_hash,
         REWARD,
         remaining_budget,
         remaining_runs,
     );
+    if matches!(
+        mutation,
+        Mutation::UnsupportedVersion | Mutation::InvalidState
+    ) {
+        let job = JobDataV1::from_slice(&canonical_job_data).expect("fixture job data");
+        canonical_job_data = match mutation {
+            Mutation::UnsupportedVersion => job.as_builder().version(2_u16.to_le_bytes()).build(),
+            Mutation::InvalidState => job.as_builder().state(1).build(),
+            _ => unreachable!("guarded mutation"),
+        }
+        .as_bytes();
+    }
     let job_cell = context.create_cell(
         CellOutput::new_builder()
             .capacity(JOB_CAPACITY)
@@ -301,6 +317,12 @@ fn changed_executor_identity_fails() {
 #[test]
 fn input_since_must_match_the_committed_lower_bound() {
     assert_script_error(Mutation::SinceMismatch, 23);
+}
+
+#[test]
+fn normal_execution_rejects_recovery_only_job_metadata() {
+    assert_script_error(Mutation::UnsupportedVersion, 11);
+    assert_script_error(Mutation::InvalidState, 13);
 }
 
 #[test]
