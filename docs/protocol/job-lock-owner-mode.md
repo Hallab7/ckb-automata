@@ -8,8 +8,8 @@ Job Lock V1 reserves two one-byte witness modes in the first group input's
 | `1`   | Cancel    |
 | `2`   | Recover   |
 
-Both modes are owner-authorized exits. Executor execution is intentionally not
-accepted by this contract version.
+Both modes are owner-authorized exits and remain separate from the 37-byte
+[execution request](job-lock-execution-mode.md).
 
 ## Authorization
 
@@ -40,7 +40,7 @@ database, queue, or hosted frontend.
 
 - Fixture-backed CKB-VM: verified with the compiled Job Lock and bundled
   secp256k1 wallet lock for valid cancellation, standalone recovery, wrong
-  owner, missing owner input, invalid signature, altered refund, and unsupported
-  mode.
+  owner, missing owner input, invalid signature, altered refund, and malformed
+  execution input.
 - Local chain: not exercised in this implementation unit.
 - Public testnet: not exercised or claimed in this implementation unit.

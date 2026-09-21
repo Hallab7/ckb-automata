@@ -25,6 +25,9 @@ pub mod job_identity {
 }
 
 #[cfg(test)]
+mod execution_mode;
+
+#[cfg(test)]
 mod owner_mode;
 
 #[cfg(test)]
