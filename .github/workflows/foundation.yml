@@ -84,6 +84,10 @@ jobs:
         uses: ./.github/actions/setup-node-workspace
       - name: Set up Rust
         uses: ./.github/actions/setup-rust
+      - name: Install Molecule compiler
+        run: cargo install moleculec --version 0.9.2 --locked
+      - name: Check generated schemas
+        run: npm exec --yes --package=pnpm@12.5.1 -- pnpm schema:check
       - name: Build contracts
         run: npm exec --yes --package=pnpm@12.5.1 -- pnpm contracts:build
       - name: Verify reproducible binaries

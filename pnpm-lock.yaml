@@ -236,7 +236,11 @@ importers:
 
   packages/core: {}
 
-  packages/molecule: {}
+  packages/molecule:
+    dependencies:
+      '@ckb-lumos/codec':
+        specifier: 0.23.0
+        version: 0.23.0
 
   packages/testing:
     devDependencies:
@@ -275,6 +279,14 @@ packages:
 
   '@cacheable/utils@2.5.0':
     resolution: {integrity: sha512-buipgOVDkkPXNR5+xBpDw7Zk2n1EvU7qBJCNUcL7rhQ//kfpOXPAvQ511Os0vpLYJ1pZnvudNytkQt2hst3wqA==}
+
+  '@ckb-lumos/bi@0.23.0':
+    resolution: {integrity: sha512-KAy+lyVpL+Al4XD+c9tHrA9DSpHkMusyXtTS81aNZi5MyL6F9jrVmFcqLorhfyfl8Fsv2sEjMe5Neo2Y+w/RJQ==}
+    engines: {node: '>=12.0.0'}
+
+  '@ckb-lumos/codec@0.23.0':
+    resolution: {integrity: sha512-FwYooXnsFDjlHHnlFnCTB1UbBzV72I0VjkRpeauFk5nQ4+/75xl28ywK3J14M+0aHTnYU9msXUTRDAGqC0CaNQ==}
+    engines: {node: '>=12.0.0'}
 
   '@eslint-community/eslint-utils@4.10.1':
     resolution: {integrity: sha512-cuadcxVFE8sDK6iWJbs8Sn0av2Nrh2QSGQhVlBW9AaAHqHwjWsZHT8LJ4hFGPh7ASBV2deFdM7H/DPjulmh8rg==}
@@ -739,6 +751,9 @@ packages:
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
 
+  jsbi@4.3.2:
+    resolution: {integrity: sha512-9fqMSQbhJykSeii05nxKl4m6Eqn2P6rOlYiS+C5Dr/HPIU/7yZxu5qzbs40tgaFORiw2Amd0mirjxatXYMkIew==}
+
   json-schema-traverse@0.4.1:
     resolution: {integrity: sha512-xbbCH5dCYU5T8LcEhhuh7HJ88HXuW3qsI3Y0zOZFKfZEHcpWiHU/Jxzk629Brsab/mMiHQti9wMP+845RPe3Vg==}
 
@@ -868,6 +883,14 @@ snapshots:
     dependencies:
       hashery: 1.5.1
       keyv: 5.6.0
+
+  '@ckb-lumos/bi@0.23.0':
+    dependencies:
+      jsbi: 4.3.2
+
+  '@ckb-lumos/codec@0.23.0':
+    dependencies:
+      '@ckb-lumos/bi': 0.23.0
 
   '@eslint-community/eslint-utils@4.10.1(eslint@10.11.0)':
     dependencies:
@@ -1205,6 +1228,8 @@ snapshots:
       is-extglob: 2.1.1
 
   isexe@2.0.0: {}
+
+  jsbi@4.3.2: {}
 
   json-schema-traverse@0.4.1: {}
 

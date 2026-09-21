@@ -12,6 +12,7 @@ manifests repeat the applicable values so their native tools enforce them.
 | pnpm        | `12.5.1`                       |
 | Rust        | `1.93.1`                       |
 | Rust target | `riscv64imac-unknown-none-elf` |
+| moleculec   | `0.9.2`                        |
 
 Use npm's exact-package runner to bootstrap the pnpm version from `package.json`.
 This path is used because Corepack `0.34.2`, bundled with the pinned Windows Node
@@ -19,6 +20,12 @@ distribution, expects pnpm's older launcher layout and cannot start pnpm 12.
 Rustup reads `rust-toolchain.toml` and installs the pinned target. `.npmrc`
 rejects an incompatible Node or pnpm runtime and makes newly saved dependencies
 exact.
+
+Install the schema compiler with its published lockfile:
+
+```text
+cargo install moleculec --version 0.9.2 --locked
+```
 
 The repository Cargo configuration provides these stable commands:
 
@@ -32,6 +39,17 @@ The first command runs the native contract harness. The second builds every
 script for the pinned RISC-V target in release mode. The reproducibility check
 builds into two isolated target directories and compares every binary by
 SHA-256.
+
+## Schema generation
+
+`pnpm schema:generate` parses the canonical Molecule schema with the pinned
+compiler and writes the Rust and TypeScript bindings. Do not edit files under
+`contracts/generated` or `packages/molecule/src/generated` directly. Both
+outputs embed the normalized source SHA-256.
+
+`pnpm schema:check` regenerates both outputs in memory and fails if either
+committed file differs. The native contract suite and TypeScript package suite
+also encode the same JSON fixture and compare its exact bytes.
 
 ## Install
 
