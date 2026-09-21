@@ -216,7 +216,11 @@ importers:
         specifier: workspace:*
         version: link:../core
 
-  packages/api-client: {}
+  packages/api-client:
+    dependencies:
+      '@ckb-automata/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/ccc:
     dependencies:
@@ -258,7 +262,11 @@ importers:
         specifier: workspace:*
         version: link:../ui
 
-  packages/ui: {}
+  packages/ui:
+    dependencies:
+      '@ckb-automata/core':
+        specifier: workspace:*
+        version: link:../core
 
 packages:
 
