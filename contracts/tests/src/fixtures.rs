@@ -128,6 +128,30 @@ pub fn sign_single_secp_input(
         .build()
 }
 
+pub fn execution_witness(
+    mode: u8,
+    reward_output_index: u32,
+    executor_hash: [u8; 32],
+    controlled_output_indices: &[u32],
+) -> WitnessArgs {
+    let mut request = Vec::with_capacity(38 + controlled_output_indices.len() * 4);
+    request.push(mode);
+    request.extend_from_slice(&reward_output_index.to_le_bytes());
+    request.extend_from_slice(&executor_hash);
+    request.push(
+        controlled_output_indices
+            .len()
+            .try_into()
+            .expect("fixture output count"),
+    );
+    for index in controlled_output_indices {
+        request.extend_from_slice(&index.to_le_bytes());
+    }
+    WitnessArgs::new_builder()
+        .input_type(Some(Bytes::from(request)).pack())
+        .build()
+}
+
 pub fn job_data(
     cancel_lock_hash: [u8; 32],
     policy_script_hash: [u8; 32],

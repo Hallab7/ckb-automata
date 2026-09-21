@@ -189,12 +189,13 @@ fn validate_execution(
         return Err(ScriptError::CapacityNotConserved);
     }
     validate_value_conservation(&job, controlled_output_indices)?;
-    validate_one_shot_termination(&job, job_lock_hash)
+    validate_successor(&job, job_lock_hash, controlled_output_indices)
 }
 
-fn validate_one_shot_termination(
+fn validate_successor(
     job: &JobDataV1,
     job_lock_hash: [u8; 32],
+    controlled_output_indices: &[usize],
 ) -> Result<(), ScriptError> {
     let mut runs_bytes = [0_u8; 4];
     runs_bytes.copy_from_slice(job.remaining_runs().as_slice());
@@ -202,13 +203,136 @@ fn validate_one_shot_termination(
     if remaining_runs == 0 {
         return Err(ScriptError::InvalidData);
     }
-    if remaining_runs == 1
-        && QueryIter::new(load_cell_lock_hash, Source::Output)
+    if remaining_runs == 1 {
+        if QueryIter::new(load_cell_lock_hash, Source::Output)
             .any(|lock_hash| lock_hash == job_lock_hash)
+        {
+            return Err(ScriptError::SuccessorCountMismatch);
+        }
+        return Ok(());
+    }
+
+    validate_recurring_successor(
+        job,
+        job_lock_hash,
+        controlled_output_indices,
+        remaining_runs,
+    )
+}
+
+fn validate_recurring_successor(
+    job: &JobDataV1,
+    job_lock_hash: [u8; 32],
+    controlled_output_indices: &[usize],
+    remaining_runs: u32,
+) -> Result<(), ScriptError> {
+    let mut successor_index = None;
+    for (index, lock_hash) in QueryIter::new(load_cell_lock_hash, Source::Output).enumerate() {
+        if lock_hash == job_lock_hash {
+            if successor_index.is_some() {
+                return Err(ScriptError::SuccessorCountMismatch);
+            }
+            successor_index = Some(index);
+        }
+    }
+    let successor_index = successor_index.ok_or(ScriptError::SuccessorCountMismatch)?;
+    if !controlled_output_indices.contains(&successor_index) {
+        return Err(ScriptError::CapacityNotConserved);
+    }
+
+    let mut policy_hash = [0_u8; 32];
+    policy_hash.copy_from_slice(job.policy_script_hash().as_slice());
+    let successor_policy = load_cell_type_hash(successor_index, Source::Output)
+        .map_err(|_| ScriptError::PolicyHashMismatch)?
+        .ok_or(ScriptError::PolicyHashMismatch)?;
+    if successor_policy != policy_hash {
+        return Err(ScriptError::PolicyHashMismatch);
+    }
+    let successor_data =
+        load_cell_data(successor_index, Source::Output).map_err(|_| ScriptError::InvalidData)?;
+    let successor = JobDataV1::from_slice(&successor_data).map_err(|_| ScriptError::InvalidData)?;
+
+    for (input, output) in [
+        (job.version().as_slice(), successor.version().as_slice()),
+        (job.flags().as_slice(), successor.flags().as_slice()),
+        (job.job_id().as_slice(), successor.job_id().as_slice()),
+        (job.state().as_slice(), successor.state().as_slice()),
+        (
+            job.trigger_kind().as_slice(),
+            successor.trigger_kind().as_slice(),
+        ),
+        (
+            job.policy_script_hash().as_slice(),
+            successor.policy_script_hash().as_slice(),
+        ),
+        (
+            job.payload_hash().as_slice(),
+            successor.payload_hash().as_slice(),
+        ),
+        (job.reward().as_slice(), successor.reward().as_slice()),
+        (job.not_after().as_slice(), successor.not_after().as_slice()),
+        (
+            job.cancel_lock_hash().as_slice(),
+            successor.cancel_lock_hash().as_slice(),
+        ),
+    ] {
+        if input != output {
+            return Err(ScriptError::SuccessorInvariantMismatch);
+        }
+    }
+
+    let input_sequence = read_u64(job.sequence().as_slice());
+    let successor_sequence = read_u64(successor.sequence().as_slice());
+    if input_sequence
+        .checked_add(1)
+        .ok_or(ScriptError::ArithmeticOverflow)?
+        != successor_sequence
     {
-        return Err(ScriptError::SuccessorCountMismatch);
+        return Err(ScriptError::SequenceMismatch);
+    }
+    if read_u32(successor.remaining_runs().as_slice()) != remaining_runs - 1 {
+        return Err(ScriptError::RunsIncrease);
+    }
+    let input_budget = read_u64(job.remaining_budget().as_slice());
+    let successor_budget = read_u64(successor.remaining_budget().as_slice());
+    if successor_budget >= input_budget {
+        return Err(ScriptError::BudgetIncrease);
+    }
+
+    let trigger_kind = read_u16(job.trigger_kind().as_slice());
+    let trigger_hash_changed =
+        successor.trigger_params_hash().as_slice() != job.trigger_params_hash().as_slice();
+    let lower_bound_advanced =
+        read_u64(successor.not_before().as_slice()) > read_u64(job.not_before().as_slice());
+    if !trigger_hash_changed || ((1..=3).contains(&trigger_kind) && !lower_bound_advanced) {
+        return Err(ScriptError::TriggerHashMismatch);
+    }
+
+    let successor_capacity = load_cell_capacity(successor_index, Source::Output)
+        .map_err(|_| ScriptError::CapacityNotConserved)?;
+    let successor_occupied = load_cell_occupied_capacity(successor_index, Source::Output)
+        .map_err(|_| ScriptError::CapacityNotConserved)?;
+    let successor_spendable = successor_capacity
+        .checked_sub(successor_occupied)
+        .ok_or(ScriptError::ArithmeticOverflow)?;
+    if successor_budget > successor_spendable
+        || read_u64(successor.reward().as_slice()) > successor_budget
+    {
+        return Err(ScriptError::CapacityNotConserved);
     }
     Ok(())
+}
+
+fn read_u16(bytes: &[u8]) -> u16 {
+    u16::from_le_bytes(bytes.try_into().expect("Molecule Uint16"))
+}
+
+fn read_u32(bytes: &[u8]) -> u32 {
+    u32::from_le_bytes(bytes.try_into().expect("Molecule Uint32"))
+}
+
+fn read_u64(bytes: &[u8]) -> u64 {
+    u64::from_le_bytes(bytes.try_into().expect("Molecule Uint64"))
 }
 
 fn validate_value_conservation(

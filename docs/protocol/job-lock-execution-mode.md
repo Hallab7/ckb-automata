@@ -47,6 +47,10 @@ terminal and recurring shapes.
 For a one-shot job, the [terminal rule](job-lock-one-shot.md) additionally
 forbids every output under the active Job Lock.
 
+For a recurring job, the
+[successor rule](job-lock-recurring-successor.md) requires exactly one
+constrained next Job Cell.
+
 The Job Cell's `remaining_budget` must fit above its occupied capacity, and the
 reward cannot exceed that budget. Every controlled output must itself meet its
 occupied capacity. All arithmetic is checked.
