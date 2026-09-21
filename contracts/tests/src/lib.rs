@@ -95,6 +95,9 @@ mod recurring_payload;
 mod recurring_payout;
 
 #[cfg(test)]
+mod recurring_final;
+
+#[cfg(test)]
 mod tests {
     use molecule::prelude::{Builder, Entity};
     use serde::Deserialize;
