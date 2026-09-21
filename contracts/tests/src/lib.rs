@@ -14,12 +14,16 @@ pub mod generated {
     include!("../../generated/job_v1.rs");
 }
 
+pub mod error_codes {
+    include!("../../shared/error_codes.rs");
+}
+
 #[cfg(test)]
 mod tests {
     use molecule::prelude::{Builder, Entity};
     use serde::Deserialize;
 
-    use super::{generated::JobDataV1, native_harness_ready};
+    use super::{error_codes::ScriptError, generated::JobDataV1, native_harness_ready};
 
     #[derive(Deserialize)]
     struct JobFixture {
@@ -59,6 +63,8 @@ mod tests {
     #[test]
     fn native_harness_compiles_and_runs() {
         assert!(native_harness_ready());
+        assert_eq!(i8::from(ScriptError::InvalidData), 10);
+        assert_eq!(i8::from(ScriptError::UnsupportedRecovery), 35);
     }
 
     #[test]
