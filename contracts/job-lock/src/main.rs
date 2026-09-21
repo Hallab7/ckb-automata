@@ -6,7 +6,8 @@ use ckb_std::{
     default_alloc, entry,
     high_level::{
         QueryIter, load_cell_capacity, load_cell_data, load_cell_lock_hash,
-        load_cell_occupied_capacity, load_cell_type_hash, load_script_hash, load_witness_args,
+        load_cell_occupied_capacity, load_cell_type_hash, load_input_since, load_script_hash,
+        load_witness_args,
     },
 };
 use molecule::prelude::Entity;
@@ -26,6 +27,10 @@ mod generated {
 
 mod error_codes {
     include!("../../shared/error_codes.rs");
+}
+
+mod trigger {
+    include!("../../shared/trigger.rs");
 }
 
 use error_codes::ScriptError;
@@ -150,6 +155,14 @@ fn validate_execution(
     controlled_output_indices: &[usize],
 ) -> Result<(), ScriptError> {
     let job = load_job()?;
+    let trigger_kind = read_u16(job.trigger_kind().as_slice());
+    let committed_since = read_u64(job.not_before().as_slice());
+    let actual_since =
+        load_input_since(0, Source::GroupInput).map_err(|_| ScriptError::InvalidSince)?;
+    if !trigger::validate_trigger_since(trigger_kind, committed_since, actual_since) {
+        return Err(ScriptError::InvalidSince);
+    }
+
     let mut committed_policy_hash = [0_u8; 32];
     committed_policy_hash.copy_from_slice(job.policy_script_hash().as_slice());
     let actual_policy_hash = load_cell_type_hash(0, Source::GroupInput)
@@ -300,11 +313,17 @@ fn validate_recurring_successor(
     }
 
     let trigger_kind = read_u16(job.trigger_kind().as_slice());
+    let successor_since = read_u64(successor.not_before().as_slice());
     let trigger_hash_changed =
         successor.trigger_params_hash().as_slice() != job.trigger_params_hash().as_slice();
-    let lower_bound_advanced =
-        read_u64(successor.not_before().as_slice()) > read_u64(job.not_before().as_slice());
-    if !trigger_hash_changed || ((1..=3).contains(&trigger_kind) && !lower_bound_advanced) {
+    let lower_bound_advanced = trigger::absolute_since_strictly_advances(
+        read_u64(job.not_before().as_slice()),
+        successor_since,
+    );
+    if !trigger::validate_trigger_since(trigger_kind, successor_since, successor_since)
+        || !trigger_hash_changed
+        || ((1..=3).contains(&trigger_kind) && !lower_bound_advanced)
+    {
         return Err(ScriptError::TriggerHashMismatch);
     }
 

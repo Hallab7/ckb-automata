@@ -24,6 +24,10 @@ pub mod job_identity {
     include!("../../shared/job_identity.rs");
 }
 
+pub mod trigger {
+    include!("../../shared/trigger.rs");
+}
+
 #[cfg(test)]
 mod execution_mode;
 
@@ -32,6 +36,9 @@ mod owner_mode;
 
 #[cfg(test)]
 mod recurring_successor;
+
+#[cfg(test)]
+mod trigger_validation;
 
 #[cfg(test)]
 mod tests {

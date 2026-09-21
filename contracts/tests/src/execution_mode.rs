@@ -42,6 +42,7 @@ enum Mutation {
     ZeroRuns,
     Mode,
     Identity,
+    SinceMismatch,
 }
 
 struct ExecutionCase {
@@ -165,8 +166,18 @@ fn build_execution_case(mutation: Mutation) -> ExecutionCase {
         &[0, 1, 2]
     };
 
+    let job_since = if matches!(mutation, Mutation::SinceMismatch) {
+        1
+    } else {
+        0
+    };
     let mut builder = TransactionBuilder::default()
-        .input(CellInput::new_builder().previous_output(job_cell).build())
+        .input(
+            CellInput::new_builder()
+                .since(job_since)
+                .previous_output(job_cell)
+                .build(),
+        )
         .input(
             CellInput::new_builder()
                 .previous_output(executor_cell)
@@ -285,6 +296,11 @@ fn changed_mode_fails() {
 #[test]
 fn changed_executor_identity_fails() {
     assert_script_error(Mutation::Identity, 30);
+}
+
+#[test]
+fn input_since_must_match_the_committed_lower_bound() {
+    assert_script_error(Mutation::SinceMismatch, 23);
 }
 
 #[test]
