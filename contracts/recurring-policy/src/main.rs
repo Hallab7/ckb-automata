@@ -132,6 +132,25 @@ fn validate_execution() -> Result<(), ScriptError> {
     if payout_count != 1 {
         return Err(ScriptError::InvalidApplicationState);
     }
+    let successor_data =
+        load_cell_data(0, Source::GroupOutput).map_err(|_| ScriptError::InvalidData)?;
+    let successor = JobDataV1::from_slice(&successor_data).map_err(|_| ScriptError::InvalidData)?;
+    let successor_sequence = read_u64(job.sequence().as_slice())
+        .checked_add(1)
+        .ok_or(ScriptError::ArithmeticOverflow)?;
+    let expected_successor = recurring::scheduled_block_lower_bound(
+        read_u64(payload.first_not_before().as_slice()),
+        successor_sequence,
+        read_u64(payload.interval_blocks().as_slice()),
+    )
+    .ok_or(ScriptError::ArithmeticOverflow)?;
+    if read_u64(successor.sequence().as_slice()) != successor_sequence
+        || read_u64(successor.not_before().as_slice()) != expected_successor
+        || successor.trigger_params_hash().as_slice()
+            != recurring::absolute_block_trigger_hash(expected_successor)
+    {
+        return Err(ScriptError::TriggerHashMismatch);
+    }
     Ok(())
 }
 
@@ -189,6 +208,14 @@ fn validate_intent(
         != total_runs as u64
     {
         return Err(ScriptError::InvalidData);
+    }
+    let expected_lower_bound = recurring::scheduled_block_lower_bound(first, sequence, interval)
+        .ok_or(ScriptError::ArithmeticOverflow)?;
+    if read_u64(job.not_before().as_slice()) != expected_lower_bound
+        || job.trigger_params_hash().as_slice()
+            != recurring::absolute_block_trigger_hash(expected_lower_bound)
+    {
+        return Err(ScriptError::TriggerHashMismatch);
     }
     Ok(payload)
 }

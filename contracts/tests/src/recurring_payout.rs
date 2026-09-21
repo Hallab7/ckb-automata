@@ -16,7 +16,7 @@ use crate::{
     },
     generated::JobDataV1,
     generated_recurring::RecurringPayloadV1,
-    recurring::recurring_payload_hash,
+    recurring::{absolute_block_trigger_hash, recurring_payload_hash},
 };
 
 const MAX_CYCLES: u64 = 30_000_000;
@@ -26,6 +26,7 @@ const REWARD: u64 = 10_000_000_000;
 const PAYOUT: u64 = 20_000_000_000;
 const FIRST_NOT_BEFORE: u64 = 500;
 const INTERVAL: u64 = 100;
+const MAX_ABSOLUTE_BLOCK: u64 = (1 << 56) - 1;
 const FEE: u64 = 1_000_000;
 
 #[derive(Clone, Copy)]
@@ -36,6 +37,9 @@ enum Mutation {
     WrongAsset,
     Early,
     Duplicate,
+    SkippedInterval,
+    Overflow,
+    ZeroInterval,
 }
 
 struct PayoutCase {
@@ -54,14 +58,24 @@ fn build_case(mutation: Mutation) -> PayoutCase {
     let owner_hash: [u8; 32] = owner.lock.calc_script_hash().unpack();
     let recipient_hash: [u8; 32] = recipient.lock.calc_script_hash().unpack();
     let policy_hash: [u8; 32] = recurring_policy.calc_script_hash().unpack();
+    let first_not_before = if matches!(mutation, Mutation::Overflow) {
+        MAX_ABSOLUTE_BLOCK - 50
+    } else {
+        FIRST_NOT_BEFORE
+    };
+    let interval = if matches!(mutation, Mutation::ZeroInterval) {
+        0
+    } else {
+        INTERVAL
+    };
 
     let payload = RecurringPayloadV1::new_builder()
         .version(1_u16.to_le_bytes())
         .owner_lock_hash(owner_hash)
         .recipient_lock_hash(recipient_hash)
         .amount(PAYOUT.to_le_bytes())
-        .interval_blocks(INTERVAL.to_le_bytes())
-        .first_not_before(FIRST_NOT_BEFORE.to_le_bytes())
+        .interval_blocks(interval.to_le_bytes())
+        .first_not_before(first_not_before.to_le_bytes())
         .total_runs(3_u32.to_le_bytes())
         .reward(REWARD.to_le_bytes())
         .final_refund_kind(0)
@@ -79,16 +93,24 @@ fn build_case(mutation: Mutation) -> PayoutCase {
     .expect("job data")
     .as_builder()
     .payload_hash(payload_hash)
-    .not_before(FIRST_NOT_BEFORE.to_le_bytes())
+    .trigger_params_hash(absolute_block_trigger_hash(first_not_before))
+    .not_before(first_not_before.to_le_bytes())
     .build()
     .as_bytes();
+    let successor_not_before = if matches!(mutation, Mutation::SkippedInterval) {
+        first_not_before + INTERVAL * 2
+    } else if matches!(mutation, Mutation::Overflow | Mutation::ZeroInterval) {
+        first_not_before + 1
+    } else {
+        first_not_before + INTERVAL
+    };
     let successor_data = JobDataV1::from_slice(&input_data)
         .expect("input job")
         .as_builder()
         .sequence(1_u64.to_le_bytes())
-        .trigger_params_hash([0x23; 32])
+        .trigger_params_hash(absolute_block_trigger_hash(successor_not_before))
         .remaining_budget(20_000_000_000_u64.to_le_bytes())
-        .not_before((FIRST_NOT_BEFORE + INTERVAL).to_le_bytes())
+        .not_before(successor_not_before.to_le_bytes())
         .remaining_runs(2_u32.to_le_bytes())
         .build()
         .as_bytes();
@@ -133,9 +155,9 @@ fn build_case(mutation: Mutation) -> PayoutCase {
     let successor_capacity =
         JOB_CAPACITY - REWARD - payout_capacity - if duplicate { PAYOUT } else { 0 };
     let input_since = if matches!(mutation, Mutation::Early) {
-        FIRST_NOT_BEFORE - 1
+        first_not_before - 1
     } else {
-        FIRST_NOT_BEFORE
+        first_not_before
     };
 
     let mut builder = TransactionBuilder::default()
@@ -238,4 +260,11 @@ fn recurring_policy_rejects_payout_discretion_and_early_execution() {
     assert_fails(Mutation::WrongAsset, 32);
     assert_fails(Mutation::Early, 23);
     assert_fails(Mutation::Duplicate, 32);
+}
+
+#[test]
+fn recurring_policy_rejects_rewritten_or_invalid_next_triggers() {
+    assert_fails(Mutation::SkippedInterval, 18);
+    assert_fails(Mutation::Overflow, 34);
+    assert_fails(Mutation::ZeroInterval, 10);
 }

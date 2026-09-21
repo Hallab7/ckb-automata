@@ -3,7 +3,10 @@ use serde::Deserialize;
 
 use crate::{
     generated_recurring::RecurringPayloadV1,
-    recurring::{recurring_payload_hash, valid_recurring_schedule},
+    recurring::{
+        absolute_block_trigger_hash, recurring_payload_hash, scheduled_block_lower_bound,
+        valid_recurring_schedule,
+    },
 };
 
 #[derive(Deserialize)]
@@ -81,4 +84,17 @@ fn recurring_schedule_rejects_invalid_boundaries() {
     assert!(!valid_recurring_schedule(1, 1, 1 << 56, 1, 0));
     assert!(!valid_recurring_schedule(1, 1, 1, 0, 0));
     assert!(!valid_recurring_schedule(1, 1, 1, 1, 1));
+}
+
+#[test]
+fn next_lower_bound_ignores_late_execution_height() {
+    assert_eq!(scheduled_block_lower_bound(500, 0, 100), Some(500));
+    assert_eq!(scheduled_block_lower_bound(500, 1, 100), Some(600));
+    assert_eq!(scheduled_block_lower_bound(500, 2, 100), Some(700));
+    assert_eq!(scheduled_block_lower_bound(500, 1, 0), None);
+    assert_eq!(scheduled_block_lower_bound((1 << 56) - 50, 1, 100), None);
+    assert_ne!(
+        absolute_block_trigger_hash(500),
+        absolute_block_trigger_hash(600)
+    );
 }
