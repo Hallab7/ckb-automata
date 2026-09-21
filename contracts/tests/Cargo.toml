@@ -10,6 +10,7 @@ rust-version.workspace = true
 path = "src/lib.rs"
 
 [dependencies]
+ckb-testtool.workspace = true
 molecule.workspace = true
 serde.workspace = true
 serde_json.workspace = true

@@ -2,6 +2,8 @@ pub fn native_harness_ready() -> bool {
     true
 }
 
+pub mod fixtures;
+
 #[allow(
     clippy::clone_on_copy,
     clippy::derivable_impls,
@@ -23,7 +25,15 @@ mod tests {
     use molecule::prelude::{Builder, Entity};
     use serde::Deserialize;
 
-    use super::{error_codes::ScriptError, generated::JobDataV1, native_harness_ready};
+    use super::{
+        error_codes::ScriptError,
+        fixtures::{executor_identity, golden_transaction},
+        generated::JobDataV1,
+        native_harness_ready,
+    };
+
+    const GOLDEN_TRANSACTION_HASH: &str =
+        "0xe21e7ae71e30551e43947e0430e239484f4dfb7ee1676e46a69f58fc5283ab50";
 
     #[derive(Deserialize)]
     struct JobFixture {
@@ -96,5 +106,19 @@ mod tests {
             .build();
 
         assert_eq!(encoded.as_slice(), decode_hex(&fixture.expected_hex));
+    }
+
+    #[test]
+    fn fixture_builders_are_deterministic() {
+        let first = golden_transaction();
+        let second = golden_transaction();
+        assert_eq!(first.data().as_slice(), second.data().as_slice());
+        assert_eq!(format!("{:#x}", first.hash()), GOLDEN_TRANSACTION_HASH);
+
+        let executor = executor_identity(0x55);
+        assert_eq!(
+            executor.lock.calc_script_hash().as_slice(),
+            executor.lock_hash
+        );
     }
 }
