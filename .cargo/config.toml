@@ -1,0 +1,6 @@
+[alias]
+build-contracts = "build --workspace --exclude automata-contract-tests --target riscv64imac-unknown-none-elf --release"
+test-native = "test -p automata-contract-tests"
+
+[build]
+target-dir = "target"

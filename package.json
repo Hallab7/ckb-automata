@@ -11,6 +11,9 @@
   "scripts": {
     "check:versions": "node scripts/check-versions.mjs",
     "check:workspace": "node scripts/check-workspace.mjs",
+    "contracts:build": "cargo build-contracts --locked",
+    "contracts:test": "cargo test-native --locked",
+    "contracts:check-reproducible": "node scripts/check-contract-build.mjs",
     "typecheck": "pnpm -r --if-present typecheck",
     "verify:workspace": "pnpm check:versions && pnpm check:workspace && pnpm typecheck"
   },

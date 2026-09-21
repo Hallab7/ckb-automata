@@ -20,6 +20,19 @@ Rustup reads `rust-toolchain.toml` and installs the pinned target. `.npmrc`
 rejects an incompatible Node or pnpm runtime and makes newly saved dependencies
 exact.
 
+The repository Cargo configuration provides these stable commands:
+
+```text
+cargo test-native --locked
+cargo build-contracts --locked
+npx --yes pnpm@12.5.1 contracts:check-reproducible
+```
+
+The first command runs the native contract harness. The second builds every
+script for the pinned RISC-V target in release mode. The reproducibility check
+builds into two isolated target directories and compares every binary by
+SHA-256.
+
 ## Install
 
 On Windows PowerShell and Linux shells, the repository install command is:
