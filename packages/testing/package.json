@@ -1,0 +1,22 @@
+{
+  "name": "@ckb-automata/testing",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@ckb-automata/adapters": "workspace:*",
+    "@ckb-automata/api-client": "workspace:*",
+    "@ckb-automata/ccc": "workspace:*",
+    "@ckb-automata/config": "workspace:*",
+    "@ckb-automata/core": "workspace:*",
+    "@ckb-automata/molecule": "workspace:*",
+    "@ckb-automata/ui": "workspace:*"
+  }
+}

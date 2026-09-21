@@ -173,6 +173,77 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
 
+  apps/api:
+    dependencies:
+      '@ckb-automata/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+    devDependencies:
+      '@ckb-automata/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
+
+  apps/executor:
+    dependencies:
+      '@ckb-automata/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+
+  apps/web:
+    dependencies:
+      '@ckb-automata/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+
+  packages/adapters:
+    dependencies:
+      '@ckb-automata/ccc':
+        specifier: workspace:*
+        version: link:../ccc
+      '@ckb-automata/core':
+        specifier: workspace:*
+        version: link:../core
+
+  packages/api-client: {}
+
+  packages/ccc:
+    dependencies:
+      '@ckb-automata/core':
+        specifier: workspace:*
+        version: link:../core
+
+  packages/config: {}
+
+  packages/core: {}
+
+  packages/molecule: {}
+
+  packages/testing:
+    devDependencies:
+      '@ckb-automata/adapters':
+        specifier: workspace:*
+        version: link:../adapters
+      '@ckb-automata/api-client':
+        specifier: workspace:*
+        version: link:../api-client
+      '@ckb-automata/ccc':
+        specifier: workspace:*
+        version: link:../ccc
+      '@ckb-automata/config':
+        specifier: workspace:*
+        version: link:../config
+      '@ckb-automata/core':
+        specifier: workspace:*
+        version: link:../core
+      '@ckb-automata/molecule':
+        specifier: workspace:*
+        version: link:../molecule
+      '@ckb-automata/ui':
+        specifier: workspace:*
+        version: link:../ui
+
+  packages/ui: {}
+
 packages:
 
   '@types/node@24.11.1':
