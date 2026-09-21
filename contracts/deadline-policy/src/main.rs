@@ -60,7 +60,7 @@ fn program_entry() -> Result<(), ScriptError> {
     let output_count = QueryIter::new(load_cell_capacity, Source::GroupOutput).count();
     match (input_count, output_count) {
         (0, 1) => validate_creation(),
-        (1, 0) => validate_success(),
+        (1, 0) => validate_finalization(),
         _ => Err(ScriptError::InvalidApplicationState),
     }
 }
@@ -89,7 +89,7 @@ fn validate_creation() -> Result<(), ScriptError> {
     Ok(())
 }
 
-fn validate_success() -> Result<(), ScriptError> {
+fn validate_finalization() -> Result<(), ScriptError> {
     let job_data = load_cell_data(0, Source::GroupInput).map_err(|_| ScriptError::InvalidData)?;
     let job = JobDataV1::from_slice(&job_data).map_err(|_| ScriptError::InvalidData)?;
     let expected_campaign_type = campaign_type_hash()?;
@@ -110,13 +110,33 @@ fn validate_success() -> Result<(), ScriptError> {
         CampaignDataV1::from_slice(&campaign_data).map_err(|_| ScriptError::InvalidData)?;
     if campaign.state().as_slice() != [0]
         || read_u64(job.not_before().as_slice()) != read_u64(campaign.deadline_since().as_slice())
-        || read_u64(campaign.pledged().as_slice()) < read_u64(campaign.target().as_slice())
     {
         return Err(ScriptError::InvalidApplicationState);
     }
 
     let mut success_lock_hash = [0_u8; 32];
     success_lock_hash.copy_from_slice(campaign.success_lock_hash().as_slice());
+    if read_u64(campaign.pledged().as_slice()) < read_u64(campaign.target().as_slice()) {
+        let mut refund_state_count = 0;
+        for (index, type_hash) in QueryIter::new(load_cell_type_hash, Source::Output).enumerate() {
+            if type_hash == Some(expected_campaign_type) {
+                let data = load_cell_data(index, Source::Output)
+                    .map_err(|_| ScriptError::InvalidApplicationState)?;
+                let output = CampaignDataV1::from_slice(&data)
+                    .map_err(|_| ScriptError::InvalidApplicationState)?;
+                if output.state().as_slice() != [2] {
+                    return Err(ScriptError::InvalidApplicationState);
+                }
+                refund_state_count += 1;
+            }
+        }
+        return if refund_state_count == 1 {
+            Ok(())
+        } else {
+            Err(ScriptError::InvalidApplicationState)
+        };
+    }
+
     let mut payout_count = 0;
     for (index, lock_hash) in QueryIter::new(load_cell_lock_hash, Source::Output).enumerate() {
         if lock_hash == success_lock_hash {

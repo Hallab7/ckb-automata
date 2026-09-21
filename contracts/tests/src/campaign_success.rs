@@ -24,6 +24,8 @@ const JOB_CAPACITY: u64 = 200_000_000_000;
 const EXECUTOR_CAPACITY: u64 = 20_000_000_000;
 const REWARD: u64 = 10_000_000_000;
 const PLEDGED: u64 = 20_000_000_000;
+const REFUND_ONE: u64 = 8_000_000_000;
+const REFUND_TWO: u64 = 12_000_000_000;
 const TARGET: u64 = 15_000_000_000;
 const DEADLINE: u64 = 42;
 const FEE: u64 = 1_000_000;
@@ -36,6 +38,14 @@ enum Mutation {
     WrongRecipient,
     RewardRedirect,
     ExtraSuccessOutput,
+    Refund,
+    RefundAtTarget,
+    RefundCommitment,
+    RefundState,
+    RefundWrongRecipient,
+    RefundAmount,
+    RefundOrder,
+    RefundMixed,
 }
 
 struct SuccessCase {
@@ -43,22 +53,31 @@ struct SuccessCase {
     transaction: TransactionView,
 }
 
-fn campaign_data(state: u8, target: u64, success_lock_hash: [u8; 32]) -> Bytes {
-    let mut records = Vec::with_capacity(76);
-    records.extend_from_slice(&[0x01; 32]);
-    records.extend_from_slice(&0_u32.to_le_bytes());
-    records.extend_from_slice(&[0x61; 32]);
-    records.extend_from_slice(&PLEDGED.to_le_bytes());
+fn refund_records(refund_hashes: [[u8; 32]; 2]) -> Vec<u8> {
+    let mut records = Vec::with_capacity(152);
+    for (seed, index, lock_hash, amount) in [
+        (0x01, 0_u32, refund_hashes[0], REFUND_ONE),
+        (0x02, 1_u32, refund_hashes[1], REFUND_TWO),
+    ] {
+        records.extend_from_slice(&[seed; 32]);
+        records.extend_from_slice(&index.to_le_bytes());
+        records.extend_from_slice(&lock_hash);
+        records.extend_from_slice(&amount.to_le_bytes());
+    }
+    records
+}
+
+fn campaign_data(state: u8, target: u64, success_lock_hash: [u8; 32], records: &[u8]) -> Bytes {
     CampaignDataV1::new_builder()
         .version(1_u16.to_le_bytes())
         .state(state)
         .campaign_id([0x11; 32])
         .pledged(PLEDGED.to_le_bytes())
-        .pledge_count(1_u32.to_le_bytes())
+        .pledge_count(2_u32.to_le_bytes())
         .target(target.to_le_bytes())
         .deadline_since(DEADLINE.to_le_bytes())
         .success_lock_hash(success_lock_hash)
-        .refund_commitment(refund_commitment(1, &records))
+        .refund_commitment(refund_commitment(2, records))
         .build()
         .as_bytes()
 }
@@ -99,14 +118,58 @@ fn build_success_case(mutation: Mutation) -> SuccessCase {
         .expect("campaign lock");
     let success_recipient = crate::fixtures::seeded_script(0x81, ScriptHashType::Type, &[0x82; 20]);
     let success_hash = success_recipient.calc_script_hash().unpack();
+    let refund_one = crate::fixtures::seeded_script(0x83, ScriptHashType::Type, &[0x84; 20]);
+    let refund_two = crate::fixtures::seeded_script(0x85, ScriptHashType::Type, &[0x86; 20]);
+    let records = refund_records([
+        refund_one.calc_script_hash().unpack(),
+        refund_two.calc_script_hash().unpack(),
+    ]);
 
-    let target = if matches!(mutation, Mutation::UnderTarget) {
+    let refund_attempt = matches!(
+        mutation,
+        Mutation::Refund
+            | Mutation::RefundAtTarget
+            | Mutation::RefundCommitment
+            | Mutation::RefundState
+            | Mutation::RefundWrongRecipient
+            | Mutation::RefundAmount
+            | Mutation::RefundOrder
+            | Mutation::RefundMixed
+    );
+    let target = if matches!(mutation, Mutation::RefundAtTarget) {
+        PLEDGED
+    } else if matches!(
+        mutation,
+        Mutation::UnderTarget
+            | Mutation::Refund
+            | Mutation::RefundCommitment
+            | Mutation::RefundState
+            | Mutation::RefundWrongRecipient
+            | Mutation::RefundAmount
+            | Mutation::RefundOrder
+            | Mutation::RefundMixed
+    ) {
         PLEDGED + 1
     } else {
         TARGET
     };
-    let input_campaign_data = campaign_data(0, target, success_hash);
-    let terminal_campaign_data = campaign_data(1, target, success_hash);
+    let input_campaign_data = campaign_data(0, target, success_hash, &records);
+    let terminal_state = if matches!(mutation, Mutation::RefundState) {
+        0
+    } else if refund_attempt {
+        2
+    } else {
+        1
+    };
+    let mut terminal_campaign_data = campaign_data(terminal_state, target, success_hash, &records);
+    if matches!(mutation, Mutation::RefundCommitment) {
+        terminal_campaign_data = CampaignDataV1::from_slice(&terminal_campaign_data)
+            .expect("terminal campaign data")
+            .as_builder()
+            .refund_commitment([0x99; 32])
+            .build()
+            .as_bytes();
+    }
     let empty_terminal = CellOutput::new_builder()
         .lock(campaign_lock.clone())
         .type_(Some(campaign_type.clone()).pack())
@@ -169,6 +232,11 @@ fn build_success_case(mutation: Mutation) -> SuccessCase {
     } else {
         0
     };
+    let mixed_capacity = if matches!(mutation, Mutation::RefundMixed) {
+        7_000_000_000
+    } else {
+        0
+    };
 
     let mut builder = TransactionBuilder::default()
         .input(
@@ -196,41 +264,116 @@ fn build_success_case(mutation: Mutation) -> SuccessCase {
         .output(
             CellOutput::new_builder()
                 .capacity(JOB_CAPACITY - REWARD)
-                .lock(owner.lock)
-                .build(),
-        )
-        .output(
-            CellOutput::new_builder()
-                .capacity(PLEDGED)
-                .lock(payout_lock)
-                .build(),
-        )
-        .output(
-            empty_terminal
-                .as_builder()
-                .capacity(terminal_capacity)
-                .build(),
-        )
-        .output(
-            CellOutput::new_builder()
-                .capacity(EXECUTOR_CAPACITY - FEE - extra_capacity)
-                .lock(executor.lock)
+                .lock(owner.lock.clone())
                 .build(),
         )
         .output_data(Bytes::new().pack())
-        .output_data(Bytes::new().pack())
-        .output_data(Bytes::new().pack())
-        .output_data(terminal_campaign_data.pack())
         .output_data(Bytes::new().pack());
-    if extra_capacity > 0 {
+    if refund_attempt {
+        let first_amount = if matches!(mutation, Mutation::RefundAmount) {
+            REFUND_ONE + 1
+        } else {
+            REFUND_ONE
+        };
+        let second_amount = if matches!(mutation, Mutation::RefundAmount) {
+            REFUND_TWO - 1
+        } else {
+            REFUND_TWO
+        };
+        let first_lock = if matches!(mutation, Mutation::RefundWrongRecipient) {
+            owner.lock.clone()
+        } else {
+            refund_one.clone()
+        };
+        if matches!(mutation, Mutation::RefundOrder) {
+            builder = builder
+                .output(
+                    CellOutput::new_builder()
+                        .capacity(second_amount)
+                        .lock(refund_two.clone())
+                        .build(),
+                )
+                .output(
+                    CellOutput::new_builder()
+                        .capacity(first_amount)
+                        .lock(first_lock)
+                        .build(),
+                );
+        } else {
+            builder = builder
+                .output(
+                    CellOutput::new_builder()
+                        .capacity(first_amount)
+                        .lock(first_lock)
+                        .build(),
+                )
+                .output(
+                    CellOutput::new_builder()
+                        .capacity(second_amount)
+                        .lock(refund_two.clone())
+                        .build(),
+                );
+        }
+        builder = builder
+            .output(
+                empty_terminal
+                    .as_builder()
+                    .capacity(terminal_capacity)
+                    .build(),
+            )
+            .output(
+                CellOutput::new_builder()
+                    .capacity(EXECUTOR_CAPACITY - FEE - mixed_capacity)
+                    .lock(executor.lock)
+                    .build(),
+            )
+            .output_data(Bytes::new().pack())
+            .output_data(Bytes::new().pack())
+            .output_data(terminal_campaign_data.pack())
+            .output_data(Bytes::new().pack());
+        if mixed_capacity > 0 {
+            builder = builder
+                .output(
+                    CellOutput::new_builder()
+                        .capacity(mixed_capacity)
+                        .lock(success_recipient)
+                        .build(),
+                )
+                .output_data(Bytes::new().pack());
+        }
+    } else {
         builder = builder
             .output(
                 CellOutput::new_builder()
-                    .capacity(extra_capacity)
-                    .lock(success_recipient)
+                    .capacity(PLEDGED)
+                    .lock(payout_lock)
                     .build(),
             )
+            .output(
+                empty_terminal
+                    .as_builder()
+                    .capacity(terminal_capacity)
+                    .build(),
+            )
+            .output(
+                CellOutput::new_builder()
+                    .capacity(EXECUTOR_CAPACITY - FEE - extra_capacity)
+                    .lock(executor.lock)
+                    .build(),
+            )
+            .output_data(Bytes::new().pack())
+            .output_data(terminal_campaign_data.pack())
             .output_data(Bytes::new().pack());
+        if extra_capacity > 0 {
+            builder = builder
+                .output(
+                    CellOutput::new_builder()
+                        .capacity(extra_capacity)
+                        .lock(success_recipient)
+                        .build(),
+                )
+                .output_data(Bytes::new().pack());
+        }
     }
 
     let transaction = builder
@@ -240,7 +383,13 @@ fn build_success_case(mutation: Mutation) -> SuccessCase {
                 .pack(),
         )
         .witness(WitnessArgs::default().as_bytes().pack())
-        .witness(WitnessArgs::default().as_bytes().pack())
+        .witness(
+            WitnessArgs::new_builder()
+                .input_type(Some(Bytes::from(records)).pack())
+                .build()
+                .as_bytes()
+                .pack(),
+        )
         .cell_dep(executor.data_dep)
         .build();
     let transaction = context.complete_tx(transaction);
@@ -283,4 +432,24 @@ fn success_finalization_binds_both_recipients_and_output_count() {
     assert_fails(Mutation::WrongRecipient, 32);
     assert_fails(Mutation::RewardRedirect, 30);
     assert_fails(Mutation::ExtraSuccessOutput, 32);
+}
+
+#[test]
+fn under_target_campaign_enters_the_committed_refund_state() {
+    verify(&build_success_case(Mutation::Refund)).expect("valid refund-state transition");
+}
+
+#[test]
+fn refund_state_rejects_target_boundary_and_mutated_commitments() {
+    assert_fails(Mutation::RefundAtTarget, 32);
+    assert_fails(Mutation::RefundCommitment, 25);
+    assert_fails(Mutation::RefundState, 32);
+}
+
+#[test]
+fn refund_outputs_are_bound_to_committed_recipient_amount_and_order() {
+    assert_fails(Mutation::RefundWrongRecipient, 32);
+    assert_fails(Mutation::RefundAmount, 32);
+    assert_fails(Mutation::RefundOrder, 32);
+    assert_fails(Mutation::RefundMixed, 32);
 }

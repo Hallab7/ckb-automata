@@ -7,7 +7,7 @@ use ckb_std::{
     high_level::{
         QueryIter, load_cell_capacity, load_cell_data, load_cell_lock_hash,
         load_cell_occupied_capacity, load_cell_type_hash, load_input_since, load_script,
-        load_witness_args,
+        load_script_hash, load_witness_args,
     },
 };
 use molecule::prelude::Entity;
@@ -52,7 +52,7 @@ fn program_entry() -> Result<(), ScriptError> {
     let output_count = QueryIter::new(load_cell_capacity, Source::GroupOutput).count();
     match (input_count, output_count) {
         (0, 1) => validate_creation(),
-        (1, 1) => validate_success_transition(),
+        (1, 1) => validate_transition(),
         _ => Err(ScriptError::InvalidApplicationState),
     }
 }
@@ -124,21 +124,14 @@ fn validate_creation() -> Result<(), ScriptError> {
     Ok(())
 }
 
-fn validate_success_transition() -> Result<(), ScriptError> {
+fn validate_transition() -> Result<(), ScriptError> {
     let input_data = load_cell_data(0, Source::GroupInput).map_err(|_| ScriptError::InvalidData)?;
     let output_data =
         load_cell_data(0, Source::GroupOutput).map_err(|_| ScriptError::InvalidData)?;
     let input = CampaignDataV1::from_slice(&input_data).map_err(|_| ScriptError::InvalidData)?;
     let output = CampaignDataV1::from_slice(&output_data).map_err(|_| ScriptError::InvalidData)?;
 
-    if input.state().as_slice() != [0] || output.state().as_slice() != [1] {
-        return Err(ScriptError::InvalidApplicationState);
-    }
-    if campaign::determine_campaign_outcome(
-        read_u64(input.pledged().as_slice()),
-        read_u64(input.target().as_slice()),
-    ) != Some(campaign::CampaignStateMarker::Succeeded)
-    {
+    if input.state().as_slice() != [0] || !matches!(output.state().as_slice(), [1] | [2]) {
         return Err(ScriptError::InvalidApplicationState);
     }
     for (before, after) in [
@@ -186,6 +179,96 @@ fn validate_success_transition() -> Result<(), ScriptError> {
         return Err(ScriptError::InvalidApplicationState);
     }
 
+    let outcome = campaign::determine_campaign_outcome(
+        read_u64(input.pledged().as_slice()),
+        read_u64(input.target().as_slice()),
+    )
+    .ok_or(ScriptError::InvalidApplicationState)?;
+    let input_capacity =
+        load_cell_capacity(0, Source::GroupInput).map_err(|_| ScriptError::InvalidData)?;
+    let terminal_capacity =
+        load_cell_capacity(0, Source::GroupOutput).map_err(|_| ScriptError::InvalidData)?;
+    if output.state().as_slice() == [2] {
+        if outcome != campaign::CampaignStateMarker::Refunding {
+            return Err(ScriptError::InvalidApplicationState);
+        }
+
+        let witness = load_witness_args(0, Source::GroupInput)
+            .map_err(|_| ScriptError::PayloadHashMismatch)?;
+        let records = witness
+            .input_type()
+            .to_opt()
+            .ok_or(ScriptError::PayloadHashMismatch)?
+            .raw_data();
+        let pledge_count = read_u32(input.pledge_count().as_slice());
+        let pledged = read_u64(input.pledged().as_slice());
+        if !campaign::validate_refund_records(
+            &records,
+            pledge_count,
+            pledged,
+            input.refund_commitment().as_slice(),
+        ) {
+            return Err(ScriptError::PayloadHashMismatch);
+        }
+
+        let script_hash = load_script_hash().map_err(|_| ScriptError::InvalidData)?;
+        let terminal_index = QueryIter::new(load_cell_type_hash, Source::Output)
+            .position(|type_hash| type_hash == Some(script_hash))
+            .ok_or(ScriptError::InvalidApplicationState)?;
+        let refund_start = terminal_index
+            .checked_sub(pledge_count as usize)
+            .ok_or(ScriptError::InvalidApplicationState)?;
+        let mut expected_success_refunds = 0_usize;
+        for (offset, record) in records
+            .chunks_exact(campaign::PLEDGE_RECORD_SIZE)
+            .enumerate()
+        {
+            let output_index = refund_start + offset;
+            let expected_lock_hash = &record[36..68];
+            let expected_amount = read_u64(&record[68..76]);
+            let lock_hash = load_cell_lock_hash(output_index, Source::Output)
+                .map_err(|_| ScriptError::InvalidApplicationState)?;
+            let capacity = load_cell_capacity(output_index, Source::Output)
+                .map_err(|_| ScriptError::InvalidApplicationState)?;
+            let type_hash = load_cell_type_hash(output_index, Source::Output)
+                .map_err(|_| ScriptError::InvalidApplicationState)?;
+            let data = load_cell_data(output_index, Source::Output)
+                .map_err(|_| ScriptError::InvalidApplicationState)?;
+            if lock_hash.as_slice() != expected_lock_hash
+                || capacity != expected_amount
+                || type_hash.is_some()
+                || !data.is_empty()
+            {
+                return Err(ScriptError::InvalidApplicationState);
+            }
+            if expected_lock_hash == success_lock_hash {
+                expected_success_refunds += 1;
+            }
+        }
+        if QueryIter::new(load_cell_lock_hash, Source::Output)
+            .filter(|lock_hash| *lock_hash == success_lock_hash)
+            .count()
+            != expected_success_refunds
+        {
+            return Err(ScriptError::InvalidApplicationState);
+        }
+
+        let terminal_occupied = load_cell_occupied_capacity(0, Source::GroupOutput)
+            .map_err(|_| ScriptError::InvalidData)?;
+        if terminal_capacity != terminal_occupied
+            || input_capacity
+                != terminal_capacity
+                    .checked_add(pledged)
+                    .ok_or(ScriptError::ArithmeticOverflow)?
+        {
+            return Err(ScriptError::CapacityNotConserved);
+        }
+        return Ok(());
+    }
+    if outcome != campaign::CampaignStateMarker::Succeeded {
+        return Err(ScriptError::InvalidApplicationState);
+    }
+
     let mut payout_index = None;
     for (index, lock_hash) in QueryIter::new(load_cell_lock_hash, Source::Output).enumerate() {
         if lock_hash == success_lock_hash {
@@ -209,10 +292,6 @@ fn validate_success_transition() -> Result<(), ScriptError> {
         return Err(ScriptError::InvalidApplicationState);
     }
 
-    let input_capacity =
-        load_cell_capacity(0, Source::GroupInput).map_err(|_| ScriptError::InvalidData)?;
-    let terminal_capacity =
-        load_cell_capacity(0, Source::GroupOutput).map_err(|_| ScriptError::InvalidData)?;
     let terminal_occupied = load_cell_occupied_capacity(0, Source::GroupOutput)
         .map_err(|_| ScriptError::InvalidData)?;
     if terminal_capacity != terminal_occupied
