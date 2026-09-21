@@ -1,1 +1,8 @@
-export const CONFIG_PACKAGE_READY = true;
+export {
+  AUTOMATA_ENV_KEYS,
+  ENVIRONMENT_PROFILES,
+  EnvironmentSchema,
+  parseEnvironment,
+  type AutomataEnvironment,
+  type EnvironmentProfile,
+} from "./environment.ts";
