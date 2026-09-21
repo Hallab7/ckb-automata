@@ -8,8 +8,8 @@ Job Lock V1 reserves two one-byte witness modes in the first group input's
 | `1`   | Cancel    |
 | `2`   | Recover   |
 
-Both modes are owner-authorized exits and remain separate from the 37-byte
-[execution request](job-lock-execution-mode.md).
+Both modes are owner-authorized exits and remain separate from the variable
+length [execution request](job-lock-execution-mode.md).
 
 ## Authorization
 

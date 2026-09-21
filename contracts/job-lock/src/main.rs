@@ -5,8 +5,8 @@ use ckb_std::{
     ckb_constants::Source,
     default_alloc, entry,
     high_level::{
-        QueryIter, load_cell_capacity, load_cell_data, load_cell_lock_hash, load_cell_type_hash,
-        load_script_hash, load_witness_args,
+        QueryIter, load_cell_capacity, load_cell_data, load_cell_lock_hash,
+        load_cell_occupied_capacity, load_cell_type_hash, load_script_hash, load_witness_args,
     },
 };
 use molecule::prelude::Entity;
@@ -36,9 +36,12 @@ default_alloc!();
 
 const MODE_CANCEL: u8 = 1;
 const MODE_RECOVER: u8 = 2;
+const MAX_CONTROLLED_OUTPUTS: usize = 16;
 
 enum Operation {
     Execute {
+        controlled_output_count: usize,
+        controlled_output_indices: [usize; MAX_CONTROLLED_OUTPUTS],
         reward_output_index: usize,
         executor_lock_hash: [u8; 32],
     },
@@ -56,9 +59,15 @@ fn main() -> i8 {
 fn program_entry() -> Result<(), ScriptError> {
     match load_operation()? {
         Operation::Execute {
+            controlled_output_count,
+            controlled_output_indices,
             reward_output_index,
             executor_lock_hash,
-        } => validate_execution(reward_output_index, executor_lock_hash),
+        } => validate_execution(
+            reward_output_index,
+            executor_lock_hash,
+            &controlled_output_indices[..controlled_output_count],
+        ),
         Operation::Cancel | Operation::Recover => validate_owner_exit(),
     }
 }
@@ -74,12 +83,35 @@ fn load_operation() -> Result<Operation, ScriptError> {
     match bytes.as_ref() {
         [MODE_CANCEL] => Ok(Operation::Cancel),
         [MODE_RECOVER] => Ok(Operation::Recover),
-        execution if execution.len() == 37 && execution[0] == 0 => {
+        execution if execution.len() >= 38 && execution[0] == 0 => {
             let mut output_index = [0_u8; 4];
             output_index.copy_from_slice(&execution[1..5]);
             let mut executor_lock_hash = [0_u8; 32];
             executor_lock_hash.copy_from_slice(&execution[5..37]);
+            let controlled_output_count = execution[37] as usize;
+            if controlled_output_count == 0
+                || controlled_output_count > MAX_CONTROLLED_OUTPUTS
+                || execution.len() != 38 + controlled_output_count * 4
+            {
+                return Err(ScriptError::InvalidWitnessMode);
+            }
+            let mut controlled_output_indices = [0_usize; MAX_CONTROLLED_OUTPUTS];
+            for (position, chunk) in execution[38..].chunks_exact(4).enumerate() {
+                let mut index = [0_u8; 4];
+                index.copy_from_slice(chunk);
+                controlled_output_indices[position] = u32::from_le_bytes(index) as usize;
+            }
+            let controlled = &controlled_output_indices[..controlled_output_count];
+            if controlled
+                .iter()
+                .enumerate()
+                .any(|(position, index)| controlled[..position].contains(index))
+            {
+                return Err(ScriptError::InvalidWitnessMode);
+            }
             Ok(Operation::Execute {
+                controlled_output_count,
+                controlled_output_indices,
                 reward_output_index: u32::from_le_bytes(output_index) as usize,
                 executor_lock_hash,
             })
@@ -115,6 +147,7 @@ fn validate_owner_exit() -> Result<(), ScriptError> {
 fn validate_execution(
     reward_output_index: usize,
     executor_lock_hash: [u8; 32],
+    controlled_output_indices: &[usize],
 ) -> Result<(), ScriptError> {
     let job = load_job()?;
     let mut committed_policy_hash = [0_u8; 32];
@@ -151,6 +184,49 @@ fn validate_execution(
         .map_err(|_| ScriptError::RewardRecipientMismatch)?;
     if actual_recipient != executor_lock_hash || reward_type.is_some() || !reward_data.is_empty() {
         return Err(ScriptError::RewardRecipientMismatch);
+    }
+    if !controlled_output_indices.contains(&reward_output_index) {
+        return Err(ScriptError::CapacityNotConserved);
+    }
+    validate_value_conservation(&job, controlled_output_indices)
+}
+
+fn validate_value_conservation(
+    job: &JobDataV1,
+    controlled_output_indices: &[usize],
+) -> Result<(), ScriptError> {
+    let input_capacity =
+        load_cell_capacity(0, Source::GroupInput).map_err(|_| ScriptError::InvalidData)?;
+    let occupied_capacity =
+        load_cell_occupied_capacity(0, Source::GroupInput).map_err(|_| ScriptError::InvalidData)?;
+    let spendable_capacity = input_capacity
+        .checked_sub(occupied_capacity)
+        .ok_or(ScriptError::ArithmeticOverflow)?;
+    let mut budget_bytes = [0_u8; 8];
+    budget_bytes.copy_from_slice(job.remaining_budget().as_slice());
+    let remaining_budget = u64::from_le_bytes(budget_bytes);
+    let mut reward_bytes = [0_u8; 8];
+    reward_bytes.copy_from_slice(job.reward().as_slice());
+    let reward = u64::from_le_bytes(reward_bytes);
+    if remaining_budget > spendable_capacity || reward > remaining_budget {
+        return Err(ScriptError::CapacityNotConserved);
+    }
+
+    let mut controlled_capacity = 0_u64;
+    for index in controlled_output_indices {
+        let capacity = load_cell_capacity(*index, Source::Output)
+            .map_err(|_| ScriptError::CapacityNotConserved)?;
+        let occupied = load_cell_occupied_capacity(*index, Source::Output)
+            .map_err(|_| ScriptError::CapacityNotConserved)?;
+        if capacity < occupied {
+            return Err(ScriptError::CapacityNotConserved);
+        }
+        controlled_capacity = controlled_capacity
+            .checked_add(capacity)
+            .ok_or(ScriptError::ArithmeticOverflow)?;
+    }
+    if controlled_capacity != input_capacity {
+        return Err(ScriptError::CapacityNotConserved);
     }
     Ok(())
 }

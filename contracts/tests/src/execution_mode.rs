@@ -12,10 +12,13 @@ use ckb_testtool::{
 use crate::fixtures::{deployed_contract, job_data, secp_wallet, sign_single_secp_input};
 
 const MAX_CYCLES: u64 = 20_000_000;
-const JOB_CAPACITY: u64 = 30_000_000_000;
+const JOB_CAPACITY: u64 = 100_000_000_000;
 const EXECUTOR_CAPACITY: u64 = 20_000_000_000;
 const REWARD: u64 = 10_000_000_000;
+const APPLICATION_PAYOUT: u64 = 20_000_000_000;
+const OWNER_REFUND: u64 = JOB_CAPACITY - REWARD - APPLICATION_PAYOUT;
 const FEE: u64 = 1_000_000;
+const LEAKAGE: u64 = 7_000_000_000;
 
 #[derive(Clone, Copy)]
 enum Mutation {
@@ -23,6 +26,14 @@ enum Mutation {
     Policy,
     RewardAmount,
     RewardRecipient,
+    ApplicationAmount,
+    RefundAmount,
+    FeeChange,
+    Leakage,
+    MissingControlledOutput,
+    DuplicateControlledOutput,
+    BudgetExceedsSpendable,
+    RewardExceedsBudget,
     Mode,
     Identity,
 }
@@ -33,11 +44,25 @@ struct ExecutionCase {
     transaction: TransactionView,
 }
 
-fn execution_witness(mode: u8, reward_output_index: u32, executor_hash: [u8; 32]) -> WitnessArgs {
-    let mut request = Vec::with_capacity(37);
+fn execution_witness(
+    mode: u8,
+    reward_output_index: u32,
+    executor_hash: [u8; 32],
+    controlled_output_indices: &[u32],
+) -> WitnessArgs {
+    let mut request = Vec::with_capacity(38 + controlled_output_indices.len() * 4);
     request.push(mode);
     request.extend_from_slice(&reward_output_index.to_le_bytes());
     request.extend_from_slice(&executor_hash);
+    request.push(
+        controlled_output_indices
+            .len()
+            .try_into()
+            .expect("fixture output count"),
+    );
+    for index in controlled_output_indices {
+        request.extend_from_slice(&index.to_le_bytes());
+    }
     WitnessArgs::new_builder()
         .input_type(Some(Bytes::from(request)).pack())
         .build()
@@ -47,10 +72,11 @@ fn build_execution_case(mutation: Mutation) -> ExecutionCase {
     let mut context = Context::new_with_deterministic_rng();
     let job_lock = deployed_contract(&mut context, "job-lock");
     let executor = secp_wallet(&mut context, 3);
-    let other = secp_wallet(&mut context, 4);
+    let owner = secp_wallet(&mut context, 4);
+    let recipient = secp_wallet(&mut context, 5);
     let secp_data_dep = executor.data_dep.clone();
     let executor_hash = executor.lock.calc_script_hash().unpack();
-    let other_hash = other.lock.calc_script_hash().unpack();
+    let owner_hash = owner.lock.calc_script_hash().unpack();
 
     let policy_code = context.deploy_cell(ALWAYS_SUCCESS.clone());
     let policy = context
@@ -66,13 +92,26 @@ fn build_execution_case(mutation: Mutation) -> ExecutionCase {
     } else {
         actual_policy_hash
     };
+    let remaining_budget = if matches!(mutation, Mutation::BudgetExceedsSpendable) {
+        JOB_CAPACITY
+    } else if matches!(mutation, Mutation::RewardExceedsBudget) {
+        REWARD - 1
+    } else {
+        REWARD + APPLICATION_PAYOUT
+    };
     let job_cell = context.create_cell(
         CellOutput::new_builder()
             .capacity(JOB_CAPACITY)
             .lock(job_lock)
             .type_(Some(policy).pack())
             .build(),
-        job_data([0xaa; 32], committed_policy_hash, REWARD, REWARD, 1),
+        job_data(
+            owner_hash,
+            committed_policy_hash,
+            REWARD,
+            remaining_budget,
+            1,
+        ),
     );
     let executor_cell = context.create_cell(
         CellOutput::new_builder()
@@ -87,13 +126,30 @@ fn build_execution_case(mutation: Mutation) -> ExecutionCase {
     } else {
         REWARD
     };
+    let application_capacity = if matches!(mutation, Mutation::ApplicationAmount) {
+        APPLICATION_PAYOUT - 1
+    } else {
+        APPLICATION_PAYOUT
+    };
+    let refund_capacity = if matches!(mutation, Mutation::RefundAmount) {
+        OWNER_REFUND - 1
+    } else if matches!(mutation, Mutation::Leakage) {
+        OWNER_REFUND - LEAKAGE
+    } else {
+        OWNER_REFUND
+    };
+    let fee_change_capacity = if matches!(mutation, Mutation::FeeChange) {
+        EXECUTOR_CAPACITY - FEE - 1
+    } else {
+        EXECUTOR_CAPACITY - FEE
+    };
     let reward_lock = if matches!(mutation, Mutation::RewardRecipient | Mutation::Identity) {
-        other.lock.clone()
+        owner.lock.clone()
     } else {
         executor.lock.clone()
     };
     let committed_executor = if matches!(mutation, Mutation::Identity) {
-        other_hash
+        owner_hash
     } else {
         executor_hash
     };
@@ -102,8 +158,15 @@ fn build_execution_case(mutation: Mutation) -> ExecutionCase {
     } else {
         0
     };
+    let controlled_outputs: &[u32] = if matches!(mutation, Mutation::MissingControlledOutput) {
+        &[0, 1]
+    } else if matches!(mutation, Mutation::DuplicateControlledOutput) {
+        &[0, 1, 1, 2]
+    } else {
+        &[0, 1, 2]
+    };
 
-    let transaction = TransactionBuilder::default()
+    let mut builder = TransactionBuilder::default()
         .input(CellInput::new_builder().previous_output(job_cell).build())
         .input(
             CellInput::new_builder()
@@ -118,14 +181,39 @@ fn build_execution_case(mutation: Mutation) -> ExecutionCase {
         )
         .output(
             CellOutput::new_builder()
-                .capacity(EXECUTOR_CAPACITY - FEE)
+                .capacity(application_capacity)
+                .lock(recipient.lock)
+                .build(),
+        )
+        .output(
+            CellOutput::new_builder()
+                .capacity(refund_capacity)
+                .lock(owner.lock.clone())
+                .build(),
+        )
+        .output(
+            CellOutput::new_builder()
+                .capacity(fee_change_capacity)
                 .lock(executor.lock)
                 .build(),
         )
         .output_data(Bytes::new().pack())
         .output_data(Bytes::new().pack())
+        .output_data(Bytes::new().pack())
+        .output_data(Bytes::new().pack());
+    if matches!(mutation, Mutation::Leakage) {
+        builder = builder
+            .output(
+                CellOutput::new_builder()
+                    .capacity(LEAKAGE)
+                    .lock(owner.lock.clone())
+                    .build(),
+            )
+            .output_data(Bytes::new().pack());
+    }
+    let transaction = builder
         .witness(
-            execution_witness(mode, 0, committed_executor)
+            execution_witness(mode, 0, committed_executor, controlled_outputs)
                 .as_bytes()
                 .pack(),
         )
@@ -136,7 +224,7 @@ fn build_execution_case(mutation: Mutation) -> ExecutionCase {
     let transaction = sign_single_secp_input(transaction, 1, &executor.key);
     ExecutionCase {
         context,
-        other_lock: other.lock,
+        other_lock: owner.lock,
         transaction,
     }
 }
@@ -187,6 +275,31 @@ fn changed_mode_fails() {
 #[test]
 fn changed_executor_identity_fails() {
     assert_script_error(Mutation::Identity, 30);
+}
+
+#[test]
+fn every_job_controlled_capacity_is_conserved() {
+    assert_script_error(Mutation::ApplicationAmount, 28);
+    assert_script_error(Mutation::RefundAmount, 28);
+    assert_script_error(Mutation::MissingControlledOutput, 28);
+    assert_script_error(Mutation::DuplicateControlledOutput, 15);
+}
+
+#[test]
+fn budget_must_fit_spendable_capacity_and_cover_reward() {
+    assert_script_error(Mutation::BudgetExceedsSpendable, 28);
+    assert_script_error(Mutation::RewardExceedsBudget, 28);
+}
+
+#[test]
+fn uncommitted_output_cannot_receive_job_value() {
+    assert_script_error(Mutation::Leakage, 28);
+}
+
+#[test]
+fn executor_fee_change_is_separate_from_job_value() {
+    let execution = build_execution_case(Mutation::FeeChange);
+    verify(&execution).expect("executor may pay an additional fee from its own input");
 }
 
 #[test]
