@@ -36,6 +36,7 @@ name = "automata-contract-tests"
 version = "0.0.0"
 dependencies = [
  "ckb-hash",
+ "ckb-system-scripts",
  "ckb-testtool",
  "molecule",
  "serde",
@@ -53,6 +54,10 @@ version = "0.0.0"
 [[package]]
 name = "automata-job-lock"
 version = "0.0.0"
+dependencies = [
+ "ckb-std",
+ "molecule",
+]
 
 [[package]]
 name = "automata-recurring-policy"
@@ -136,6 +141,12 @@ checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
 dependencies = [
  "generic-array",
 ]
+
+[[package]]
+name = "buddy-alloc"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee741d62dcaf41ca303576ef890989ccb01d5dd77f8ce1a6d6c7846ab5d09efb"
 
 [[package]]
 name = "bumpalo"
@@ -479,6 +490,19 @@ dependencies = [
  "faster-hex",
  "serde",
  "tokio",
+]
+
+[[package]]
+name = "ckb-std"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7defadecfc39d5a25cddf11d86308130d745262f8f006bd9f602e7c968596460"
+dependencies = [
+ "buddy-alloc",
+ "cc",
+ "ckb-gen-types",
+ "gcd",
+ "int-enum",
 ]
 
 [[package]]
@@ -848,6 +872,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "gcd"
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d758ba1b47b00caf47f24925c0074ecb20d6dfcffe7f6d53395c0465674841a"
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -988,6 +1018,18 @@ dependencies = [
  "flate2",
  "phf_codegen",
  "walkdir",
+]
+
+[[package]]
+name = "int-enum"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e366a1634cccc76b4cfd3e7580de9b605e4d93f1edac48d786c1f867c0def495"
+dependencies = [
+ "proc-macro2",
+ "proc-macro2-diagnostics",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -1275,6 +1317,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "proc-macro2-diagnostics"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af066a9c399a26e020ada66a034357a868728e72cd426f3adcd35f80d88d88c8"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+ "version_check",
 ]
 
 [[package]]
