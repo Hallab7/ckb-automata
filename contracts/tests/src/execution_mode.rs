@@ -166,7 +166,7 @@ fn build_execution_case(mutation: Mutation) -> ExecutionCase {
         executor_hash
     };
     let mode = if matches!(mutation, Mutation::Mode) {
-        3
+        4
     } else {
         0
     };

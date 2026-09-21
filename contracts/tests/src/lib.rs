@@ -41,6 +41,9 @@ mod recurring_successor;
 mod trigger_validation;
 
 #[cfg(test)]
+mod top_up;
+
+#[cfg(test)]
 mod tests {
     use molecule::prelude::{Builder, Entity};
     use serde::Deserialize;
