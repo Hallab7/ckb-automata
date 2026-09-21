@@ -1,0 +1,112 @@
+name: Foundation
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: foundation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  install:
+    name: install
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up workspace
+        uses: ./.github/actions/setup-node-workspace
+      - name: Validate version pins
+        run: npm exec --yes --package=pnpm@12.5.1 -- pnpm check:versions
+      - name: Validate workspace links
+        run: npm exec --yes --package=pnpm@12.5.1 -- pnpm check:workspace
+
+  lint:
+    name: lint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+      - name: Set up workspace
+        uses: ./.github/actions/setup-node-workspace
+      - name: Set up Rust
+        uses: ./.github/actions/setup-rust
+      - name: Run linters
+        run: npm exec --yes --package=pnpm@12.5.1 -- pnpm lint
+      - name: Check formatting
+        run: npm exec --yes --package=pnpm@12.5.1 -- pnpm format:check
+      - name: Check pushed commit subject
+        if: github.event_name == 'push'
+        run: npm exec --yes --package=pnpm@12.5.1 -- pnpm commit:check
+      - name: Check pull request commit subjects
+        if: github.event_name == 'pull_request'
+        run: npm exec --yes --package=pnpm@12.5.1 -- pnpm commit:check --range "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up workspace
+        uses: ./.github/actions/setup-node-workspace
+      - name: Check TypeScript
+        run: npm exec --yes --package=pnpm@12.5.1 -- pnpm typecheck
+
+  unit-test:
+    name: unit-test
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up workspace
+        uses: ./.github/actions/setup-node-workspace
+      - name: Run unit tests
+        run: npm exec --yes --package=pnpm@12.5.1 -- pnpm test
+
+  contract-build:
+    name: contract-build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up workspace
+        uses: ./.github/actions/setup-node-workspace
+      - name: Set up Rust
+        uses: ./.github/actions/setup-rust
+      - name: Build contracts
+        run: npm exec --yes --package=pnpm@12.5.1 -- pnpm contracts:build
+      - name: Verify reproducible binaries
+        run: npm exec --yes --package=pnpm@12.5.1 -- pnpm contracts:check-reproducible
+      - name: Upload contract binaries
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: contract-binaries-${{ github.sha }}
+          path: |
+            target/riscv64imac-unknown-none-elf/release/job-lock
+            target/riscv64imac-unknown-none-elf/release/deadline-policy
+            target/riscv64imac-unknown-none-elf/release/recurring-policy
+            target/riscv64imac-unknown-none-elf/release/demo-campaign-type
+          if-no-files-found: error
+          retention-days: 14
+
+  contract-test:
+    name: contract-test
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up workspace
+        uses: ./.github/actions/setup-node-workspace
+      - name: Set up Rust
+        uses: ./.github/actions/setup-rust
+      - name: Run contract tests
+        run: npm exec --yes --package=pnpm@12.5.1 -- pnpm contracts:test

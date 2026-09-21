@@ -1,0 +1,32 @@
+name: Set up Node workspace
+description: Install the pinned Node and pnpm toolchain with a lock-keyed store cache
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+      with:
+        node-version-file: .node-version
+        check-latest: false
+
+    - name: Verify pnpm version
+      shell: bash
+      run: npm exec --yes --package=pnpm@12.5.1 -- pnpm --version
+
+    - name: Resolve pnpm store
+      id: pnpm-store
+      shell: bash
+      run: echo "path=$(npm exec --yes --package=pnpm@12.5.1 -- pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+    - name: Restore pnpm store
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+      with:
+        path: ${{ steps.pnpm-store.outputs.path }}
+        key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: |
+          pnpm-${{ runner.os }}-
+
+    - name: Install workspace dependencies
+      shell: bash
+      run: npm exec --yes --package=pnpm@12.5.1 -- pnpm install --frozen-lockfile
