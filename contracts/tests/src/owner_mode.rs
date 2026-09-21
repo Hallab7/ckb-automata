@@ -1,18 +1,23 @@
-use crate::fixtures::{deployed_contract, job_data, secp_wallet, sign_single_secp_input};
+use crate::fixtures::{
+    deployed_contract, execution_witness, job_data, secp_wallet, sign_single_secp_input,
+};
 use ckb_testtool::{
+    builtin::ALWAYS_SUCCESS,
     ckb_crypto::secp::Privkey,
     ckb_types::{
         bytes::Bytes,
-        core::{TransactionBuilder, TransactionView},
-        packed::{CellInput, CellOutput, WitnessArgs},
+        core::{ScriptHashType, TransactionBuilder, TransactionView},
+        packed::{CellInput, CellOutput, Script, WitnessArgs},
         prelude::*,
     },
     context::Context,
 };
 
 const MAX_CYCLES: u64 = 20_000_000;
-const JOB_CAPACITY: u64 = 30_000_000_000;
+const JOB_CAPACITY: u64 = 200_000_000_000;
 const OWNER_CAPACITY: u64 = 20_000_000_000;
+const REWARD: u64 = 10_000_000_000;
+const REMAINING_BUDGET: u64 = 30_000_000_000;
 const FEE: u64 = 1_000_000;
 
 #[derive(Clone, Copy)]
@@ -34,6 +39,7 @@ impl OwnerOperation {
 
 struct OwnerCase {
     context: Context,
+    job_lock: Script,
     transaction: TransactionView,
     owner_key: Privkey,
 }
@@ -43,6 +49,24 @@ fn build_owner_case(
     include_owner_input: bool,
     commit_wrong_owner: bool,
     alter_refund: bool,
+) -> OwnerCase {
+    build_owner_case_with_job(
+        operation,
+        include_owner_input,
+        commit_wrong_owner,
+        alter_refund,
+        1,
+        false,
+    )
+}
+
+fn build_owner_case_with_job(
+    operation: OwnerOperation,
+    include_owner_input: bool,
+    commit_wrong_owner: bool,
+    alter_refund: bool,
+    remaining_runs: u32,
+    commit_wrong_policy: bool,
 ) -> OwnerCase {
     let mut context = Context::new_with_deterministic_rng();
     let job_lock = deployed_contract(&mut context, "job-lock");
@@ -57,13 +81,33 @@ fn build_owner_case(
         owner_lock.clone()
     };
     let cancel_lock_hash = committed_lock.calc_script_hash().unpack();
+    let policy_code = context.deploy_cell(ALWAYS_SUCCESS.clone());
+    let policy = context
+        .build_script_with_hash_type(
+            &policy_code,
+            ScriptHashType::Data1,
+            Bytes::from(vec![0x55; 32]),
+        )
+        .expect("policy script");
+    let policy_hash = if commit_wrong_policy {
+        [0x99; 32]
+    } else {
+        policy.calc_script_hash().unpack()
+    };
 
     let job_cell = context.create_cell(
         CellOutput::new_builder()
             .capacity(JOB_CAPACITY)
-            .lock(job_lock)
+            .lock(job_lock.clone())
+            .type_(Some(policy).pack())
             .build(),
-        job_data(cancel_lock_hash, [0x33; 32], 100_000_000, 1_000_000_000, 1),
+        job_data(
+            cancel_lock_hash,
+            policy_hash,
+            REWARD,
+            REMAINING_BUDGET,
+            remaining_runs,
+        ),
     );
 
     let mut builder = TransactionBuilder::default()
@@ -114,6 +158,7 @@ fn build_owner_case(
     let transaction = context.complete_tx(builder.cell_dep(secp_data_dep).build());
     OwnerCase {
         context,
+        job_lock,
         transaction,
         owner_key,
     }
@@ -136,6 +181,30 @@ fn valid_owner_cancellation_succeeds() {
         ..owner_case
     })
     .expect("valid cancellation");
+}
+
+#[test]
+fn recurring_live_job_can_be_cancelled_without_a_successor() {
+    let owner_case =
+        build_owner_case_with_job(OwnerOperation::Cancel, true, false, false, 3, false);
+    let transaction = sign_single_secp_input(owner_case.transaction, 1, &owner_case.owner_key);
+    verify_owner_case(OwnerCase {
+        transaction,
+        ..owner_case
+    })
+    .expect("valid recurring cancellation");
+}
+
+#[test]
+fn cancellation_requires_the_committed_policy() {
+    let owner_case = build_owner_case_with_job(OwnerOperation::Cancel, true, false, false, 1, true);
+    let transaction = sign_single_secp_input(owner_case.transaction, 1, &owner_case.owner_key);
+    let error = verify_owner_case(OwnerCase {
+        transaction,
+        ..owner_case
+    })
+    .expect_err("mismatched policy commitment must fail");
+    assert!(error.contains("17"), "unexpected error: {error}");
 }
 
 #[test]
@@ -190,15 +259,131 @@ fn invalid_wallet_signature_fails() {
 }
 
 #[test]
-fn altered_refund_fails() {
+fn cancellation_cannot_divert_job_capacity_to_an_executor_reward() {
     let owner_case = build_owner_case(OwnerOperation::Cancel, true, false, true);
     let transaction = sign_single_secp_input(owner_case.transaction, 1, &owner_case.owner_key);
     let error = verify_owner_case(OwnerCase {
         transaction,
         ..owner_case
     })
-    .expect_err("altered refund must fail");
+    .expect_err("job-funded cancellation reward must fail");
     assert!(error.contains("28"), "unexpected error: {error}");
+}
+
+#[test]
+fn cancellation_cannot_create_a_future_job() {
+    let mut owner_case = build_owner_case(OwnerOperation::Cancel, true, false, false);
+    let successor_capacity = 7_000_000_000;
+    let mut outputs: Vec<_> = owner_case.transaction.outputs().into_iter().collect();
+    let owner_change: u64 = outputs[1].capacity().unpack();
+    outputs[1] = outputs[1]
+        .clone()
+        .as_builder()
+        .capacity(owner_change - successor_capacity)
+        .build();
+    outputs.push(
+        CellOutput::new_builder()
+            .capacity(successor_capacity)
+            .lock(owner_case.job_lock.clone())
+            .build(),
+    );
+    let mut outputs_data: Vec<_> = owner_case.transaction.outputs_data().into_iter().collect();
+    outputs_data.push(Bytes::new().pack());
+    owner_case.transaction = owner_case
+        .transaction
+        .as_advanced_builder()
+        .set_outputs(outputs)
+        .set_outputs_data(outputs_data)
+        .build();
+    owner_case.transaction =
+        sign_single_secp_input(owner_case.transaction, 1, &owner_case.owner_key);
+
+    let error = verify_owner_case(owner_case).expect_err("cancellation successor must fail");
+    assert!(error.contains("24"), "unexpected error: {error}");
+}
+
+#[test]
+fn cancellation_and_execution_race_for_the_same_job_outpoint() {
+    let OwnerCase {
+        mut context,
+        transaction,
+        owner_key,
+        ..
+    } = build_owner_case(OwnerOperation::Cancel, true, false, false);
+    let cancellation = sign_single_secp_input(transaction, 1, &owner_key);
+    let job_out_point = cancellation
+        .inputs()
+        .get(0)
+        .expect("job input")
+        .previous_output();
+    let owner_lock = cancellation.outputs().get(0).expect("owner refund").lock();
+
+    let executor = secp_wallet(&mut context, 8);
+    let executor_hash = executor.lock.calc_script_hash().unpack();
+    let executor_cell = context.create_cell(
+        CellOutput::new_builder()
+            .capacity(OWNER_CAPACITY)
+            .lock(executor.lock.clone())
+            .build(),
+        Bytes::new(),
+    );
+    let execution = TransactionBuilder::default()
+        .input(
+            CellInput::new_builder()
+                .previous_output(job_out_point.clone())
+                .build(),
+        )
+        .input(
+            CellInput::new_builder()
+                .previous_output(executor_cell)
+                .build(),
+        )
+        .output(
+            CellOutput::new_builder()
+                .capacity(REWARD)
+                .lock(executor.lock.clone())
+                .build(),
+        )
+        .output(
+            CellOutput::new_builder()
+                .capacity(JOB_CAPACITY - REWARD)
+                .lock(owner_lock)
+                .build(),
+        )
+        .output(
+            CellOutput::new_builder()
+                .capacity(OWNER_CAPACITY - FEE)
+                .lock(executor.lock)
+                .build(),
+        )
+        .output_data(Bytes::new().pack())
+        .output_data(Bytes::new().pack())
+        .output_data(Bytes::new().pack())
+        .witness(
+            execution_witness(0, 0, executor_hash, &[0, 1])
+                .as_bytes()
+                .pack(),
+        )
+        .witness(WitnessArgs::default().as_bytes().pack())
+        .cell_dep(executor.data_dep)
+        .build();
+    let execution = context.complete_tx(execution);
+    let execution = sign_single_secp_input(execution, 1, &executor.key);
+
+    assert_eq!(
+        job_out_point,
+        execution
+            .inputs()
+            .get(0)
+            .expect("competing job input")
+            .previous_output()
+    );
+    context
+        .verify_tx(&cancellation, MAX_CYCLES)
+        .expect("valid cancellation contender");
+    context
+        .verify_tx(&execution, MAX_CYCLES)
+        .expect("valid execution contender");
 }
 
 #[test]

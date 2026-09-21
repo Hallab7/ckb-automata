@@ -73,7 +73,8 @@ fn program_entry() -> Result<(), ScriptError> {
             executor_lock_hash,
             &controlled_output_indices[..controlled_output_count],
         ),
-        Operation::Cancel | Operation::Recover => validate_owner_exit(),
+        Operation::Cancel => validate_cancellation(),
+        Operation::Recover => validate_recovery(),
     }
 }
 
@@ -133,8 +134,29 @@ fn load_job() -> Result<JobDataV1, ScriptError> {
     JobDataV1::from_slice(&data).map_err(|_| ScriptError::InvalidData)
 }
 
-fn validate_owner_exit() -> Result<(), ScriptError> {
+fn validate_cancellation() -> Result<(), ScriptError> {
     let job = load_job()?;
+    validate_supported_live_job(&job)?;
+    validate_policy_commitment(&job)?;
+    let cancel_lock_hash = validate_owner_authorization(&job)?;
+
+    let job_lock_hash = load_script_hash().map_err(|_| ScriptError::InvalidData)?;
+    if QueryIter::new(load_cell_lock_hash, Source::Output)
+        .any(|lock_hash| lock_hash == job_lock_hash)
+    {
+        return Err(ScriptError::SuccessorCountMismatch);
+    }
+
+    validate_refund(cancel_lock_hash)
+}
+
+fn validate_recovery() -> Result<(), ScriptError> {
+    let job = load_job()?;
+    let cancel_lock_hash = validate_owner_authorization(&job)?;
+    validate_refund(cancel_lock_hash)
+}
+
+fn validate_owner_authorization(job: &JobDataV1) -> Result<[u8; 32], ScriptError> {
     let mut cancel_lock_hash = [0_u8; 32];
     cancel_lock_hash.copy_from_slice(job.cancel_lock_hash().as_slice());
 
@@ -146,7 +168,38 @@ fn validate_owner_exit() -> Result<(), ScriptError> {
         return Err(ScriptError::MissingOwnerAuthorization);
     }
 
-    validate_refund(cancel_lock_hash)
+    Ok(cancel_lock_hash)
+}
+
+fn validate_supported_live_job(job: &JobDataV1) -> Result<(), ScriptError> {
+    if read_u16(job.version().as_slice()) != 1 {
+        return Err(ScriptError::UnsupportedVersion);
+    }
+    if read_u16(job.flags().as_slice()) != 0 {
+        return Err(ScriptError::ReservedFlags);
+    }
+    if job.state().as_slice() != [0] {
+        return Err(ScriptError::InvalidState);
+    }
+    if !(1..=6).contains(&read_u16(job.trigger_kind().as_slice())) {
+        return Err(ScriptError::UnsupportedTrigger);
+    }
+    if read_u32(job.remaining_runs().as_slice()) == 0 {
+        return Err(ScriptError::InvalidData);
+    }
+    Ok(())
+}
+
+fn validate_policy_commitment(job: &JobDataV1) -> Result<(), ScriptError> {
+    let mut committed_policy_hash = [0_u8; 32];
+    committed_policy_hash.copy_from_slice(job.policy_script_hash().as_slice());
+    let actual_policy_hash = load_cell_type_hash(0, Source::GroupInput)
+        .map_err(|_| ScriptError::PolicyHashMismatch)?
+        .ok_or(ScriptError::PolicyHashMismatch)?;
+    if actual_policy_hash != committed_policy_hash {
+        return Err(ScriptError::PolicyHashMismatch);
+    }
+    Ok(())
 }
 
 fn validate_execution(
@@ -163,14 +216,7 @@ fn validate_execution(
         return Err(ScriptError::InvalidSince);
     }
 
-    let mut committed_policy_hash = [0_u8; 32];
-    committed_policy_hash.copy_from_slice(job.policy_script_hash().as_slice());
-    let actual_policy_hash = load_cell_type_hash(0, Source::GroupInput)
-        .map_err(|_| ScriptError::PolicyHashMismatch)?
-        .ok_or(ScriptError::PolicyHashMismatch)?;
-    if actual_policy_hash != committed_policy_hash {
-        return Err(ScriptError::PolicyHashMismatch);
-    }
+    validate_policy_commitment(&job)?;
 
     let job_lock_hash = load_script_hash().map_err(|_| ScriptError::InvalidData)?;
     if executor_lock_hash == job_lock_hash
