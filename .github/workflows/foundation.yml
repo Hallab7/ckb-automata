@@ -43,6 +43,8 @@ jobs:
         run: npm exec --yes --package=pnpm@12.5.1 -- pnpm lint
       - name: Check formatting
         run: npm exec --yes --package=pnpm@12.5.1 -- pnpm format:check
+      - name: Check repository secrets
+        run: npm exec --yes --package=pnpm@12.5.1 -- pnpm secrets:check
       - name: Check pushed commit subject
         if: github.event_name == 'push'
         run: npm exec --yes --package=pnpm@12.5.1 -- pnpm commit:check

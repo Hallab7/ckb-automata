@@ -27,9 +27,10 @@
     "lint:ts": "oxlint --deny-warnings .",
     "quality": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm commit:check",
     "quality:self-test": "node scripts/check-quality-failures.mjs",
+    "secrets:check": "node scripts/check-secrets.mjs",
     "test": "node --test scripts/*.test.mjs && pnpm -r --if-present test",
     "typecheck": "pnpm -r --if-present typecheck",
-    "verify": "pnpm check:versions && pnpm check:workspace && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm contracts:build && pnpm contracts:test",
+    "verify": "pnpm check:versions && pnpm check:workspace && pnpm secrets:check && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm contracts:build && pnpm contracts:test",
     "verify:workspace": "pnpm check:versions && pnpm check:workspace && pnpm typecheck"
   },
   "devDependencies": {

@@ -65,3 +65,14 @@ test("unrelated process values do not enter the parsed configuration", () => {
   });
   assert.equal("PATH" in result, false);
 });
+
+test("user signing material fails startup validation", () => {
+  assert.throws(
+    () =>
+      parseEnvironment({
+        ...validEnvironment("local"),
+        USER_SEED_PHRASE: "never accepted",
+      }),
+    /USER_SEED_PHRASE is forbidden/,
+  );
+});

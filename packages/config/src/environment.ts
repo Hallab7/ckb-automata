@@ -15,6 +15,13 @@ export const AUTOMATA_ENV_KEYS = [
   "PUBLIC_APP_ORIGIN",
 ] as const;
 
+export const FORBIDDEN_USER_SECRET_KEYS = [
+  "USER_MNEMONIC",
+  "USER_PRIVATE_KEY",
+  "USER_SEED_PHRASE",
+  "WALLET_EXPORT",
+] as const;
+
 const commonFields = {
   CKB_GENESIS_HASH: z.string().regex(/^0x[a-fA-F0-9]{64}$/, "must be a 32-byte hexadecimal hash"),
   CKB_INDEXER_URL: z.url(),
@@ -65,6 +72,11 @@ export type AutomataEnvironment = z.infer<typeof EnvironmentSchema>;
 export function parseEnvironment(
   input: Readonly<Record<string, string | undefined>>,
 ): AutomataEnvironment {
+  const forbiddenKey = FORBIDDEN_USER_SECRET_KEYS.find((key) => Boolean(input[key]?.trim()));
+  if (forbiddenKey) {
+    throw new Error(`${forbiddenKey} is forbidden in application processes`);
+  }
+
   const candidate = Object.fromEntries(AUTOMATA_ENV_KEYS.map((key) => [key, input[key]]));
   return EnvironmentSchema.parse(candidate);
 }
