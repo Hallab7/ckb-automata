@@ -9,6 +9,7 @@ use ckb_testtool::{
     context::Context,
 };
 use molecule::prelude::{Builder, Entity};
+use proptest::prelude::*;
 
 use crate::{
     fixtures::{
@@ -48,6 +49,10 @@ struct PayoutCase {
 }
 
 fn build_case(mutation: Mutation) -> PayoutCase {
+    build_case_with_executor_extra(mutation, 0)
+}
+
+fn build_case_with_executor_extra(mutation: Mutation, executor_extra: u64) -> PayoutCase {
     let mut context = Context::new_with_deterministic_rng();
     let job_lock = deployed_contract(&mut context, "job-lock");
     let recurring_policy = deployed_contract(&mut context, "recurring-policy");
@@ -125,7 +130,7 @@ fn build_case(mutation: Mutation) -> PayoutCase {
     );
     let executor_cell = context.create_cell(
         CellOutput::new_builder()
-            .capacity(EXECUTOR_CAPACITY)
+            .capacity(EXECUTOR_CAPACITY + executor_extra)
             .lock(executor.lock.clone())
             .build(),
         Bytes::new(),
@@ -207,7 +212,7 @@ fn build_case(mutation: Mutation) -> PayoutCase {
         )
         .output(
             CellOutput::new_builder()
-                .capacity(EXECUTOR_CAPACITY - FEE)
+                .capacity(EXECUTOR_CAPACITY + executor_extra - FEE)
                 .lock(executor.lock)
                 .build(),
         )
@@ -267,4 +272,26 @@ fn recurring_policy_rejects_rewritten_or_invalid_next_triggers() {
     assert_fails(Mutation::SkippedInterval, 18);
     assert_fails(Mutation::Overflow, 34);
     assert_fails(Mutation::ZeroInterval, 10);
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(16))]
+
+    #[test]
+    fn generated_valid_executor_funding_keeps_the_job_valid(executor_extra in 0_u64..1_000_000_000) {
+        let case = build_case_with_executor_extra(Mutation::None, executor_extra);
+        prop_assert!(verify(&case).is_ok());
+    }
+
+    #[test]
+    fn generated_payout_mutation_classes_are_rejected(selector in 0_u8..3) {
+        let mutation = match selector {
+            0 => Mutation::WrongRecipient,
+            1 => Mutation::WrongAmount,
+            _ => Mutation::Duplicate,
+        };
+        let case = build_case(mutation);
+        let error = verify(&case).expect_err("generated payout mutation must fail");
+        prop_assert!(error.contains("32"), "unexpected error: {error}");
+    }
 }

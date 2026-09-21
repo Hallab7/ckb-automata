@@ -9,6 +9,7 @@ use ckb_testtool::{
     context::Context,
 };
 use molecule::prelude::{Builder, Entity};
+use proptest::prelude::*;
 
 use crate::{
     fixtures::{
@@ -308,4 +309,27 @@ fn successor_advances_sequence_runs_budget_and_trigger() {
     assert_script_error(Mutation::Budget, 26);
     assert_script_error(Mutation::BudgetIncrease, 26);
     assert_script_error(Mutation::Trigger, 18);
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(32))]
+
+    #[test]
+    fn generated_successor_invariant_mutations_are_rejected(selector in 0_u8..10) {
+        let (mutation, code) = match selector {
+            0 => (Mutation::Uncontrolled, 28),
+            1 => (Mutation::Sequence, 21),
+            2 => (Mutation::Runs, 27),
+            3 => (Mutation::PolicyData, 25),
+            4 => (Mutation::PolicyType, 17),
+            5 => (Mutation::Payload, 25),
+            6 => (Mutation::Owner, 25),
+            7 => (Mutation::Reward, 25),
+            8 => (Mutation::Missing, 24),
+            _ => (Mutation::Multiple, 24),
+        };
+        let case = build_recurring_case(mutation);
+        let error = verify(&case).expect_err("generated invariant mutation must fail");
+        prop_assert!(error.contains(&code.to_string()), "unexpected error: {error}");
+    }
 }
