@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "deny",
+    "perf": "warn",
+    "suspicious": "deny"
+  },
+  "ignorePatterns": [
+    "**/.next/**",
+    "**/coverage/**",
+    "**/generated/**",
+    "**/node_modules/**",
+    "**/target/**"
+  ],
+  "rules": {
+    "no-await-in-loop": "allow"
+  }
+}

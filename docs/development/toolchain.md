@@ -6,11 +6,11 @@ manifests repeat the applicable values so their native tools enforce them.
 
 ## Required host tools
 
-| Tool | Version |
-| --- | --- |
-| Node.js | `24.11.1` |
-| pnpm | `12.5.1` |
-| Rust | `1.93.1` |
+| Tool        | Version                        |
+| ----------- | ------------------------------ |
+| Node.js     | `24.11.1`                      |
+| pnpm        | `12.5.1`                       |
+| Rust        | `1.93.1`                       |
 | Rust target | `riscv64imac-unknown-none-elf` |
 
 Use npm's exact-package runner to bootstrap the pnpm version from `package.json`.

@@ -1,17 +1,12 @@
 import { readFile } from "node:fs/promises";
 
 const root = new URL("../", import.meta.url);
-const packageManifest = JSON.parse(
-  await readFile(new URL("package.json", root), "utf8"),
-);
-const versions = JSON.parse(
-  await readFile(new URL("config/versions.json", root), "utf8"),
-);
+const packageManifest = JSON.parse(await readFile(new URL("package.json", root), "utf8"));
+const versions = JSON.parse(await readFile(new URL("config/versions.json", root), "utf8"));
 
 const failures = [];
 const exactSemver = /^\d+\.\d+\.\d+$/;
-const digestImage =
-  /^[^\s]+:\d+(?:\.\d+){1,2}[^\s]*@sha256:[a-f0-9]{64}$/;
+const digestImage = /^[^\s]+:\d+(?:\.\d+){1,2}[^\s]*@sha256:[a-f0-9]{64}$/;
 
 for (const [name, version] of Object.entries(versions.directDependencies)) {
   if (!exactSemver.test(version)) {
@@ -48,9 +43,7 @@ if (packageManifest.engines.pnpm !== versions.toolchain.pnpm) {
 }
 
 if (process.versions.node !== versions.toolchain.node) {
-  failures.push(
-    `running Node ${process.versions.node} does not match ${versions.toolchain.node}`,
-  );
+  failures.push(`running Node ${process.versions.node} does not match ${versions.toolchain.node}`);
 }
 
 if (failures.length > 0) {

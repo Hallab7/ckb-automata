@@ -1,11 +1,13 @@
-pub const NATIVE_HARNESS_READY: bool = true;
+pub fn native_harness_ready() -> bool {
+    true
+}
 
 #[cfg(test)]
 mod tests {
-    use super::NATIVE_HARNESS_READY;
+    use super::native_harness_ready;
 
     #[test]
     fn native_harness_compiles_and_runs() {
-        assert!(NATIVE_HARNESS_READY);
+        assert!(native_harness_ready());
     }
 }

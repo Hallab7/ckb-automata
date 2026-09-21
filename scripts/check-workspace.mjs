@@ -12,12 +12,7 @@ const packageDirectories = [
   "packages/config",
   "packages/testing",
 ];
-const consumerDirectories = [
-  "apps/web",
-  "apps/api",
-  "apps/executor",
-  ...packageDirectories,
-];
+const consumerDirectories = ["apps/web", "apps/api", "apps/executor", ...packageDirectories];
 
 const manifests = new Map();
 for (const directory of consumerDirectories) {
@@ -56,9 +51,7 @@ for (const [packageName, directory] of expectedNames) {
 
   try {
     const requireFromConsumer = createRequire(consumer.manifestUrl);
-    const resolvedManifest = requireFromConsumer.resolve(
-      `${packageName}/package.json`,
-    );
+    const resolvedManifest = requireFromConsumer.resolve(`${packageName}/package.json`);
     await access(resolvedManifest);
   } catch (error) {
     failures.push(`${packageName} cannot be resolved by package name: ${error}`);
@@ -66,9 +59,7 @@ for (const [packageName, directory] of expectedNames) {
 }
 
 for (const [directory] of manifests) {
-  const tsconfig = JSON.parse(
-    await readFile(new URL(`${directory}/tsconfig.json`, root), "utf8"),
-  );
+  const tsconfig = JSON.parse(await readFile(new URL(`${directory}/tsconfig.json`, root), "utf8"));
   if (tsconfig.compilerOptions?.paths) {
     failures.push(`${directory} uses a source-path alias`);
   }

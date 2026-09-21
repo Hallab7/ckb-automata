@@ -1,0 +1,13 @@
+.next/
+coverage/
+node_modules/
+target/
+Cargo.lock
+pnpm-lock.yaml
+packages/api-client/src/generated/
+packages/molecule/src/generated/
+contracts/**/generated/
+CKB_AUTOMATA_FULL_PROJECT_DOCUMENTATION.md
+CKB_AUTOMATA_SUMMARY.md
+ckb-automata.md
+implementation.md

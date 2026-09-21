@@ -11,14 +11,27 @@
   "scripts": {
     "check:versions": "node scripts/check-versions.mjs",
     "check:workspace": "node scripts/check-workspace.mjs",
+    "commit:check": "node scripts/check-commit-message.mjs",
     "contracts:build": "cargo build-contracts --locked",
     "contracts:test": "cargo test-native --locked",
     "contracts:check-reproducible": "node scripts/check-contract-build.mjs",
+    "format": "prettier --write . && cargo fmt --all",
+    "format:check": "prettier --check . && cargo fmt --all --check",
+    "lint": "pnpm lint:js && pnpm lint:ts && pnpm lint:rust",
+    "lint:js": "eslint . --max-warnings 0",
+    "lint:rust": "cargo clippy -p automata-contract-tests --all-targets --locked -- -D warnings && cargo clippy --workspace --exclude automata-contract-tests --target riscv64imac-unknown-none-elf --release --locked -- -D warnings",
+    "lint:ts": "oxlint --deny-warnings .",
+    "quality": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm commit:check",
+    "quality:self-test": "node scripts/check-quality-failures.mjs",
     "typecheck": "pnpm -r --if-present typecheck",
     "verify:workspace": "pnpm check:versions && pnpm check:workspace && pnpm typecheck"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@types/node": "24.11.1",
+    "eslint": "10.11.0",
+    "oxlint": "1.85.0",
+    "prettier": "3.9.8",
     "typescript": "7.0.2"
   }
 }
