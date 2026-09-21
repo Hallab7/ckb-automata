@@ -188,7 +188,27 @@ fn validate_execution(
     if !controlled_output_indices.contains(&reward_output_index) {
         return Err(ScriptError::CapacityNotConserved);
     }
-    validate_value_conservation(&job, controlled_output_indices)
+    validate_value_conservation(&job, controlled_output_indices)?;
+    validate_one_shot_termination(&job, job_lock_hash)
+}
+
+fn validate_one_shot_termination(
+    job: &JobDataV1,
+    job_lock_hash: [u8; 32],
+) -> Result<(), ScriptError> {
+    let mut runs_bytes = [0_u8; 4];
+    runs_bytes.copy_from_slice(job.remaining_runs().as_slice());
+    let remaining_runs = u32::from_le_bytes(runs_bytes);
+    if remaining_runs == 0 {
+        return Err(ScriptError::InvalidData);
+    }
+    if remaining_runs == 1
+        && QueryIter::new(load_cell_lock_hash, Source::Output)
+            .any(|lock_hash| lock_hash == job_lock_hash)
+    {
+        return Err(ScriptError::SuccessorCountMismatch);
+    }
+    Ok(())
 }
 
 fn validate_value_conservation(

@@ -44,6 +44,9 @@ type script determines which application outputs are valid; the Job Lock owns
 the generic accounting boundary. Later lifecycle rules further constrain the
 terminal and recurring shapes.
 
+For a one-shot job, the [terminal rule](job-lock-one-shot.md) additionally
+forbids every output under the active Job Lock.
+
 The Job Cell's `remaining_budget` must fit above its occupied capacity, and the
 reward cannot exceed that budget. Every controlled output must itself meet its
 occupied capacity. All arithmetic is checked.

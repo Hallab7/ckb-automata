@@ -12,13 +12,14 @@ use ckb_testtool::{
 use crate::fixtures::{deployed_contract, job_data, secp_wallet, sign_single_secp_input};
 
 const MAX_CYCLES: u64 = 20_000_000;
-const JOB_CAPACITY: u64 = 100_000_000_000;
+const JOB_CAPACITY: u64 = 200_000_000_000;
 const EXECUTOR_CAPACITY: u64 = 20_000_000_000;
 const REWARD: u64 = 10_000_000_000;
 const APPLICATION_PAYOUT: u64 = 20_000_000_000;
 const OWNER_REFUND: u64 = JOB_CAPACITY - REWARD - APPLICATION_PAYOUT;
 const FEE: u64 = 1_000_000;
 const LEAKAGE: u64 = 7_000_000_000;
+const SUCCESSOR_CAPACITY: u64 = 50_000_000_000;
 
 #[derive(Clone, Copy)]
 enum Mutation {
@@ -34,6 +35,9 @@ enum Mutation {
     DuplicateControlledOutput,
     BudgetExceedsSpendable,
     RewardExceedsBudget,
+    OneSuccessor,
+    TwoSuccessors,
+    ZeroRuns,
     Mode,
     Identity,
 }
@@ -99,19 +103,25 @@ fn build_execution_case(mutation: Mutation) -> ExecutionCase {
     } else {
         REWARD + APPLICATION_PAYOUT
     };
+    let remaining_runs = if matches!(mutation, Mutation::ZeroRuns) {
+        0
+    } else {
+        1
+    };
+    let canonical_job_data = job_data(
+        owner_hash,
+        committed_policy_hash,
+        REWARD,
+        remaining_budget,
+        remaining_runs,
+    );
     let job_cell = context.create_cell(
         CellOutput::new_builder()
             .capacity(JOB_CAPACITY)
-            .lock(job_lock)
-            .type_(Some(policy).pack())
+            .lock(job_lock.clone())
+            .type_(Some(policy.clone()).pack())
             .build(),
-        job_data(
-            owner_hash,
-            committed_policy_hash,
-            REWARD,
-            remaining_budget,
-            1,
-        ),
+        canonical_job_data.clone(),
     );
     let executor_cell = context.create_cell(
         CellOutput::new_builder()
@@ -131,12 +141,19 @@ fn build_execution_case(mutation: Mutation) -> ExecutionCase {
     } else {
         APPLICATION_PAYOUT
     };
+    let successor_count = if matches!(mutation, Mutation::OneSuccessor) {
+        1
+    } else if matches!(mutation, Mutation::TwoSuccessors) {
+        2
+    } else {
+        0
+    };
     let refund_capacity = if matches!(mutation, Mutation::RefundAmount) {
         OWNER_REFUND - 1
     } else if matches!(mutation, Mutation::Leakage) {
         OWNER_REFUND - LEAKAGE
     } else {
-        OWNER_REFUND
+        OWNER_REFUND - SUCCESSOR_CAPACITY * successor_count
     };
     let fee_change_capacity = if matches!(mutation, Mutation::FeeChange) {
         EXECUTOR_CAPACITY - FEE - 1
@@ -162,6 +179,10 @@ fn build_execution_case(mutation: Mutation) -> ExecutionCase {
         &[0, 1]
     } else if matches!(mutation, Mutation::DuplicateControlledOutput) {
         &[0, 1, 1, 2]
+    } else if successor_count == 1 {
+        &[0, 1, 2, 4]
+    } else if successor_count == 2 {
+        &[0, 1, 2, 4, 5]
     } else {
         &[0, 1, 2]
     };
@@ -210,6 +231,17 @@ fn build_execution_case(mutation: Mutation) -> ExecutionCase {
                     .build(),
             )
             .output_data(Bytes::new().pack());
+    }
+    for _ in 0..successor_count {
+        builder = builder
+            .output(
+                CellOutput::new_builder()
+                    .capacity(SUCCESSOR_CAPACITY)
+                    .lock(job_lock.clone())
+                    .type_(Some(policy.clone()).pack())
+                    .build(),
+            )
+            .output_data(canonical_job_data.clone().pack());
     }
     let transaction = builder
         .witness(
@@ -289,6 +321,23 @@ fn every_job_controlled_capacity_is_conserved() {
 fn budget_must_fit_spendable_capacity_and_cover_reward() {
     assert_script_error(Mutation::BudgetExceedsSpendable, 28);
     assert_script_error(Mutation::RewardExceedsBudget, 28);
+}
+
+#[test]
+fn one_shot_accepts_zero_successors() {
+    let execution = build_execution_case(Mutation::None);
+    verify(&execution).expect("terminal execution without successor");
+}
+
+#[test]
+fn one_shot_rejects_one_or_multiple_successors() {
+    assert_script_error(Mutation::OneSuccessor, 24);
+    assert_script_error(Mutation::TwoSuccessors, 24);
+}
+
+#[test]
+fn zero_remaining_runs_is_invalid() {
+    assert_script_error(Mutation::ZeroRuns, 10);
 }
 
 #[test]
