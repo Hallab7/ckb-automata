@@ -11,3 +11,7 @@ name = "deadline-policy"
 path = "src/main.rs"
 bench = false
 test = false
+
+[dependencies]
+ckb-std.workspace = true
+molecule.workspace = true

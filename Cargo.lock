@@ -46,6 +46,10 @@ dependencies = [
 [[package]]
 name = "automata-deadline-policy"
 version = "0.0.0"
+dependencies = [
+ "ckb-std",
+ "molecule",
+]
 
 [[package]]
 name = "automata-demo-campaign-type"

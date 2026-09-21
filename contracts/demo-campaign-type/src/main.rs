@@ -5,7 +5,8 @@ use ckb_std::{
     ckb_constants::Source,
     default_alloc, entry,
     high_level::{
-        QueryIter, load_cell_capacity, load_cell_data, load_cell_occupied_capacity, load_script,
+        QueryIter, load_cell_capacity, load_cell_data, load_cell_lock_hash,
+        load_cell_occupied_capacity, load_cell_type_hash, load_input_since, load_script,
         load_witness_args,
     },
 };
@@ -49,10 +50,11 @@ fn main() -> i8 {
 fn program_entry() -> Result<(), ScriptError> {
     let input_count = QueryIter::new(load_cell_capacity, Source::GroupInput).count();
     let output_count = QueryIter::new(load_cell_capacity, Source::GroupOutput).count();
-    if input_count == 0 && output_count == 1 {
-        return validate_creation();
+    match (input_count, output_count) {
+        (0, 1) => validate_creation(),
+        (1, 1) => validate_success_transition(),
+        _ => Err(ScriptError::InvalidApplicationState),
     }
-    Err(ScriptError::InvalidApplicationState)
 }
 
 fn validate_creation() -> Result<(), ScriptError> {
@@ -87,6 +89,11 @@ fn validate_creation() -> Result<(), ScriptError> {
     if !campaign::is_absolute_block_deadline(deadline_since) {
         return Err(ScriptError::InvalidSince);
     }
+    let output_lock = load_cell_lock_hash(0, Source::GroupOutput)
+        .map_err(|_| ScriptError::InvalidApplicationState)?;
+    if output_lock == campaign.success_lock_hash().as_slice() {
+        return Err(ScriptError::InvalidApplicationState);
+    }
 
     let witness =
         load_witness_args(0, Source::Input).map_err(|_| ScriptError::PayloadHashMismatch)?;
@@ -112,6 +119,108 @@ fn validate_creation() -> Result<(), ScriptError> {
         .checked_sub(occupied)
         .ok_or(ScriptError::ArithmeticOverflow)?;
     if pledged != spendable {
+        return Err(ScriptError::CapacityNotConserved);
+    }
+    Ok(())
+}
+
+fn validate_success_transition() -> Result<(), ScriptError> {
+    let input_data = load_cell_data(0, Source::GroupInput).map_err(|_| ScriptError::InvalidData)?;
+    let output_data =
+        load_cell_data(0, Source::GroupOutput).map_err(|_| ScriptError::InvalidData)?;
+    let input = CampaignDataV1::from_slice(&input_data).map_err(|_| ScriptError::InvalidData)?;
+    let output = CampaignDataV1::from_slice(&output_data).map_err(|_| ScriptError::InvalidData)?;
+
+    if input.state().as_slice() != [0] || output.state().as_slice() != [1] {
+        return Err(ScriptError::InvalidApplicationState);
+    }
+    if campaign::determine_campaign_outcome(
+        read_u64(input.pledged().as_slice()),
+        read_u64(input.target().as_slice()),
+    ) != Some(campaign::CampaignStateMarker::Succeeded)
+    {
+        return Err(ScriptError::InvalidApplicationState);
+    }
+    for (before, after) in [
+        (input.version().as_slice(), output.version().as_slice()),
+        (
+            input.campaign_id().as_slice(),
+            output.campaign_id().as_slice(),
+        ),
+        (input.pledged().as_slice(), output.pledged().as_slice()),
+        (
+            input.pledge_count().as_slice(),
+            output.pledge_count().as_slice(),
+        ),
+        (input.target().as_slice(), output.target().as_slice()),
+        (
+            input.deadline_since().as_slice(),
+            output.deadline_since().as_slice(),
+        ),
+        (
+            input.success_lock_hash().as_slice(),
+            output.success_lock_hash().as_slice(),
+        ),
+        (
+            input.refund_commitment().as_slice(),
+            output.refund_commitment().as_slice(),
+        ),
+    ] {
+        if before != after {
+            return Err(ScriptError::SuccessorInvariantMismatch);
+        }
+    }
+
+    let deadline = read_u64(input.deadline_since().as_slice());
+    if !QueryIter::new(load_input_since, Source::Input).any(|since| since == deadline) {
+        return Err(ScriptError::NotYetEligible);
+    }
+
+    let input_lock = load_cell_lock_hash(0, Source::GroupInput)
+        .map_err(|_| ScriptError::InvalidApplicationState)?;
+    let output_lock = load_cell_lock_hash(0, Source::GroupOutput)
+        .map_err(|_| ScriptError::InvalidApplicationState)?;
+    let mut success_lock_hash = [0_u8; 32];
+    success_lock_hash.copy_from_slice(input.success_lock_hash().as_slice());
+    if input_lock != output_lock || input_lock == success_lock_hash {
+        return Err(ScriptError::InvalidApplicationState);
+    }
+
+    let mut payout_index = None;
+    for (index, lock_hash) in QueryIter::new(load_cell_lock_hash, Source::Output).enumerate() {
+        if lock_hash == success_lock_hash {
+            if payout_index.is_some() {
+                return Err(ScriptError::InvalidApplicationState);
+            }
+            payout_index = Some(index);
+        }
+    }
+    let payout_index = payout_index.ok_or(ScriptError::InvalidApplicationState)?;
+    let payout_capacity = load_cell_capacity(payout_index, Source::Output)
+        .map_err(|_| ScriptError::InvalidApplicationState)?;
+    let payout_type = load_cell_type_hash(payout_index, Source::Output)
+        .map_err(|_| ScriptError::InvalidApplicationState)?;
+    let payout_data = load_cell_data(payout_index, Source::Output)
+        .map_err(|_| ScriptError::InvalidApplicationState)?;
+    if payout_capacity != read_u64(input.pledged().as_slice())
+        || payout_type.is_some()
+        || !payout_data.is_empty()
+    {
+        return Err(ScriptError::InvalidApplicationState);
+    }
+
+    let input_capacity =
+        load_cell_capacity(0, Source::GroupInput).map_err(|_| ScriptError::InvalidData)?;
+    let terminal_capacity =
+        load_cell_capacity(0, Source::GroupOutput).map_err(|_| ScriptError::InvalidData)?;
+    let terminal_occupied = load_cell_occupied_capacity(0, Source::GroupOutput)
+        .map_err(|_| ScriptError::InvalidData)?;
+    if terminal_capacity != terminal_occupied
+        || input_capacity
+            != terminal_capacity
+                .checked_add(payout_capacity)
+                .ok_or(ScriptError::ArithmeticOverflow)?
+    {
         return Err(ScriptError::CapacityNotConserved);
     }
     Ok(())

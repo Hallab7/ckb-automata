@@ -21,7 +21,7 @@ const PLEDGED: u64 = 10_000_000_000;
 const CHANGE: u64 = 10_000_000_000;
 const FEE: u64 = 1_000_000;
 const CREATION_TRANSACTION_HASH: &str =
-    "0xe2ace56159597675a15cec774bde531b656b4ffe65e0652d1bafa6a37a10848e";
+    "0x79131790277064e4460c34b043e8ad5b3a2f9c95e62ca6f9ce0b936409d54a8c";
 
 #[derive(Clone, Copy)]
 enum Mutation {
