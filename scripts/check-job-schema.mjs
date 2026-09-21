@@ -49,7 +49,9 @@ for (const requiredRule of [
   "ckb-automata/trigger-params/v1",
   "ckb-automata/policy-payload/v1",
   "ckb-automata/job-id/v1",
-  "genesis hash binds identity",
+  "uint16_le(protocol_version)",
+  "Anchor tag 0 uses uint64_le(output_index); tag 1 uses a 32-byte Type ID",
+  "prevent cross-network and cross-version",
 ]) {
   assert.ok(content.includes(requiredRule), `missing schema rule: ${requiredRule}`);
 }

@@ -10,5 +10,8 @@
   "scripts": {
     "test": "node --test src/**/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@nervosnetwork/ckb-sdk-utils": "0.109.5"
   }
 }

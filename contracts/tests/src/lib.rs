@@ -20,6 +20,10 @@ pub mod error_codes {
     include!("../../shared/error_codes.rs");
 }
 
+pub mod job_identity {
+    include!("../../shared/job_identity.rs");
+}
+
 #[cfg(test)]
 mod tests {
     use molecule::prelude::{Builder, Entity};
@@ -29,6 +33,7 @@ mod tests {
         error_codes::ScriptError,
         fixtures::{executor_identity, golden_transaction},
         generated::JobDataV1,
+        job_identity::{CreationAnchor, derive_job_id},
         native_harness_ready,
     };
 
@@ -53,6 +58,23 @@ mod tests {
         remaining_runs: u32,
         cancel_lock_hash: String,
         expected_hex: String,
+    }
+
+    #[derive(Deserialize)]
+    struct JobIdentityAnchorFixture {
+        kind: String,
+        output_index: String,
+    }
+
+    #[derive(Deserialize)]
+    struct JobIdentityFixture {
+        genesis_hash: String,
+        protocol_version: u16,
+        creation_commitment: String,
+        anchor: JobIdentityAnchorFixture,
+        creator_nonce: String,
+        policy_script_hash: String,
+        expected_job_id: String,
     }
 
     fn decode_hex(value: &str) -> Vec<u8> {
@@ -119,6 +141,73 @@ mod tests {
         assert_eq!(
             executor.lock.calc_script_hash().as_slice(),
             executor.lock_hash
+        );
+    }
+
+    #[test]
+    fn rust_job_identity_matches_cross_language_fixture() {
+        let fixture: JobIdentityFixture =
+            serde_json::from_str(include_str!("../../fixtures/job_identity_v1.json")).unwrap();
+        assert_eq!(fixture.anchor.kind, "output_index");
+        let actual = derive_job_id(
+            &byte32(&fixture.genesis_hash),
+            fixture.protocol_version,
+            &byte32(&fixture.creation_commitment),
+            CreationAnchor::OutputIndex(fixture.anchor.output_index.parse().unwrap()),
+            fixture.creator_nonce.parse().unwrap(),
+            &byte32(&fixture.policy_script_hash),
+        );
+        assert_eq!(actual, byte32(&fixture.expected_job_id));
+    }
+
+    #[test]
+    fn job_identity_inputs_are_collision_resistant() {
+        let genesis = [0x11; 32];
+        let creation = [0x22; 32];
+        let policy = [0x33; 32];
+        let baseline = derive_job_id(
+            &genesis,
+            1,
+            &creation,
+            CreationAnchor::OutputIndex(0),
+            7,
+            &policy,
+        );
+
+        let mut other_network = genesis;
+        other_network[0] ^= 1;
+        assert_ne!(
+            baseline,
+            derive_job_id(
+                &other_network,
+                1,
+                &creation,
+                CreationAnchor::OutputIndex(0),
+                7,
+                &policy,
+            )
+        );
+        assert_ne!(
+            baseline,
+            derive_job_id(
+                &genesis,
+                2,
+                &creation,
+                CreationAnchor::OutputIndex(0),
+                7,
+                &policy,
+            )
+        );
+        assert_ne!(
+            baseline,
+            derive_job_id(
+                &genesis,
+                1,
+                &creation,
+                CreationAnchor::TypeId(&[0; 32]),
+                7,
+                &policy,
+            )
         );
     }
 }

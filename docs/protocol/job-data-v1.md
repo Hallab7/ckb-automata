@@ -17,6 +17,8 @@ document reviews its semantics and must not be used to generate bindings.
 - Terminal outcomes are represented by consumption without a Job Cell
   successor. Operational transaction confidence belongs to the event model.
 - Hash fields use the exact domain-separated rules embedded beside the schema.
+- Job identity uses the network- and version-bound layout in
+  [`job-identity.md`](job-identity.md).
 
 ## Lifecycle coverage
 
