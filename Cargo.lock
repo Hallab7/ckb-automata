@@ -47,6 +47,7 @@ dependencies = [
 name = "automata-deadline-policy"
 version = "0.0.0"
 dependencies = [
+ "ckb-hash",
  "ckb-std",
  "molecule",
 ]

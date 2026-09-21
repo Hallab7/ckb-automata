@@ -12,6 +12,7 @@ use molecule::prelude::{Builder, Entity};
 
 use crate::{
     campaign::refund_commitment,
+    deadline_payload::deadline_campaign_payload_hash,
     fixtures::{
         deployed_contract, execution_witness, job_data, secp_wallet, sign_single_secp_input,
     },
@@ -46,6 +47,12 @@ enum Mutation {
     RefundAmount,
     RefundOrder,
     RefundMixed,
+    PayloadHash,
+    CrossWiredCampaign,
+    PolicyCommitment,
+    RewardAmount,
+    JobSuccessor,
+    CrossWiredTerminal,
 }
 
 struct SuccessCase {
@@ -170,6 +177,14 @@ fn build_success_case(mutation: Mutation) -> SuccessCase {
             .build()
             .as_bytes();
     }
+    if matches!(mutation, Mutation::CrossWiredTerminal) {
+        terminal_campaign_data = CampaignDataV1::from_slice(&terminal_campaign_data)
+            .expect("terminal campaign data")
+            .as_builder()
+            .campaign_id([0x12; 32])
+            .build()
+            .as_bytes();
+    }
     let empty_terminal = CellOutput::new_builder()
         .lock(campaign_lock.clone())
         .type_(Some(campaign_type.clone()).pack())
@@ -189,20 +204,51 @@ fn build_success_case(mutation: Mutation) -> SuccessCase {
         input_campaign_data,
     );
 
-    let mut input_job_data = job_data(owner_hash, deadline_policy_hash, REWARD, 30_000_000_000, 1);
+    let mut committed_policy_hash = deadline_policy_hash;
+    if matches!(mutation, Mutation::PolicyCommitment) {
+        committed_policy_hash = [0x91; 32];
+    }
+    let mut campaign_out_point: [u8; 36] = campaign_cell
+        .as_slice()
+        .try_into()
+        .expect("campaign outpoint");
+    if matches!(mutation, Mutation::CrossWiredCampaign) {
+        campaign_out_point[0] ^= 1;
+    }
+    let mut payload_hash = deadline_campaign_payload_hash(
+        &deadline_policy_hash,
+        &campaign_type_hash,
+        &campaign_out_point,
+    );
+    if matches!(mutation, Mutation::PayloadHash) {
+        payload_hash = [0x92; 32];
+    }
+    let committed_reward = if matches!(mutation, Mutation::RewardAmount) {
+        REWARD + 1
+    } else {
+        REWARD
+    };
+    let mut input_job_data = job_data(
+        owner_hash,
+        committed_policy_hash,
+        committed_reward,
+        30_000_000_000,
+        1,
+    );
     input_job_data = JobDataV1::from_slice(&input_job_data)
         .expect("job data")
         .as_builder()
         .not_before(DEADLINE.to_le_bytes())
+        .payload_hash(payload_hash)
         .build()
         .as_bytes();
     let job_cell = context.create_cell(
         CellOutput::new_builder()
             .capacity(JOB_CAPACITY)
-            .lock(job_lock)
-            .type_(Some(deadline_policy).pack())
+            .lock(job_lock.clone())
+            .type_(Some(deadline_policy.clone()).pack())
             .build(),
-        input_job_data,
+        input_job_data.clone(),
     );
     let executor_cell = context.create_cell(
         CellOutput::new_builder()
@@ -237,6 +283,23 @@ fn build_success_case(mutation: Mutation) -> SuccessCase {
     } else {
         0
     };
+    let owner_or_successor = if matches!(mutation, Mutation::JobSuccessor) {
+        CellOutput::new_builder()
+            .capacity(JOB_CAPACITY - REWARD)
+            .lock(job_lock)
+            .type_(Some(deadline_policy).pack())
+            .build()
+    } else {
+        CellOutput::new_builder()
+            .capacity(JOB_CAPACITY - REWARD)
+            .lock(owner.lock.clone())
+            .build()
+    };
+    let owner_or_successor_data = if matches!(mutation, Mutation::JobSuccessor) {
+        input_job_data
+    } else {
+        Bytes::new()
+    };
 
     let mut builder = TransactionBuilder::default()
         .input(
@@ -261,14 +324,9 @@ fn build_success_case(mutation: Mutation) -> SuccessCase {
                 .lock(reward_lock)
                 .build(),
         )
-        .output(
-            CellOutput::new_builder()
-                .capacity(JOB_CAPACITY - REWARD)
-                .lock(owner.lock.clone())
-                .build(),
-        )
+        .output(owner_or_successor)
         .output_data(Bytes::new().pack())
-        .output_data(Bytes::new().pack());
+        .output_data(owner_or_successor_data.pack());
     if refund_attempt {
         let first_amount = if matches!(mutation, Mutation::RefundAmount) {
             REFUND_ONE + 1
@@ -452,4 +510,18 @@ fn refund_outputs_are_bound_to_committed_recipient_amount_and_order() {
     assert_fails(Mutation::RefundAmount, 32);
     assert_fails(Mutation::RefundOrder, 32);
     assert_fails(Mutation::RefundMixed, 32);
+}
+
+#[test]
+fn deadline_adapter_binds_policy_payload_reward_and_termination() {
+    assert_fails(Mutation::PayloadHash, 19);
+    assert_fails(Mutation::CrossWiredCampaign, 19);
+    assert_fails(Mutation::PolicyCommitment, 17);
+    assert_fails(Mutation::RewardAmount, 29);
+    assert_fails(Mutation::JobSuccessor, 24);
+}
+
+#[test]
+fn campaign_contract_rejects_a_cross_wired_terminal_fixture() {
+    assert_fails(Mutation::CrossWiredTerminal, 25);
 }

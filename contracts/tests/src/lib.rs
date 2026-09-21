@@ -44,6 +44,10 @@ pub mod campaign {
     include!("../../shared/campaign.rs");
 }
 
+pub mod deadline_payload {
+    include!("../../shared/deadline_payload.rs");
+}
+
 #[cfg(test)]
 mod execution_mode;
 

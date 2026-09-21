@@ -6,7 +6,7 @@ use ckb_std::{
     default_alloc, entry,
     high_level::{
         QueryIter, load_cell_capacity, load_cell_data, load_cell_lock_hash, load_cell_type_hash,
-        load_script, load_script_hash,
+        load_input, load_script, load_script_hash, load_witness_args,
     },
 };
 use molecule::prelude::Entity;
@@ -39,6 +39,10 @@ mod campaign_generated {
 
 mod error_codes {
     include!("../../shared/error_codes.rs");
+}
+
+mod deadline_payload {
+    include!("../../shared/deadline_payload.rs");
 }
 
 use campaign_generated::CampaignDataV1;
@@ -77,21 +81,34 @@ fn validate_creation() -> Result<(), ScriptError> {
     let data = load_cell_data(0, Source::GroupOutput).map_err(|_| ScriptError::InvalidData)?;
     let job = JobDataV1::from_slice(&data).map_err(|_| ScriptError::InvalidData)?;
     let script_hash = load_script_hash().map_err(|_| ScriptError::InvalidData)?;
-    if job.policy_script_hash().as_slice() != script_hash
-        || read_u16(job.version().as_slice()) != 1
+    validate_job_configuration(&job, script_hash)?;
+    campaign_type_hash()?;
+    Ok(())
+}
+
+fn validate_job_configuration(job: &JobDataV1, script_hash: [u8; 32]) -> Result<(), ScriptError> {
+    if job.policy_script_hash().as_slice() != script_hash {
+        return Err(ScriptError::PolicyHashMismatch);
+    }
+    if read_u16(job.version().as_slice()) != 1
+        || read_u16(job.flags().as_slice()) != 0
+        || job.state().as_slice() != [0]
         || read_u16(job.trigger_kind().as_slice()) != 1
         || read_u32(job.remaining_runs().as_slice()) != 1
         || read_u64(job.not_before().as_slice()) == 0
+        || read_u64(job.not_after().as_slice()) != 0
+        || is_zero(job.payload_hash().as_slice())
     {
         return Err(ScriptError::InvalidData);
     }
-    campaign_type_hash()?;
     Ok(())
 }
 
 fn validate_finalization() -> Result<(), ScriptError> {
     let job_data = load_cell_data(0, Source::GroupInput).map_err(|_| ScriptError::InvalidData)?;
     let job = JobDataV1::from_slice(&job_data).map_err(|_| ScriptError::InvalidData)?;
+    let script_hash = load_script_hash().map_err(|_| ScriptError::InvalidData)?;
+    validate_job_configuration(&job, script_hash)?;
     let expected_campaign_type = campaign_type_hash()?;
 
     let mut campaign_index = None;
@@ -108,33 +125,33 @@ fn validate_finalization() -> Result<(), ScriptError> {
         load_cell_data(campaign_index, Source::Input).map_err(|_| ScriptError::InvalidData)?;
     let campaign =
         CampaignDataV1::from_slice(&campaign_data).map_err(|_| ScriptError::InvalidData)?;
+    let campaign_input = load_input(campaign_index, Source::Input)
+        .map_err(|_| ScriptError::InvalidApplicationState)?;
+    let campaign_out_point: [u8; 36] = campaign_input
+        .previous_output()
+        .as_slice()
+        .try_into()
+        .map_err(|_| ScriptError::InvalidData)?;
+    let expected_payload = deadline_payload::deadline_campaign_payload_hash(
+        &script_hash,
+        &expected_campaign_type,
+        &campaign_out_point,
+    );
+    if job.payload_hash().as_slice() != expected_payload {
+        return Err(ScriptError::PayloadHashMismatch);
+    }
     if campaign.state().as_slice() != [0]
         || read_u64(job.not_before().as_slice()) != read_u64(campaign.deadline_since().as_slice())
     {
         return Err(ScriptError::InvalidApplicationState);
     }
+    validate_reward(&job)?;
+    validate_no_successor()?;
 
     let mut success_lock_hash = [0_u8; 32];
     success_lock_hash.copy_from_slice(campaign.success_lock_hash().as_slice());
     if read_u64(campaign.pledged().as_slice()) < read_u64(campaign.target().as_slice()) {
-        let mut refund_state_count = 0;
-        for (index, type_hash) in QueryIter::new(load_cell_type_hash, Source::Output).enumerate() {
-            if type_hash == Some(expected_campaign_type) {
-                let data = load_cell_data(index, Source::Output)
-                    .map_err(|_| ScriptError::InvalidApplicationState)?;
-                let output = CampaignDataV1::from_slice(&data)
-                    .map_err(|_| ScriptError::InvalidApplicationState)?;
-                if output.state().as_slice() != [2] {
-                    return Err(ScriptError::InvalidApplicationState);
-                }
-                refund_state_count += 1;
-            }
-        }
-        return if refund_state_count == 1 {
-            Ok(())
-        } else {
-            Err(ScriptError::InvalidApplicationState)
-        };
+        return validate_terminal_state(expected_campaign_type, 2);
     }
 
     let mut payout_count = 0;
@@ -158,6 +175,71 @@ fn validate_finalization() -> Result<(), ScriptError> {
     if payout_count != 1 {
         return Err(ScriptError::InvalidApplicationState);
     }
+    validate_terminal_state(expected_campaign_type, 1)
+}
+
+fn validate_terminal_state(
+    expected_campaign_type: [u8; 32],
+    expected_state: u8,
+) -> Result<(), ScriptError> {
+    let mut terminal_count = 0;
+    for (index, type_hash) in QueryIter::new(load_cell_type_hash, Source::Output).enumerate() {
+        if type_hash == Some(expected_campaign_type) {
+            let data = load_cell_data(index, Source::Output)
+                .map_err(|_| ScriptError::InvalidApplicationState)?;
+            let output = CampaignDataV1::from_slice(&data)
+                .map_err(|_| ScriptError::InvalidApplicationState)?;
+            if output.state().as_slice() != [expected_state] {
+                return Err(ScriptError::InvalidApplicationState);
+            }
+            terminal_count += 1;
+        }
+    }
+    if terminal_count == 1 {
+        Ok(())
+    } else {
+        Err(ScriptError::InvalidApplicationState)
+    }
+}
+
+fn validate_reward(job: &JobDataV1) -> Result<(), ScriptError> {
+    let witness =
+        load_witness_args(0, Source::GroupInput).map_err(|_| ScriptError::InvalidWitnessMode)?;
+    let request = witness
+        .input_type()
+        .to_opt()
+        .ok_or(ScriptError::InvalidWitnessMode)?
+        .raw_data();
+    if request.len() < 38 || request[0] != 0 {
+        return Err(ScriptError::InvalidWitnessMode);
+    }
+    let reward_output_index = read_u32(&request[1..5]) as usize;
+    let expected_recipient = &request[5..37];
+    let capacity = load_cell_capacity(reward_output_index, Source::Output)
+        .map_err(|_| ScriptError::RewardAmountMismatch)?;
+    if capacity != read_u64(job.reward().as_slice()) {
+        return Err(ScriptError::RewardAmountMismatch);
+    }
+    let recipient = load_cell_lock_hash(reward_output_index, Source::Output)
+        .map_err(|_| ScriptError::RewardRecipientMismatch)?;
+    let type_hash = load_cell_type_hash(reward_output_index, Source::Output)
+        .map_err(|_| ScriptError::RewardRecipientMismatch)?;
+    let data = load_cell_data(reward_output_index, Source::Output)
+        .map_err(|_| ScriptError::RewardRecipientMismatch)?;
+    if recipient.as_slice() != expected_recipient || type_hash.is_some() || !data.is_empty() {
+        return Err(ScriptError::RewardRecipientMismatch);
+    }
+    Ok(())
+}
+
+fn validate_no_successor() -> Result<(), ScriptError> {
+    let job_lock_hash =
+        load_cell_lock_hash(0, Source::GroupInput).map_err(|_| ScriptError::InvalidData)?;
+    if QueryIter::new(load_cell_lock_hash, Source::Output)
+        .any(|lock_hash| lock_hash == job_lock_hash)
+    {
+        return Err(ScriptError::SuccessorCountMismatch);
+    }
     Ok(())
 }
 
@@ -171,4 +253,8 @@ fn read_u32(bytes: &[u8]) -> u32 {
 
 fn read_u64(bytes: &[u8]) -> u64 {
     u64::from_le_bytes(bytes.try_into().expect("Molecule Uint64"))
+}
+
+fn is_zero(bytes: &[u8]) -> bool {
+    bytes.iter().all(|byte| *byte == 0)
 }
