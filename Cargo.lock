@@ -72,6 +72,11 @@ dependencies = [
 [[package]]
 name = "automata-recurring-policy"
 version = "0.0.0"
+dependencies = [
+ "ckb-hash",
+ "ckb-std",
+ "molecule",
+]
 
 [[package]]
 name = "base64"

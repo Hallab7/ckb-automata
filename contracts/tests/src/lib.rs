@@ -92,6 +92,9 @@ mod campaign_success;
 mod recurring_payload;
 
 #[cfg(test)]
+mod recurring_payout;
+
+#[cfg(test)]
 mod tests {
     use molecule::prelude::{Builder, Entity};
     use serde::Deserialize;
