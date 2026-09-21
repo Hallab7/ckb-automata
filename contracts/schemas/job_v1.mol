@@ -1,0 +1,60 @@
+// Canonical Automata Job Cell data for protocol version 1.
+//
+// Integer byte arrays are unsigned little-endian values. reward and
+// remaining_budget are shannons. sequence and remaining_runs are counters.
+// not_before and not_after use the raw absolute CKB since encoding selected by
+// trigger_kind; zero means absent where the trigger permits it.
+//
+// version: 1 is JobDataV1; 0 and 2..65535 are reserved.
+// flags: every bit is reserved in V1 and MUST be zero.
+// state: 0 = LIVE; 1..255 are reserved. Terminal and operational states are
+// represented by cell consumption and off-chain events, not JobDataV1 values.
+// trigger_kind:
+//   0 = INVALID (MUST reject)
+//   1 = ABSOLUTE_BLOCK_SINCE
+//   2 = ABSOLUTE_EPOCH_SINCE
+//   3 = ABSOLUTE_TIMESTAMP_SINCE
+//   4 = MATCHING_INPUT_STATE
+//   5 = REFERENCED_CELL
+//   6 = REFERENCED_HEADER
+//   7..65535 are reserved and MUST reject in V1.
+// remaining_runs includes the current action and MUST be at least 1. A value
+// of 1 is terminal; a larger value requires exactly one successor decremented
+// by one.
+// not_after is advisory unless the selected policy verifies freshness using
+// transaction-visible evidence.
+//
+// H(domain, body) is blake2b-256 with CKB personalization "ckb-default-hash"
+// over UTF-8(domain), one zero byte, uint32_le(body length), and body.
+// trigger_params_hash = H("ckb-automata/trigger-params/v1",
+//   uint16_le(trigger_kind) || canonical trigger parameter bytes).
+// payload_hash = H("ckb-automata/policy-payload/v1",
+//   policy_script_hash || canonical policy payload bytes).
+// policy_script_hash and cancel_lock_hash use CKB's native Script hash over
+// canonical Molecule Script bytes.
+// job_id = H("ckb-automata/job-id/v1", genesis_hash || canonical first
+//   creation CellInput || uint64_le(output_index) || uint64_le(creator_nonce)
+//   || policy_script_hash). The genesis hash binds identity to one network.
+
+array Uint16 [byte; 2];
+array Uint32 [byte; 4];
+array Uint64 [byte; 8];
+array Byte32 [byte; 32];
+
+table JobDataV1 {
+  version: Uint16,
+  flags: Uint16,
+  job_id: Byte32,
+  sequence: Uint64,
+  state: byte,
+  trigger_kind: Uint16,
+  trigger_params_hash: Byte32,
+  policy_script_hash: Byte32,
+  payload_hash: Byte32,
+  reward: Uint64,
+  remaining_budget: Uint64,
+  not_before: Uint64,
+  not_after: Uint64,
+  remaining_runs: Uint32,
+  cancel_lock_hash: Byte32,
+}
