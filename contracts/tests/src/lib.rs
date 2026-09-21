@@ -16,6 +16,18 @@ pub mod generated {
     include!("../../generated/job_v1.rs");
 }
 
+#[allow(
+    clippy::clone_on_copy,
+    clippy::derivable_impls,
+    clippy::if_same_then_else,
+    clippy::manual_is_multiple_of,
+    clippy::needless_borrow,
+    clippy::write_literal
+)]
+pub mod generated_campaign {
+    include!("../../generated/campaign_v1.rs");
+}
+
 pub mod error_codes {
     include!("../../shared/error_codes.rs");
 }
@@ -26,6 +38,10 @@ pub mod job_identity {
 
 pub mod trigger {
     include!("../../shared/trigger.rs");
+}
+
+pub mod campaign {
+    include!("../../shared/campaign.rs");
 }
 
 #[cfg(test)]
@@ -42,6 +58,9 @@ mod trigger_validation;
 
 #[cfg(test)]
 mod top_up;
+
+#[cfg(test)]
+mod campaign_state;
 
 #[cfg(test)]
 mod tests {

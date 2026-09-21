@@ -29,7 +29,7 @@
     "quality:self-test": "node scripts/check-quality-failures.mjs",
     "schema:check": "node scripts/generate-schemas.mjs --check",
     "schema:generate": "node scripts/generate-schemas.mjs",
-    "schema:review": "node scripts/check-job-schema.mjs",
+    "schema:review": "node scripts/check-job-schema.mjs && node scripts/check-campaign-schema.mjs",
     "secrets:check": "node scripts/check-secrets.mjs",
     "test": "node --test scripts/*.test.mjs && pnpm -r --if-present test",
     "typecheck": "pnpm -r --if-present typecheck",

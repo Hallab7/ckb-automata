@@ -1,0 +1,42 @@
+// Canonical demo campaign state for protocol version 1.
+//
+// All integers are unsigned little-endian values. pledged and target are
+// shannons. deadline_since is a non-zero absolute block-number since encoding.
+// version: 1 is CampaignDataV1; every other value is reserved.
+// state: 0 = OPEN, 1 = SUCCEEDED, 2 = REFUNDING; 3..255 are reserved.
+// campaign_id binds the creation transaction using the same network-bound
+// identity construction used by JobDataV1.
+// pledged is the exact sum of the canonical pledge records represented by
+// refund_commitment; pledge_count is the number of those records.
+// target MUST be greater than zero.
+// success_lock_hash is the full CKB Script hash of the only success recipient.
+//
+// A canonical pledge record is:
+//   out_point_tx_hash || uint32_le(out_point_index) || refund_lock_hash ||
+//   uint64_le(amount).
+// Records are sorted lexicographically by out_point_tx_hash, then output index.
+// refund_commitment = H("ckb-automata/campaign-refunds/v1",
+//   uint32_le(pledge_count) || canonical pledge records).
+// H(domain, body) is blake2b-256 with CKB personalization "ckb-default-hash"
+// over UTF-8(domain), one zero byte, uint32_le(body length), and body.
+//
+// At or after deadline_since the objective terminal marker is SUCCEEDED when
+// pledged >= target, otherwise REFUNDING. No subjective evidence, API value,
+// wall clock, signature vote, or executor assertion participates in outcome.
+
+array Uint16 [byte; 2];
+array Uint32 [byte; 4];
+array Uint64 [byte; 8];
+array Byte32 [byte; 32];
+
+table CampaignDataV1 {
+  version: Uint16,
+  state: byte,
+  campaign_id: Byte32,
+  pledged: Uint64,
+  pledge_count: Uint32,
+  target: Uint64,
+  deadline_since: Uint64,
+  success_lock_hash: Byte32,
+  refund_commitment: Byte32,
+}

@@ -1,6 +1,13 @@
 export const WORKSPACE_NAME = "ckb-automata" as const;
 
 export {
+  CAMPAIGN_STATES,
+  determineCampaignOutcome,
+  isAbsoluteBlockDeadline,
+  type CampaignOutcome,
+} from "./campaign.ts";
+
+export {
   JOB_ID_DOMAIN,
   deriveJobId,
   type CreationAnchor,
