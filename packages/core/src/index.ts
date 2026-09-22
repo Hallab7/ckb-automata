@@ -21,6 +21,7 @@ export {
   parseOutputIndex,
   parseRunCount,
   parseSequence,
+  parseSince,
   parseShannons,
   toRpcHex,
   uint32ToLittleEndian,
@@ -38,6 +39,7 @@ export {
   type RpcOutPoint,
   type RunCount,
   type Sequence,
+  type SinceValue,
   type Shannons,
   type Uint32Value,
   type Uint64Value,
@@ -88,3 +90,22 @@ export {
   type CanonicalTerm,
   type CanonicalTransactionState,
 } from "./vocabulary.ts";
+
+export {
+  DEPLOYED_CONTRACT_NAMES,
+  inspectJobData,
+  validateDeploymentManifest,
+  type CellDepIdentity,
+  type DeployedContract,
+  type DeployedContractName,
+  type DeploymentManifest,
+  type InspectedJobDataV1,
+  type JobInspectionOptions,
+  type JobInspectionResult,
+  type JobSemanticIssue,
+  type ManifestIssue,
+  type ManifestValidationResult,
+  type PolicyMetadata,
+  type ScriptHashType,
+  type ScriptIdentity,
+} from "./job-inspection.ts";

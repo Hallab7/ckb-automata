@@ -7,6 +7,7 @@ export type Shannons = BrandedBigInt<"Shannons">;
 export type BlockNumber = BrandedBigInt<"BlockNumber">;
 export type Sequence = BrandedBigInt<"Sequence">;
 export type RunCount = BrandedBigInt<"RunCount">;
+export type SinceValue = BrandedBigInt<"SinceValue">;
 export type OutputIndex = BrandedBigInt<"OutputIndex">;
 export type EpochNumber = BrandedBigInt<"EpochNumber">;
 export type EpochIndex = BrandedBigInt<"EpochIndex">;
@@ -15,7 +16,7 @@ export type EpochValue = BrandedBigInt<"EpochValue">;
 export type Hash32 = BrandedString<"Hash32">;
 export type IntegerInput = bigint | string;
 
-export type Uint64Value = Shannons | BlockNumber | Sequence;
+export type Uint64Value = Shannons | BlockNumber | Sequence | SinceValue;
 export type Uint32Value = RunCount | OutputIndex;
 
 export interface Epoch {
@@ -69,6 +70,10 @@ export function parseBlockNumber(value: IntegerInput): BlockNumber {
 
 export function parseSequence(value: IntegerInput): Sequence {
   return parseUnsigned(value, "sequence", MAX_UINT64) as Sequence;
+}
+
+export function parseSince(value: IntegerInput): SinceValue {
+  return parseUnsigned(value, "since", MAX_UINT64) as SinceValue;
 }
 
 export function parseRunCount(value: IntegerInput): RunCount {

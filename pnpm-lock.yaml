@@ -236,6 +236,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@ckb-automata/molecule':
+        specifier: workspace:*
+        version: link:../molecule
       '@nervosnetwork/ckb-sdk-utils':
         specifier: 0.109.5
         version: 0.109.5

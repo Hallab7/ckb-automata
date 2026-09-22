@@ -17,6 +17,7 @@ import {
   parseOutputIndex,
   parseRunCount,
   parseSequence,
+  parseSince,
   parseShannons,
   toRpcHex,
   uint32ToLittleEndian,
@@ -30,6 +31,7 @@ test("uint64 money and counters accept only lossless canonical inputs", () => {
   assert.equal(parseSequence(0n), 0n);
   assert.equal(toRpcHex(parseShannons(255n)), "0xff");
   assert.deepEqual(uint64ToLittleEndian(parseSequence(MAX_UINT64)), new Uint8Array(8).fill(255));
+  assert.equal(parseSince("0x40000000000003e8"), 0x40000000000003e8n);
 
   const money = parseShannons(1n);
   // @ts-expect-error Money and block heights are intentionally distinct brands.
