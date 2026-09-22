@@ -50,6 +50,16 @@ test("event route publishes explicit timeline, provenance, and reference schemas
     assert.ok(confidence && !("$ref" in confidence));
     assert.deepEqual(confidence.enum, ["observed", "committed", "confirmed", "reorged"]);
 
+    const stream = document.paths["/v1/events/stream"]?.get;
+    assert.ok(stream);
+    const streamParameters = (stream.parameters ?? []).map((parameter) =>
+      "$ref" in parameter ? parameter.$ref : parameter.name,
+    );
+    assert.deepEqual(streamParameters.toSorted(), ["cursor", "jobId"]);
+    const streamResponse = stream.responses?.["200"];
+    assert.ok(streamResponse && "content" in streamResponse);
+    assert.ok(streamResponse.content?.["text/event-stream"]);
+
     const fastify = result.app.getHttpAdapter().getInstance() as {
       inject(input: {
         method: string;

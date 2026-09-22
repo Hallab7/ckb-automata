@@ -58,10 +58,16 @@ export {
 export {
   EVENT_CONFIDENCE,
   EVENT_SOURCES,
+  EVENT_STREAM_BATCH_SIZE,
+  EVENT_STREAM_HEARTBEAT_MS,
+  EVENT_STREAM_POLL_MS,
+  JobEventStreamController,
+  JobEventStreamService,
   JobEventsController,
   JobEventsService,
   type EventConfidence,
   type EventSource,
+  type EventStreamOptions,
   type JobEventReadModel,
   type JobEventTimeline,
 } from "./events.ts";

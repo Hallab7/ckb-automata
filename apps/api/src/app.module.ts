@@ -4,7 +4,12 @@ import type { AutomataEnvironment } from "@ckb-automata/config";
 
 import { CkbClient, createCkbClient } from "./ckb-client.ts";
 import { DatabaseClient, createDatabaseClient } from "./database/client.ts";
-import { JobEventsController, JobEventsService } from "./events.ts";
+import {
+  JobEventStreamController,
+  JobEventStreamService,
+  JobEventsController,
+  JobEventsService,
+} from "./events.ts";
 import { HealthController, HealthService, createDefaultHealthProbes } from "./health.ts";
 import { CanonicalCheckpointStore } from "./indexer/checkpoints.ts";
 import { JobCellDiscovery } from "./indexer/job-discovery.ts";
@@ -32,6 +37,7 @@ Module({
     AccountJobsController,
     TemplatesController,
     JobEventsController,
+    JobEventStreamController,
     JobQuoteController,
     TransactionController,
   ],
@@ -116,6 +122,11 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
         inject: [DatabaseClient],
         useFactory: (databaseClient: DatabaseClient) =>
           new JobEventsService(databaseClient.database, environment.CKB_NETWORK),
+      },
+      {
+        provide: JobEventStreamService,
+        inject: [JobEventsService],
+        useFactory: (events: JobEventsService) => new JobEventStreamService(events),
       },
       {
         provide: JobQuoteService,

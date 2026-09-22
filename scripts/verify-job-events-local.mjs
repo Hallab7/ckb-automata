@@ -7,6 +7,7 @@ import { pathToFileURL } from "node:url";
 
 import { createApiApplication } from "../apps/api/src/bootstrap.ts";
 import { migrateDatabase } from "../apps/api/src/database/migrator.ts";
+import { JobEventStreamService, JobEventsService } from "../apps/api/src/events.ts";
 
 const requireFromApi = createRequire(new URL("../apps/api/package.json", import.meta.url));
 const postgres = (await import(pathToFileURL(requireFromApi.resolve("postgres")).href)).default;
@@ -244,8 +245,43 @@ try {
   assert.equal(stale.status, 409);
   assert.equal(stale.body.code, "STALE_EVENT_CURSOR");
 
+  const stream = new JobEventStreamService(app.get(JobEventsService), {
+    heartbeatMs: 1_000,
+    pollMs: 10,
+  });
+  const collectIds = (lastEventId, count) =>
+    new Promise((resolve, reject) => {
+      const ids = [];
+      const subscription = stream.stream(jobId, lastEventId, undefined).subscribe({
+        next: (frame) => {
+          if (frame.id !== undefined) ids.push(frame.id);
+          if (ids.length === count) {
+            subscription.unsubscribe();
+            resolve(ids);
+          }
+        },
+        error: reject,
+      });
+    });
+  const initialStreamIds = await collectIds((firstEventId + 4n).toString(), 3);
+  assert.deepEqual(initialStreamIds, [
+    (firstEventId + 5n).toString(),
+    (firstEventId + 6n).toString(),
+    (firstEventId + 7n).toString(),
+  ]);
+  await insertEvent({
+    id: firstEventId + 8n,
+    type: "transaction_submitted",
+    source: "operational",
+    txHash: hash(53),
+    payload: { attemptId },
+    occurredAt: "2026-01-01T10:06:00.000Z",
+  });
+  const resumedStreamIds = await collectIds((firstEventId + 7n).toString(), 1);
+  assert.deepEqual(resumedStreamIds, [(firstEventId + 8n).toString()]);
+
   console.log(
-    "Job events verified: ordering, retries, confidence, bigint IDs, reorg links, and cursors",
+    "Job events verified: ordering, retries, confidence, reorg links, cursors, and SSE replay",
   );
 } finally {
   await app?.close();

@@ -5,11 +5,16 @@ import {
   ConflictException,
   Controller,
   Get,
+  Header,
+  Headers,
   Inject,
   Injectable,
   NotFoundException,
   Param,
   Query,
+  Sse,
+  SseSignal,
+  type MessageEvent,
 } from "@nestjs/common";
 import {
   ApiBadRequestResponse,
@@ -18,10 +23,12 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiProduces,
   ApiQuery,
   ApiTags,
 } from "@nestjs/swagger";
 import { and, asc, eq, gt, inArray, lte, or, type SQL } from "drizzle-orm";
+import { Observable } from "rxjs";
 
 import type { AutomataDatabase } from "./database/client.ts";
 import {
@@ -38,6 +45,10 @@ const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 100;
 const CURSOR_VERSION = 1;
 const INT64_MAX = 9_223_372_036_854_775_807n;
+export const EVENT_STREAM_BATCH_SIZE = 100;
+export const EVENT_STREAM_HEARTBEAT_MS = 15_000;
+export const EVENT_STREAM_POLL_MS = 1_000;
+const EVENT_STREAM_MAX_BATCHES_PER_POLL = 5;
 
 export const EVENT_SOURCES = ["indexed", "operational"] as const;
 export const EVENT_CONFIDENCE = ["observed", "committed", "confirmed", "reorged"] as const;
@@ -55,6 +66,16 @@ interface EventCursor {
   readonly f: string;
   readonly c: string | null;
   readonly i: string;
+}
+
+interface EventReadOptions {
+  readonly afterEventId?: string;
+}
+
+export interface EventStreamOptions {
+  readonly heartbeatMs?: number;
+  readonly now?: () => Date;
+  readonly pollMs?: number;
 }
 
 interface BlockReference {
@@ -195,6 +216,20 @@ function decodeCursor(value: string): EventCursor {
   }
 }
 
+function parseEventId(value: string, name: string): string {
+  if (!/^(0|[1-9][0-9]*)$/.test(value) || BigInt(value) > INT64_MAX) {
+    throw invalid(`${name} must be a canonical event ID`);
+  }
+  return value;
+}
+
+function resumeEventId(lastEventId: string | undefined, cursor: string | undefined): string {
+  if (lastEventId !== undefined && cursor !== undefined && lastEventId !== cursor) {
+    throw invalid("Last-Event-ID and cursor must match when both are provided");
+  }
+  return parseEventId(lastEventId ?? cursor ?? "0", "event cursor");
+}
+
 function category(row: EventRow): JobEventReadModel["category"] {
   if (row.source === "indexed") return "lifecycle";
   if (row.eventType.startsWith("execution_")) return "execution";
@@ -240,7 +275,7 @@ function details(payload: unknown): Readonly<Record<string, unknown>> {
 }
 
 function blockReference(row: EventRow): BlockReference | null {
-  if (row.blockNumber === null && row.blockHash === null && row.txHash === null) return null;
+  if (row.blockNumber === null && row.blockHash === null) return null;
   if (row.blockNumber === null || row.blockHash === null || row.txHash === null) {
     throw new Error(`event ${row.id.toString()} has incomplete block provenance`);
   }
@@ -300,11 +335,19 @@ export class JobEventsService {
   async timeline(
     jobIdInput: string,
     input: Readonly<Record<string, unknown>>,
+    options: EventReadOptions = {},
   ): Promise<JobEventTimeline> {
     const jobId = parseHash(jobIdInput);
     const query = parseQuery(input);
     const filterFingerprint = fingerprint(this.#network, jobId, query.source);
     const cursor = query.cursor === undefined ? undefined : decodeCursor(query.cursor);
+    if (cursor !== undefined && options.afterEventId !== undefined) {
+      throw new Error("event cursor modes cannot be combined");
+    }
+    const afterEventId =
+      options.afterEventId === undefined
+        ? cursor?.i
+        : parseEventId(options.afterEventId, "afterEventId");
     if (cursor !== undefined && cursor.f !== filterFingerprint) {
       throw invalid("cursor does not match the requested event filters");
     }
@@ -356,8 +399,8 @@ export class JobEventsService {
           or(eq(jobEvents.source, "operational"), visibleCanonical)!,
         ];
         if (query.source !== undefined) clauses.push(eq(jobEvents.source, query.source));
-        if (cursor !== undefined) {
-          clauses.push(gt(jobEvents.id, BigInt(cursor.i)));
+        if (afterEventId !== undefined) {
+          clauses.push(gt(jobEvents.id, BigInt(afterEventId)));
         }
 
         const rows = await tx
@@ -472,6 +515,125 @@ export class JobEventsService {
   }
 }
 
+interface EventTimelineReader {
+  timeline(
+    jobId: string,
+    query: Readonly<Record<string, unknown>>,
+    options?: EventReadOptions,
+  ): Promise<JobEventTimeline>;
+}
+
+export class JobEventStreamService {
+  readonly #events: EventTimelineReader;
+  readonly #heartbeatMs: number;
+  readonly #now: () => Date;
+  readonly #pollMs: number;
+
+  constructor(events: EventTimelineReader, options: EventStreamOptions = {}) {
+    this.#events = events;
+    this.#heartbeatMs = options.heartbeatMs ?? EVENT_STREAM_HEARTBEAT_MS;
+    this.#now = options.now ?? (() => new Date());
+    this.#pollMs = options.pollMs ?? EVENT_STREAM_POLL_MS;
+    if (!Number.isInteger(this.#heartbeatMs) || this.#heartbeatMs < 1) {
+      throw new RangeError("heartbeatMs must be a positive integer");
+    }
+    if (!Number.isInteger(this.#pollMs) || this.#pollMs < 1) {
+      throw new RangeError("pollMs must be a positive integer");
+    }
+  }
+
+  stream(
+    jobId: string,
+    lastEventId: string | undefined,
+    cursor: string | undefined,
+    signal?: AbortSignal,
+  ): Observable<MessageEvent> {
+    parseHash(jobId);
+    const initialEventId = resumeEventId(lastEventId, cursor);
+
+    return new Observable<MessageEvent>((subscriber) => {
+      let currentEventId = initialEventId;
+      let polling = false;
+      let stopped = false;
+
+      const stop = () => {
+        if (stopped) return;
+        stopped = true;
+        clearInterval(pollTimer);
+        clearInterval(heartbeatTimer);
+      };
+      const onAbort = () => {
+        stop();
+        subscriber.complete();
+      };
+      const poll = async () => {
+        if (polling || stopped) return;
+        polling = true;
+        try {
+          for (let batch = 0; batch < EVENT_STREAM_MAX_BATCHES_PER_POLL; batch += 1) {
+            const timeline = await this.#events.timeline(
+              jobId,
+              { limit: EVENT_STREAM_BATCH_SIZE },
+              { afterEventId: currentEventId },
+            );
+            if (stopped) return;
+            for (const item of timeline.items) {
+              subscriber.next({
+                data: item,
+                id: item.eventId,
+                retry: this.#pollMs,
+                type: item.category === "transaction" ? "transaction-event" : "job-event",
+              });
+              currentEventId = item.eventId;
+            }
+            if (timeline.items.length < EVENT_STREAM_BATCH_SIZE) break;
+          }
+        } catch (error) {
+          stop();
+          subscriber.error(error);
+        } finally {
+          polling = false;
+        }
+      };
+      const pollTimer = setInterval(() => void poll(), this.#pollMs);
+      const heartbeatTimer = setInterval(() => {
+        if (!stopped) {
+          subscriber.next({ comment: `heartbeat ${this.#now().toISOString()}` });
+        }
+      }, this.#heartbeatMs);
+      if (signal?.aborted) {
+        stop();
+        subscriber.complete();
+        return stop;
+      }
+      signal?.addEventListener("abort", onAbort, { once: true });
+      void poll();
+
+      return () => {
+        stop();
+        signal?.removeEventListener("abort", onAbort);
+      };
+    });
+  }
+}
+
+export class JobEventStreamController {
+  readonly #stream: JobEventStreamService;
+
+  constructor(stream: JobEventStreamService) {
+    this.#stream = stream;
+  }
+
+  stream(
+    jobId: string,
+    lastEventId: string | undefined,
+    cursor: string | undefined,
+    signal: AbortSignal,
+  ): Observable<MessageEvent> {
+    return this.#stream.stream(jobId, lastEventId, cursor, signal);
+  }
+}
+
 export class JobEventsController {
   readonly #events: JobEventsService;
 
@@ -556,8 +718,11 @@ const eventSchema = {
 
 Injectable()(JobEventsService);
 Inject(JobEventsService)(JobEventsController, undefined, 0);
+Inject(JobEventStreamService)(JobEventStreamController, undefined, 0);
 Controller("jobs")(JobEventsController);
+Controller("events")(JobEventStreamController);
 ApiTags("job events")(JobEventsController);
+ApiTags("job events")(JobEventStreamController);
 Get(":jobId/events")(
   JobEventsController.prototype,
   "list",
@@ -637,4 +802,69 @@ ApiNotFoundResponse({ description: "Job not found" })(
   JobEventsController.prototype,
   "list",
   Object.getOwnPropertyDescriptor(JobEventsController.prototype, "list")!,
+);
+
+Sse("stream")(
+  JobEventStreamController.prototype,
+  "stream",
+  Object.getOwnPropertyDescriptor(JobEventStreamController.prototype, "stream")!,
+);
+Query("jobId")(JobEventStreamController.prototype, "stream", 0);
+Headers("last-event-id")(JobEventStreamController.prototype, "stream", 1);
+Query("cursor")(JobEventStreamController.prototype, "stream", 2);
+SseSignal()(JobEventStreamController.prototype, "stream", 3);
+Header("Cache-Control", "no-cache, no-transform")(
+  JobEventStreamController.prototype,
+  "stream",
+  Object.getOwnPropertyDescriptor(JobEventStreamController.prototype, "stream")!,
+);
+Header("X-Accel-Buffering", "no")(
+  JobEventStreamController.prototype,
+  "stream",
+  Object.getOwnPropertyDescriptor(JobEventStreamController.prototype, "stream")!,
+);
+ApiOperation({
+  summary: "Stream public job and transaction events with resumable event IDs",
+})(
+  JobEventStreamController.prototype,
+  "stream",
+  Object.getOwnPropertyDescriptor(JobEventStreamController.prototype, "stream")!,
+);
+ApiQuery({ name: "jobId", required: true, schema: hashSchema })(
+  JobEventStreamController.prototype,
+  "stream",
+  Object.getOwnPropertyDescriptor(JobEventStreamController.prototype, "stream")!,
+);
+ApiQuery({
+  name: "cursor",
+  required: false,
+  type: String,
+  description: "Last delivered decimal event ID; Last-Event-ID takes precedence",
+})(
+  JobEventStreamController.prototype,
+  "stream",
+  Object.getOwnPropertyDescriptor(JobEventStreamController.prototype, "stream")!,
+);
+ApiProduces("text/event-stream")(
+  JobEventStreamController.prototype,
+  "stream",
+  Object.getOwnPropertyDescriptor(JobEventStreamController.prototype, "stream")!,
+);
+ApiOkResponse({
+  description: "Resumable stream of job-event, transaction-event, and heartbeat frames",
+  schema: { type: "string" },
+})(
+  JobEventStreamController.prototype,
+  "stream",
+  Object.getOwnPropertyDescriptor(JobEventStreamController.prototype, "stream")!,
+);
+ApiBadRequestResponse({ description: "Malformed job ID or reconnect cursor" })(
+  JobEventStreamController.prototype,
+  "stream",
+  Object.getOwnPropertyDescriptor(JobEventStreamController.prototype, "stream")!,
+);
+ApiNotFoundResponse({ description: "Job not found" })(
+  JobEventStreamController.prototype,
+  "stream",
+  Object.getOwnPropertyDescriptor(JobEventStreamController.prototype, "stream")!,
 );

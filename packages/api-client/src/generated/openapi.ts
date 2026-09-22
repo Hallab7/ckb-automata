@@ -21,6 +21,23 @@ export type paths = {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/v1/events/stream": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /** Stream public job and transaction events with resumable event IDs */
+        readonly get: operations["JobEventStreamController_stream"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/v1/health/live": {
         readonly parameters: {
             readonly query?: never;
@@ -362,6 +379,44 @@ export interface operations {
             };
             /** @description Index checkpoint changed during pagination */
             readonly 409: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly JobEventStreamController_stream: {
+        readonly parameters: {
+            readonly query: {
+                /** @description Last delivered decimal event ID; Last-Event-ID takes precedence */
+                readonly cursor?: string;
+                readonly jobId: string;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Resumable stream of job-event, transaction-event, and heartbeat frames */
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "text/event-stream": string;
+                };
+            };
+            /** @description Malformed job ID or reconnect cursor */
+            readonly 400: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Job not found */
+            readonly 404: {
                 headers: {
                     readonly [name: string]: unknown;
                 };

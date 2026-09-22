@@ -203,6 +203,36 @@
         "tags": ["jobs"]
       }
     },
+    "/v1/events/stream": {
+      "get": {
+        "operationId": "JobEventStreamController_stream",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "jobId",
+            "required": true,
+            "schema": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+          },
+          {
+            "description": "Last delivered decimal event ID; Last-Event-ID takes precedence",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": { "text/event-stream": { "schema": { "type": "string" } } },
+            "description": "Resumable stream of job-event, transaction-event, and heartbeat frames"
+          },
+          "400": { "description": "Malformed job ID or reconnect cursor" },
+          "404": { "description": "Job not found" }
+        },
+        "summary": "Stream public job and transaction events with resumable event IDs",
+        "tags": ["job events"]
+      }
+    },
     "/v1/health/live": {
       "get": {
         "operationId": "HealthController_live",
