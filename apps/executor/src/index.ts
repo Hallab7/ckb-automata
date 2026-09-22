@@ -30,4 +30,11 @@ export {
   type DeadlineInspection,
   type DeadlineRefundRecord,
 } from "./policies/deadline.ts";
-export { RECURRING_EXECUTOR_REGISTRATION } from "./policies/recurring.ts";
+export {
+  RECURRING_EXECUTOR_ADAPTER,
+  RECURRING_EXECUTOR_REGISTRATION,
+  RecurringAdapterError,
+  type RecurringAdapterErrorCode,
+  type RecurringEvidence,
+  type RecurringInspection,
+} from "./policies/recurring.ts";

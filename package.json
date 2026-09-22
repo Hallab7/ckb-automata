@@ -20,6 +20,7 @@
     "contracts:fuzz:long": "node scripts/run-contract-fuzz.mjs --seconds 300",
     "contracts:fuzz:smoke": "node scripts/run-contract-fuzz.mjs --runs 256",
     "contracts:deploy:local": "node scripts/deploy-local-contracts.mjs",
+    "executor:verify:recurring:local": "node scripts/verify-recurring-executor-local.mjs",
     "format": "prettier --write . && cargo fmt --all",
     "format:check": "prettier --check . && cargo fmt --all --check",
     "fixtures:generate": "node scripts/generate-creation-fixtures.mjs",
