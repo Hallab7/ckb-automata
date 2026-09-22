@@ -1,6 +1,15 @@
 name: ckb-automata-local
 
 services:
+  ckb:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/ckb-dev.Dockerfile
+    ports:
+      - 127.0.0.1:${CKB_RPC_PORT:-58114}:8114
+    volumes:
+      - ckb-data:/var/lib/ckb
+
   postgres:
     image: postgres:18.0-bookworm@sha256:3f55f8895c4ed50603e2fbdfc72fffeeaba3173321fee5cb825bbbeb30d9d854
     environment:
@@ -44,6 +53,8 @@ services:
       - redis-data:/data
 
 volumes:
+  ckb-data:
+    name: ckb-automata-ckb-data-v1
   postgres-data:
     name: ckb-automata-postgres-data
   redis-data:

@@ -7,10 +7,11 @@ const contractBuilder = await readFile(
   new URL("deploy/docker/contracts-builder.Dockerfile", root),
   "utf8",
 );
+const localCkb = await readFile(new URL("deploy/docker/ckb-dev.Dockerfile", root), "utf8");
 
 const failures = [];
 const exactSemver = /^\d+\.\d+\.\d+$/;
-const digestImage = /^[^\s]+:\d+(?:\.\d+){1,2}[^\s]*@sha256:[a-f0-9]{64}$/;
+const digestImage = /^[^\s]+:v?\d+(?:\.\d+){1,2}[^\s]*@sha256:[a-f0-9]{64}$/;
 
 for (const [name, version] of Object.entries(versions.directDependencies)) {
   if (!exactSemver.test(version)) {
@@ -26,6 +27,10 @@ for (const [name, image] of Object.entries(versions.dockerImages)) {
 
 if (!contractBuilder.replaceAll("\r\n", "\n").startsWith(`FROM ${versions.dockerImages.rust}\n`)) {
   failures.push("contract builder image differs from the Rust image pin");
+}
+
+if (!localCkb.replaceAll("\r\n", "\n").startsWith(`FROM ${versions.dockerImages.ckb}\n`)) {
+  failures.push("local CKB image differs from the CKB image pin");
 }
 
 for (const [name, version] of Object.entries(packageManifest.devDependencies)) {

@@ -34,6 +34,7 @@
     "zod": "4.6.5"
   },
   "dockerImages": {
+    "ckb": "nervos/ckb:v0.210.0@sha256:35a5c23ebceb9593fe937ddf697ba68d170fcb37c931fbfbd606686d5c753ae8",
     "node": "node:24.11.1-bookworm-slim@sha256:48abc13a19400ca3985071e287bd405a1d99306770eb81d61202fb6b65cf0b57",
     "postgres": "postgres:18.0-bookworm@sha256:3f55f8895c4ed50603e2fbdfc72fffeeaba3173321fee5cb825bbbeb30d9d854",
     "redis": "redis:8.2.1-bookworm@sha256:5fa2edb1e408fa8235e6db8fab01d1afaaae96c9403ba67b70feceb8661e8621",

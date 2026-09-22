@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "network": "ckb_dev",
+  "rpcUrl": "http://127.0.0.1:58114",
+  "genesisHash": "0x5a7b2eb5a3aa224edb367eb7aba742c6f60efaddb6b9536ab2a2c20e0af6cff3",
+  "consensus": {
+    "hardfork": "ckb2023",
+    "activationEpoch": 0
+  },
+  "nodeVersion": "0.210.0 (2592ddf 2026-09-17)",
+  "fixtureWallet": {
+    "lockArg": "0xb6ac779881b4fe05a167e413ff534469b6b5f6c0",
+    "warning": "Public local-development fixture only"
+  },
+  "artifacts": {
+    "sourceRevision": "5ee2ba3c3ab8dc8ef0544992599088aced00502a",
+    "schemaSha256": "3e7c161fd3781500d740d5b14ffb3e6f74e02b5e1912dba48389d3dda7165380",
+    "builder": {
+      "baseImage": "rust:1.93.1-bookworm@sha256:7c4ae649a84014c467d79319bbf17ce2632ae8b8be123ac2fb2ea5be46823f31",
+      "dockerfileSha256": "6528426d04c00b9d22294c14184b34c3097d75031c44e8f2f95756b5096cb16b",
+      "rust": "1.93.1",
+      "target": "riscv64imac-unknown-none-elf",
+      "profile": "release",
+      "sourceDateEpoch": 0
+    }
+  },
+  "secp256k1Blake160": {
+    "codeHash": "0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8",
+    "hashType": "type",
+    "cellDep": {
+      "outPoint": {
+        "txHash": "0x9c7cf03c830f03f03547b3db6ff1cc40e38aaa5cede5c14b217f26ef2a10c372",
+        "index": "0x0"
+      },
+      "depType": "depGroup"
+    }
+  },
+  "deployment": {
+    "transactionHash": "0xf54878e7d6a198dfbadbb3186ae5672609b3f9cd19d28c8bdc67a10fc59c55d0",
+    "blockHash": "0xfa08885bc07af9d105879353de92cb93143fe0b0c360aeae5a39ae02cdf1dcd7"
+  },
+  "contracts": {
+    "job-lock": {
+      "codeHash": "0x49bac0e6cbf5030c72212a745872cd2ba3e1ca97597bdb73fae3efb706da3165",
+      "hashType": "data1",
+      "cellDep": {
+        "outPoint": {
+          "txHash": "0xf54878e7d6a198dfbadbb3186ae5672609b3f9cd19d28c8bdc67a10fc59c55d0",
+          "index": "0x0"
+        },
+        "depType": "code"
+      },
+      "binarySha256": "a54481bb4af6e028d2a52f1c72b61a958b8314ddc460419faac9bf1f4ddf6549",
+      "sizeBytes": 25792
+    },
+    "deadline-policy": {
+      "codeHash": "0x613d3d0b820444ddab17f8d36f605715927716537e03f873d1771344c891d0c8",
+      "hashType": "data1",
+      "cellDep": {
+        "outPoint": {
+          "txHash": "0xf54878e7d6a198dfbadbb3186ae5672609b3f9cd19d28c8bdc67a10fc59c55d0",
+          "index": "0x1"
+        },
+        "depType": "code"
+      },
+      "binarySha256": "d9b12ea60487d1fce8d1f7bd13119453587487c6f6b3dfad0ab8c1835ea5bac9",
+      "sizeBytes": 31136
+    },
+    "recurring-policy": {
+      "codeHash": "0xd671a134cc96ba214696eba27bab6f7ad3436a980e6b1a3916cabcf5e358da57",
+      "hashType": "data1",
+      "cellDep": {
+        "outPoint": {
+          "txHash": "0xf54878e7d6a198dfbadbb3186ae5672609b3f9cd19d28c8bdc67a10fc59c55d0",
+          "index": "0x2"
+        },
+        "depType": "code"
+      },
+      "binarySha256": "44edf5ec776084979ae3d623b0e329bfefca70c4ed685631e6e1a5776e721c89",
+      "sizeBytes": 35224
+    },
+    "demo-campaign-type": {
+      "codeHash": "0x6220c518ced03601cc26c6594c754c560ee56624de94e8a901d25d1f737e9c10",
+      "hashType": "data1",
+      "cellDep": {
+        "outPoint": {
+          "txHash": "0xf54878e7d6a198dfbadbb3186ae5672609b3f9cd19d28c8bdc67a10fc59c55d0",
+          "index": "0x3"
+        },
+        "depType": "code"
+      },
+      "binarySha256": "6531ce179592c3322aff3dc83b61f6f599c339819165da082801a3b2f966b915",
+      "sizeBytes": 31584
+    }
+  },
+  "verification": {
+    "kind": "campaign-creation",
+    "transactionHash": "0xad30ce0f3801f1c484864242061de0be2ccb51dcfba89e72d7efbe3b383db96c",
+    "blockHash": "0xf0cfc83f283126ca2b2dd07b440a6aa7c6247ab6e614265203b7198c16c5cc57",
+    "contract": "demo-campaign-type",
+    "status": "committed"
+  }
+}
