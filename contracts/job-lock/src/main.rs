@@ -33,30 +33,15 @@ mod trigger {
     include!("../../shared/trigger.rs");
 }
 
+mod execution_witness {
+    include!("../../shared/execution_witness.rs");
+}
+
 use error_codes::ScriptError;
 use generated::JobDataV1;
 
 entry!(main);
 default_alloc!();
-
-const MODE_CANCEL: u8 = 1;
-const MODE_RECOVER: u8 = 2;
-const MODE_TOP_UP: u8 = 3;
-const MAX_CONTROLLED_OUTPUTS: usize = 16;
-
-enum Operation {
-    Execute {
-        controlled_output_count: usize,
-        controlled_output_indices: [usize; MAX_CONTROLLED_OUTPUTS],
-        reward_output_index: usize,
-        executor_lock_hash: [u8; 32],
-    },
-    Cancel,
-    Recover,
-    TopUp {
-        successor_output_index: usize,
-    },
-}
 
 fn main() -> i8 {
     match program_entry() {
@@ -67,25 +52,20 @@ fn main() -> i8 {
 
 fn program_entry() -> Result<(), ScriptError> {
     match load_operation()? {
-        Operation::Execute {
-            controlled_output_count,
-            controlled_output_indices,
-            reward_output_index,
-            executor_lock_hash,
-        } => validate_execution(
-            reward_output_index,
-            executor_lock_hash,
-            &controlled_output_indices[..controlled_output_count],
+        execution_witness::WitnessOperation::Execute(request) => validate_execution(
+            request.reward_output_index,
+            request.executor_lock_hash,
+            &request.controlled_output_indices[..request.controlled_output_count],
         ),
-        Operation::Cancel => validate_cancellation(),
-        Operation::Recover => validate_recovery(),
-        Operation::TopUp {
+        execution_witness::WitnessOperation::Cancel => validate_cancellation(),
+        execution_witness::WitnessOperation::Recover => validate_recovery(),
+        execution_witness::WitnessOperation::TopUp {
             successor_output_index,
         } => validate_top_up(successor_output_index),
     }
 }
 
-fn load_operation() -> Result<Operation, ScriptError> {
+fn load_operation() -> Result<execution_witness::WitnessOperation, ScriptError> {
     let witness =
         load_witness_args(0, Source::GroupInput).map_err(|_| ScriptError::InvalidWitnessMode)?;
     let input_type = witness
@@ -93,51 +73,7 @@ fn load_operation() -> Result<Operation, ScriptError> {
         .to_opt()
         .ok_or(ScriptError::InvalidWitnessMode)?;
     let bytes = input_type.raw_data();
-    match bytes.as_ref() {
-        [MODE_CANCEL] => Ok(Operation::Cancel),
-        [MODE_RECOVER] => Ok(Operation::Recover),
-        [MODE_TOP_UP, index @ ..] if index.len() == 4 => {
-            let mut output_index = [0_u8; 4];
-            output_index.copy_from_slice(index);
-            Ok(Operation::TopUp {
-                successor_output_index: u32::from_le_bytes(output_index) as usize,
-            })
-        }
-        execution if execution.len() >= 38 && execution[0] == 0 => {
-            let mut output_index = [0_u8; 4];
-            output_index.copy_from_slice(&execution[1..5]);
-            let mut executor_lock_hash = [0_u8; 32];
-            executor_lock_hash.copy_from_slice(&execution[5..37]);
-            let controlled_output_count = execution[37] as usize;
-            if controlled_output_count == 0
-                || controlled_output_count > MAX_CONTROLLED_OUTPUTS
-                || execution.len() != 38 + controlled_output_count * 4
-            {
-                return Err(ScriptError::InvalidWitnessMode);
-            }
-            let mut controlled_output_indices = [0_usize; MAX_CONTROLLED_OUTPUTS];
-            for (position, chunk) in execution[38..].chunks_exact(4).enumerate() {
-                let mut index = [0_u8; 4];
-                index.copy_from_slice(chunk);
-                controlled_output_indices[position] = u32::from_le_bytes(index) as usize;
-            }
-            let controlled = &controlled_output_indices[..controlled_output_count];
-            if controlled
-                .iter()
-                .enumerate()
-                .any(|(position, index)| controlled[..position].contains(index))
-            {
-                return Err(ScriptError::InvalidWitnessMode);
-            }
-            Ok(Operation::Execute {
-                controlled_output_count,
-                controlled_output_indices,
-                reward_output_index: u32::from_le_bytes(output_index) as usize,
-                executor_lock_hash,
-            })
-        }
-        _ => Err(ScriptError::InvalidWitnessMode),
-    }
+    execution_witness::parse_witness_operation(&bytes).ok_or(ScriptError::InvalidWitnessMode)
 }
 
 fn load_job() -> Result<JobDataV1, ScriptError> {

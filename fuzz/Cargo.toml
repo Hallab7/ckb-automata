@@ -1,0 +1,38 @@
+[package]
+name = "automata-contract-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+ckb-hash = { version = "=1.1.0", default-features = false, features = ["ckb-contract"] }
+ckb-types = "=1.1.0"
+libfuzzer-sys = "=0.4.13"
+molecule = { version = "=0.9.2", default-features = false, features = ["bytes_vec"] }
+
+[[bin]]
+name = "molecule_parsing"
+path = "fuzz_targets/molecule_parsing.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "witness_arithmetic"
+path = "fuzz_targets/witness_arithmetic.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "malformed_transaction"
+path = "fuzz_targets/malformed_transaction.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]
+members = ["."]

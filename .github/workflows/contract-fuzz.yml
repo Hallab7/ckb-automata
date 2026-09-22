@@ -1,0 +1,38 @@
+name: Contract Fuzz
+
+on:
+  schedule:
+    - cron: "17 2 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contract-fuzz-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  extended-fuzz:
+    name: extended-fuzz
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up workspace
+        uses: ./.github/actions/setup-node-workspace
+      - name: Install pinned nightly and fuzz runner
+        run: |
+          rustup toolchain install nightly-2026-09-01 --profile minimal
+          cargo +nightly-2026-09-01 install cargo-fuzz --version 0.13.2 --locked
+      - name: Run extended reproducible fuzz campaign
+        run: npm exec --yes --package=pnpm@12.5.1 -- pnpm contracts:fuzz:long
+      - name: Upload crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fuzz-artifacts-${{ github.run_id }}
+          path: fuzz/artifacts
+          if-no-files-found: ignore
+          retention-days: 14

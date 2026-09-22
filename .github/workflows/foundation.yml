@@ -116,3 +116,18 @@ jobs:
         uses: ./.github/actions/setup-rust
       - name: Run contract tests
         run: npm exec --yes --package=pnpm@12.5.1 -- pnpm contracts:test
+
+  contract-fuzz-smoke:
+    name: contract-fuzz-smoke
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up workspace
+        uses: ./.github/actions/setup-node-workspace
+      - name: Install pinned nightly and fuzz runner
+        run: |
+          rustup toolchain install nightly-2026-09-01 --profile minimal
+          cargo +nightly-2026-09-01 install cargo-fuzz --version 0.13.2 --locked
+      - name: Run bounded fuzz smoke tests
+        run: npm exec --yes --package=pnpm@12.5.1 -- pnpm contracts:fuzz:smoke

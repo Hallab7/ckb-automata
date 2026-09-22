@@ -64,6 +64,14 @@ pub mod recurring {
     include!("../../shared/recurring.rs");
 }
 
+pub mod execution_witness {
+    include!("../../shared/execution_witness.rs");
+}
+
+pub mod output_match {
+    include!("../../shared/output_match.rs");
+}
+
 #[cfg(test)]
 mod execution_mode;
 

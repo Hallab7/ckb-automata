@@ -12,6 +12,7 @@ Configure branch protection to require these stable job names:
 - `unit-test`
 - `contract-build`
 - `contract-test`
+- `contract-fuzz-smoke`
 
 The contract build uploads the four RISC-V binaries as a 14-day artifact named
 with the source revision. Missing binaries fail the job.
@@ -35,3 +36,8 @@ Remove-Item Env:AUTOMATA_CI_BREAK
 
 The middle command must exit nonzero. Run it again without the environment
 variable to verify the successful path.
+
+The fuzz smoke job exercises the contract parsers and arithmetic helpers with
+fixed seeds on every foundation run. The separate `Contract Fuzz` workflow runs
+the same targets for five minutes each every Monday and can also be dispatched
+manually. Crash artifacts are retained for 14 days.

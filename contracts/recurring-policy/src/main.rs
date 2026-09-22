@@ -45,21 +45,20 @@ mod recurring {
     include!("../../shared/recurring.rs");
 }
 
+mod execution_witness {
+    include!("../../shared/execution_witness.rs");
+}
+
+mod output_match {
+    include!("../../shared/output_match.rs");
+}
+
 use error_codes::ScriptError;
 use job_generated::JobDataV1;
 use recurring_generated::RecurringPayloadV1;
 
 entry!(main);
 default_alloc!();
-
-const MAX_CONTROLLED_OUTPUTS: usize = 16;
-
-struct ExecutionRequest {
-    reward_output_index: usize,
-    executor_lock_hash: [u8; 32],
-    controlled_output_count: usize,
-    controlled_output_indices: [usize; MAX_CONTROLLED_OUTPUTS],
-}
 
 fn main() -> i8 {
     match program_entry() {
@@ -221,7 +220,14 @@ fn validate_unique_payout(payload: &RecurringPayloadV1) -> Result<usize, ScriptE
                 .map_err(|_| ScriptError::InvalidApplicationState)?;
             let data = load_cell_data(index, Source::Output)
                 .map_err(|_| ScriptError::InvalidApplicationState)?;
-            if capacity == amount && type_hash.is_none() && data.is_empty() {
+            if output_match::matches_plain_output(
+                &lock_hash,
+                &recipient_hash,
+                capacity,
+                amount,
+                type_hash.is_some(),
+                data.is_empty(),
+            ) {
                 if payout_index.is_some() {
                     return Err(ScriptError::InvalidApplicationState);
                 }
@@ -245,17 +251,20 @@ fn validate_plain_output(
         .map_err(|_| ScriptError::InvalidApplicationState)?;
     let data =
         load_cell_data(index, Source::Output).map_err(|_| ScriptError::InvalidApplicationState)?;
-    if lock_hash != *expected_lock_hash
-        || capacity != expected_capacity
-        || type_hash.is_some()
-        || !data.is_empty()
-    {
+    if !output_match::matches_plain_output(
+        &lock_hash,
+        expected_lock_hash,
+        capacity,
+        expected_capacity,
+        type_hash.is_some(),
+        data.is_empty(),
+    ) {
         return Err(ScriptError::InvalidApplicationState);
     }
     Ok(())
 }
 
-fn load_execution_request() -> Result<ExecutionRequest, ScriptError> {
+fn load_execution_request() -> Result<execution_witness::ExecutionRequest, ScriptError> {
     let witness =
         load_witness_args(0, Source::GroupInput).map_err(|_| ScriptError::InvalidWitnessMode)?;
     let bytes = witness
@@ -263,37 +272,10 @@ fn load_execution_request() -> Result<ExecutionRequest, ScriptError> {
         .to_opt()
         .ok_or(ScriptError::InvalidWitnessMode)?
         .raw_data();
-    if bytes.len() < 38 || bytes[0] != 0 {
-        return Err(ScriptError::InvalidWitnessMode);
+    match execution_witness::parse_witness_operation(&bytes) {
+        Some(execution_witness::WitnessOperation::Execute(request)) => Ok(request),
+        _ => Err(ScriptError::InvalidWitnessMode),
     }
-    let reward_output_index = read_u32(&bytes[1..5]) as usize;
-    let mut executor_lock_hash = [0_u8; 32];
-    executor_lock_hash.copy_from_slice(&bytes[5..37]);
-    let controlled_output_count = bytes[37] as usize;
-    if controlled_output_count == 0
-        || controlled_output_count > MAX_CONTROLLED_OUTPUTS
-        || bytes.len() != 38 + controlled_output_count * 4
-    {
-        return Err(ScriptError::InvalidWitnessMode);
-    }
-    let mut controlled_output_indices = [0_usize; MAX_CONTROLLED_OUTPUTS];
-    for (position, chunk) in bytes[38..].chunks_exact(4).enumerate() {
-        controlled_output_indices[position] = read_u32(chunk) as usize;
-    }
-    let controlled = &controlled_output_indices[..controlled_output_count];
-    if controlled
-        .iter()
-        .enumerate()
-        .any(|(position, index)| controlled[..position].contains(index))
-    {
-        return Err(ScriptError::InvalidWitnessMode);
-    }
-    Ok(ExecutionRequest {
-        reward_output_index,
-        executor_lock_hash,
-        controlled_output_count,
-        controlled_output_indices,
-    })
 }
 
 fn validate_intent(

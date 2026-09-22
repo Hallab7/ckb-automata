@@ -15,6 +15,8 @@
     "contracts:build": "cargo build-contracts --locked",
     "contracts:test": "cargo test-native --locked",
     "contracts:check-reproducible": "node scripts/check-contract-build.mjs",
+    "contracts:fuzz:long": "node scripts/run-contract-fuzz.mjs --seconds 300",
+    "contracts:fuzz:smoke": "node scripts/run-contract-fuzz.mjs --runs 256",
     "format": "prettier --write . && cargo fmt --all",
     "format:check": "prettier --check . && cargo fmt --all --check",
     "infra:down": "docker compose --file deploy/docker/compose.yml down",
