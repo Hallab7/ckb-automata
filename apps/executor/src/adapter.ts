@@ -8,6 +8,7 @@ import {
   type PolicyMetadata,
   type RegisteredDeployment,
   type ScriptIdentity,
+  type Shannons,
   type UnsignedDeadlineTransaction,
 } from "@ckb-automata/core";
 
@@ -37,11 +38,16 @@ export interface ExecutorSnapshot {
   readonly tip: ExecutorHeaderSnapshot;
   readonly job: ExecutorCellSnapshot;
   readonly applicationCells: readonly ExecutorCellSnapshot[];
+  readonly feeCells: readonly ExecutorCellSnapshot[];
   readonly headers: readonly ExecutorHeaderSnapshot[];
+  readonly resolvedLocks: readonly ScriptIdentity[];
+  readonly payloads: readonly Hex[];
+  readonly claims: Readonly<Record<string, unknown>>;
 }
 
 export interface ExecutorIdentity {
   readonly rewardLock: ScriptIdentity;
+  readonly transactionFee: Shannons;
 }
 
 export interface ExecutorContext {

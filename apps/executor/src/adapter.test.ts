@@ -8,6 +8,7 @@ import {
   parseBlockNumber,
   parseHash32,
   parseOutPoint,
+  parseShannons,
   type RegisteredDeployment,
   type ScriptIdentity,
 } from "@ckb-automata/core";
@@ -88,7 +89,11 @@ async function recurringSnapshot(): Promise<{
         blockNumber: jobHeader.number,
       }),
       applicationCells: Object.freeze([]),
+      feeCells: Object.freeze([]),
       headers: Object.freeze([jobHeader]),
+      resolvedLocks: Object.freeze([]),
+      payloads: Object.freeze([]),
+      claims: Object.freeze({}),
     }),
   };
 }
@@ -134,9 +139,11 @@ test("identical snapshot and executor identity produce identical policy outputs"
   const registry = new ExecutorAdapterRegistry([adapter]);
   const first = runExecutorAdapter(registry, fixture.snapshot, {
     rewardLock: fixture.rewardLock,
+    transactionFee: parseShannons("1000000"),
   });
   const second = runExecutorAdapter(registry, fixture.snapshot, {
     rewardLock: fixture.rewardLock,
+    transactionFee: parseShannons("1000000"),
   });
   assert.deepEqual(first, second);
   assert.equal(first.status, "built");
@@ -192,6 +199,7 @@ test("ineligible decisions stop before build", async () => {
   });
   const result = runExecutorAdapter(new ExecutorAdapterRegistry([adapter]), fixture.snapshot, {
     rewardLock: fixture.rewardLock,
+    transactionFee: parseShannons("1000000"),
   });
   assert.equal(result.status, "ineligible");
   assert.equal(builds, 0);
@@ -212,6 +220,7 @@ test("the registry rejects ambiguous support and exposes failed self-verificatio
   });
   const result = runExecutorAdapter(new ExecutorAdapterRegistry([invalid]), fixture.snapshot, {
     rewardLock: fixture.rewardLock,
+    transactionFee: parseShannons("1000000"),
   });
   assert.equal(result.status, "invalid_build");
   assert.equal(result.verification.reason, "EXECUTOR_SIMULATION_REJECTED");
@@ -228,7 +237,7 @@ test("the registry rejects ambiguous support and exposes failed self-verificatio
       runExecutorAdapter(
         new ExecutorAdapterRegistry([invalid, duplicateSupport]),
         fixture.snapshot,
-        { rewardLock: fixture.rewardLock },
+        { rewardLock: fixture.rewardLock, transactionFee: parseShannons("1000000") },
       ),
     (error: unknown) =>
       error instanceof ExecutorAdapterError && error.code === "UNSUPPORTED_POLICY",

@@ -21,5 +21,13 @@ export {
   type RegisteredExecutorAdapter,
 } from "./adapter.ts";
 
-export { DEADLINE_EXECUTOR_REGISTRATION } from "./policies/deadline.ts";
+export {
+  DEADLINE_EXECUTOR_ADAPTER,
+  DEADLINE_EXECUTOR_REGISTRATION,
+  DeadlineAdapterError,
+  type DeadlineAdapterErrorCode,
+  type DeadlineEvidence,
+  type DeadlineInspection,
+  type DeadlineRefundRecord,
+} from "./policies/deadline.ts";
 export { RECURRING_EXECUTOR_REGISTRATION } from "./policies/recurring.ts";

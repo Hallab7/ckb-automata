@@ -8,6 +8,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@ckb-automata/core": "workspace:*"
+    "@ckb-automata/core": "workspace:*",
+    "@ckb-automata/molecule": "workspace:*",
+    "@nervosnetwork/ckb-sdk-utils": "0.109.5"
   }
 }

@@ -200,6 +200,12 @@ importers:
       '@ckb-automata/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@ckb-automata/molecule':
+        specifier: workspace:*
+        version: link:../../packages/molecule
+      '@nervosnetwork/ckb-sdk-utils':
+        specifier: 0.109.5
+        version: 0.109.5
 
   apps/web:
     dependencies:
