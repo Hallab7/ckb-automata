@@ -89,6 +89,8 @@ their domain-separated hash equals `refund_commitment`.
   pays a job-funded reward.
 - Top up creates one owner-selected successor, preserves intent and progress,
   and only increases reward, budget, or both with sufficient added capacity.
+  Recurring jobs keep reward unchanged because it is committed by
+  `RecurringPayloadV1`; they may increase remaining budget only.
 
 ### Recurring Policy
 

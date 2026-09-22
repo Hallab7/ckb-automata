@@ -2,6 +2,8 @@
 
 Witness mode `3` lets the committed owner increase a live Job Cell's executor
 reward, remaining budget, and backing capacity without replacing its intent.
+For recurring jobs, the payload fixes the per-run reward, so their top-up path
+increases remaining budget and backing capacity without changing reward.
 The five-byte `input_type` payload is the mode byte followed by the successor
 output index as a little-endian `u32`.
 

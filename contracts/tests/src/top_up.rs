@@ -45,6 +45,7 @@ enum Mutation {
     Runs,
     Owner,
     RewardDecrease,
+    RewardIncrease,
     BudgetDecrease,
     NoIncrease,
     RewardExceedsBudget,
@@ -95,9 +96,14 @@ fn build_top_up_case_with_policy(mutation: Mutation, deployed_policy: Option<&st
     let input_data = job_data(owner_hash, policy_hash, REWARD, BUDGET, 3);
     let input_job = JobDataV1::from_slice(&input_data).expect("fixture job data");
 
+    let default_reward = if deployed_policy == Some("recurring-policy") {
+        REWARD
+    } else {
+        REWARD + 2_000_000_000
+    };
     let mut successor_builder = input_job
         .as_builder()
-        .reward((REWARD + 2_000_000_000).to_le_bytes())
+        .reward(default_reward.to_le_bytes())
         .remaining_budget((BUDGET + 10_000_000_000).to_le_bytes());
     successor_builder = match mutation {
         Mutation::Version => successor_builder.version(2_u16.to_le_bytes()),
@@ -114,6 +120,9 @@ fn build_top_up_case_with_policy(mutation: Mutation, deployed_policy: Option<&st
         Mutation::Runs => successor_builder.remaining_runs(4_u32.to_le_bytes()),
         Mutation::Owner => successor_builder.cancel_lock_hash([0x85; 32]),
         Mutation::RewardDecrease => successor_builder.reward((REWARD - 1).to_le_bytes()),
+        Mutation::RewardIncrease => {
+            successor_builder.reward((REWARD + 2_000_000_000).to_le_bytes())
+        }
         Mutation::BudgetDecrease => successor_builder.remaining_budget((BUDGET - 1).to_le_bytes()),
         Mutation::NoIncrease => successor_builder
             .reward(REWARD.to_le_bytes())
@@ -252,6 +261,13 @@ fn deployed_policies_allow_owner_top_up() {
         ))
         .unwrap_or_else(|error| panic!("{policy_name} top-up failed: {error}"));
     }
+}
+
+#[test]
+fn recurring_top_up_preserves_the_payload_committed_reward() {
+    let case = build_top_up_case_with_policy(Mutation::RewardIncrease, Some("recurring-policy"));
+    let error = verify(&case).expect_err("recurring reward mutation must fail");
+    assert!(error.contains("25"), "unexpected error: {error}");
 }
 
 #[test]

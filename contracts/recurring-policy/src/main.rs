@@ -74,7 +74,7 @@ fn program_entry() -> Result<(), ScriptError> {
         (0, 1) => validate_creation(),
         (1, 1) => {
             if owner_top_up_requested()? {
-                Ok(())
+                validate_owner_top_up()
             } else {
                 validate_execution()
             }
@@ -88,6 +88,18 @@ fn program_entry() -> Result<(), ScriptError> {
         }
         _ => Err(ScriptError::InvalidApplicationState),
     }
+}
+
+fn validate_owner_top_up() -> Result<(), ScriptError> {
+    let input_data = load_cell_data(0, Source::GroupInput).map_err(|_| ScriptError::InvalidData)?;
+    let output_data =
+        load_cell_data(0, Source::GroupOutput).map_err(|_| ScriptError::InvalidData)?;
+    let input = JobDataV1::from_slice(&input_data).map_err(|_| ScriptError::InvalidData)?;
+    let output = JobDataV1::from_slice(&output_data).map_err(|_| ScriptError::InvalidData)?;
+    if input.reward().as_slice() != output.reward().as_slice() {
+        return Err(ScriptError::SuccessorInvariantMismatch);
+    }
+    Ok(())
 }
 
 fn owner_top_up_requested() -> Result<bool, ScriptError> {

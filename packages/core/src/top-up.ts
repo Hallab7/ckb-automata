@@ -130,7 +130,10 @@ function delta(after: Shannons, before: Shannons): bigint {
 function policyDependency(
   deployment: RegisteredDeployment,
   policyScript: ScriptIdentity | null,
-): CellDepIdentity {
+): {
+  readonly contract: "recurring-policy" | "deadline-policy";
+  readonly cellDep: CellDepIdentity;
+} {
   if (policyScript) {
     for (const name of ["recurring-policy", "deadline-policy"] as const) {
       const registered = deployment.contracts[name];
@@ -140,7 +143,7 @@ function policyDependency(
         ((name === "recurring-policy" && policyScript.args === "0x") ||
           (name === "deadline-policy" && /^0x[0-9a-f]{64}$/.test(policyScript.args)))
       ) {
-        return registered.cellDep;
+        return Object.freeze({ contract: name, cellDep: registered.cellDep });
       }
     }
   }
@@ -238,7 +241,7 @@ export async function buildTopUp(input: TopUpInput): Promise<TopUpBuild> {
       "the resolved cell is not locked by the registered Job Lock",
     );
   }
-  const policyDep = policyDependency(input.deployment, live.output.type);
+  const policy = policyDependency(input.deployment, live.output.type);
   const inspection = inspectJobData(live.data, {
     manifest: input.deployment.manifest,
     expectedGenesisHash: input.deployment.genesisHash,
@@ -260,6 +263,12 @@ export async function buildTopUp(input: TopUpInput): Promise<TopUpBuild> {
   const rewardIncrease = parseShannons(input.rewardIncrease);
   const budgetIncrease = parseShannons(input.budgetIncrease);
   const capacityIncrease = parseShannons(input.capacityIncrease);
+  if (policy.contract === "recurring-policy" && rewardIncrease > 0n) {
+    throw new TopUpBuildError(
+      "INVALID_INCREASE",
+      "recurring reward is payload-committed; recurring top-up may increase budget only",
+    );
+  }
   if (rewardIncrease === 0n && budgetIncrease === 0n) {
     throw new TopUpBuildError(
       "INVALID_INCREASE",
@@ -305,7 +314,7 @@ export async function buildTopUp(input: TopUpInput): Promise<TopUpBuild> {
     cellDeps: Object.freeze([
       input.deployment.manifest.secp256k1Blake160.cellDep,
       input.deployment.contracts["job-lock"].cellDep,
-      policyDep,
+      policy.cellDep,
     ]),
     headerDeps: Object.freeze([]),
     inputs: Object.freeze([

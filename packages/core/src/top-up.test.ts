@@ -105,18 +105,19 @@ test("top-up preserves intent for recurring and deadline policies", async () => 
   const registered = await deployment();
   const owner = ownerLock(registered);
   for (const cell of [recurringCell(registered, owner), deadlineCell(registered, owner)]) {
+    const recurring = cell.output.type?.args === "0x";
     const build = await buildTopUp({
       deployment: registered,
       resolver: resolver(cell),
       jobOutPoint,
       ownerLock: owner,
-      rewardIncrease: "1000000000",
+      rewardIncrease: recurring ? "0" : "1000000000",
       budgetIncrease: "10000000000",
       capacityIncrease: "10000000000",
     });
     assert.equal(build.diff.classification, "top_up");
     assert.deepEqual(build.diff.immutableChanges, []);
-    assert.equal(build.diff.funding.reward.delta, 1_000_000_000n);
+    assert.equal(build.diff.funding.reward.delta, recurring ? 0n : 1_000_000_000n);
     assert.equal(build.diff.funding.remainingBudget.delta, 10_000_000_000n);
     assert.equal(build.diff.funding.capacity.delta, 10_000_000_000n);
     assert.deepEqual(build.transaction.outputs[0]?.lock, cell.output.lock);
@@ -188,6 +189,17 @@ test("top-up rejects stale, wrong-owner, no-op, and unfunded requests", async ()
     capacityIncrease: "10000000000",
   } as const;
   await assert.rejects(
+    buildTopUp({
+      ...baseline,
+      resolver: resolver(cell),
+      rewardIncrease: "1000000000",
+    }),
+    (error: unknown) =>
+      error instanceof TopUpBuildError &&
+      error.code === "INVALID_INCREASE" &&
+      /payload-committed/.test(error.message),
+  );
+  await assert.rejects(
     buildTopUp({ ...baseline, resolver: resolver(null) }),
     (error: unknown) => error instanceof TopUpBuildError && error.code === "STALE_OUTPOINT",
   );
@@ -230,7 +242,7 @@ test("wallet completion cannot mutate the successor or operation", async () => {
     resolver: resolver(recurringCell(registered, owner)),
     jobOutPoint,
     ownerLock: owner,
-    rewardIncrease: "1000000000",
+    rewardIncrease: "0",
     budgetIncrease: "10000000000",
     capacityIncrease: "10000000000",
   });

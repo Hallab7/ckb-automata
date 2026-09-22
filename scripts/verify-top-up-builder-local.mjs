@@ -162,7 +162,7 @@ const topUp = await buildTopUp({
   resolver,
   jobOutPoint,
   ownerLock,
-  rewardIncrease: "1000000000",
+  rewardIncrease: "0",
   budgetIncrease: topUpCapacity,
   capacityIncrease: topUpCapacity,
 });
