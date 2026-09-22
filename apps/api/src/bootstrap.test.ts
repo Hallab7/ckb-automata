@@ -140,6 +140,24 @@ test("default application factory uses the pinned Fastify adapter", async () => 
   try {
     assert.equal(result.app.getHttpAdapter().constructor.name, "FastifyAdapter");
     await result.app.init();
+    const fastify = result.app.getHttpAdapter().getInstance() as {
+      inject(input: {
+        method: string;
+        url: string;
+      }): Promise<{ statusCode: number; json(): unknown }>;
+    };
+    const liveness = await fastify.inject({ method: "GET", url: "/v1/health/live" });
+    assert.equal(liveness.statusCode, 200);
+    assert.deepEqual(liveness.json(), {
+      status: "ok",
+      service: "ckb-automata:api",
+      uptimeSeconds: (liveness.json() as { uptimeSeconds: number }).uptimeSeconds,
+    });
+    const unversioned = await fastify.inject({ method: "GET", url: "/health/live" });
+    assert.equal(unversioned.statusCode, 404);
+    const readiness = await fastify.inject({ method: "GET", url: "/v1/health/ready" });
+    assert.equal(readiness.statusCode, 503);
+    assert.equal((readiness.json() as { status: string }).status, "not_ready");
   } finally {
     await result.app.close();
   }

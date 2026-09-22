@@ -9,7 +9,7 @@ import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fa
 
 import { parseEnvironment, type AutomataEnvironment } from "@ckb-automata/config";
 
-import { AppModule } from "./app.module.ts";
+import { createAppModule } from "./app.module.ts";
 
 export const API_GLOBAL_PREFIX = "v1" as const;
 export const DEFAULT_API_HOST = "0.0.0.0" as const;
@@ -27,7 +27,10 @@ export interface ApiBootstrapResult {
 }
 
 export interface ApiBootstrapDependencies {
-  readonly createApplication?: (logger: LoggerService) => Promise<INestApplication>;
+  readonly createApplication?: (
+    logger: LoggerService,
+    config: ApiBootstrapConfig,
+  ) => Promise<INestApplication>;
   readonly logger?: LoggerService;
 }
 
@@ -73,12 +76,19 @@ function structuredLogger(): ConsoleLogger {
   return new ConsoleLogger("api-bootstrap", { json: true, timestamp: true });
 }
 
-async function createFastifyApplication(logger: LoggerService): Promise<INestApplication> {
-  return NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter(), {
-    abortOnError: true,
-    bufferLogs: true,
-    logger,
-  });
+async function createFastifyApplication(
+  logger: LoggerService,
+  config: ApiBootstrapConfig,
+): Promise<INestApplication> {
+  return NestFactory.create<NestFastifyApplication>(
+    createAppModule(config.environment),
+    new FastifyAdapter(),
+    {
+      abortOnError: true,
+      bufferLogs: true,
+      logger,
+    },
+  );
 }
 
 export async function createApiApplication(
@@ -87,7 +97,7 @@ export async function createApiApplication(
 ): Promise<ApiBootstrapResult> {
   const config = parseApiBootstrapConfig(input);
   const logger = dependencies.logger ?? structuredLogger();
-  const app = await (dependencies.createApplication ?? createFastifyApplication)(logger);
+  const app = await (dependencies.createApplication ?? createFastifyApplication)(logger, config);
   configureApiApplication(app);
   return Object.freeze({ app, config });
 }
