@@ -14,6 +14,7 @@
   "dependencies": {
     "@ckb-automata/config": "workspace:*",
     "@ckb-automata/core": "workspace:*",
+    "@ckb-ccc/shell": "1.3.13",
     "@nestjs/common": "12.0.4",
     "@nestjs/core": "12.0.4",
     "@nestjs/platform-fastify": "12.0.4",

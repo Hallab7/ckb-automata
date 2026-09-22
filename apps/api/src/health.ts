@@ -3,7 +3,9 @@ import { connect as connectTls } from "node:tls";
 
 import { Controller, Get, Inject, Injectable, ServiceUnavailableException } from "@nestjs/common";
 
-import { deploymentRegistry, parseBlockNumber } from "@ckb-automata/core";
+import { deploymentRegistry } from "@ckb-automata/core";
+
+import type { CkbReadClient } from "./ckb-client.ts";
 
 export const HEALTH_DEPENDENCIES = ["postgres", "redis", "rpc", "deployment", "indexLag"] as const;
 
@@ -59,32 +61,6 @@ function socketProbe(urlValue: string, tls: boolean): Promise<void> {
   });
 }
 
-function rpcClient(urlValue: string) {
-  const url = new URL(urlValue);
-  let id = 0;
-  return async (method: string, params: readonly unknown[] = []): Promise<unknown> => {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ id: ++id, jsonrpc: "2.0", method, params }),
-      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
-    });
-    const payload = (await response.json()) as {
-      readonly result?: unknown;
-      readonly error?: { readonly message?: string };
-    };
-    if (!response.ok || payload.error) throw new Error("RPC request failed");
-    return payload.result;
-  };
-}
-
-function record(value: unknown): Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error("RPC response is not an object");
-  }
-  return value as Record<string, unknown>;
-}
-
 function requiredEnvironment(
   input: Readonly<Record<string, string | undefined>>,
   key: string,
@@ -96,14 +72,11 @@ function requiredEnvironment(
 
 export function createDefaultHealthProbes(
   input: Readonly<Record<string, string | undefined>>,
+  ckbClient: Pick<CkbReadClient, "getGenesisHash" | "getIndexerTip" | "getTipHeader">,
 ): readonly HealthProbe[] {
   const databaseUrl = requiredEnvironment(input, "DATABASE_URL");
   const redisUrl = requiredEnvironment(input, "REDIS_URL");
-  const rpcUrl = requiredEnvironment(input, "CKB_RPC_URL");
-  const indexerUrl = requiredEnvironment(input, "CKB_INDEXER_URL");
   const genesisHash = requiredEnvironment(input, "CKB_GENESIS_HASH");
-  const chainRpc = rpcClient(rpcUrl);
-  const indexerRpc = rpcClient(indexerUrl);
 
   return Object.freeze([
     Object.freeze({
@@ -117,13 +90,12 @@ export function createDefaultHealthProbes(
     Object.freeze({
       name: "rpc" as const,
       check: async () => {
-        const [remoteGenesis, tipValue] = await Promise.all([
-          chainRpc("get_block_hash", ["0x0"]),
-          chainRpc("get_tip_header"),
+        const [remoteGenesis, tip] = await Promise.all([
+          ckbClient.getGenesisHash(),
+          ckbClient.getTipHeader(),
         ]);
         if (remoteGenesis !== genesisHash) throw new Error("wrong network");
-        const tip = record(tipValue);
-        return Object.freeze({ blockNumber: parseBlockNumber(String(tip["number"])).toString() });
+        return Object.freeze({ blockNumber: tip.number.toString() });
       },
     }),
     Object.freeze({
@@ -137,13 +109,12 @@ export function createDefaultHealthProbes(
     Object.freeze({
       name: "indexLag" as const,
       check: async () => {
-        const [chainTipValue, indexerTipValue] = await Promise.all([
-          chainRpc("get_tip_header"),
-          indexerRpc("get_tip"),
+        const [chainTip, indexerTip] = await Promise.all([
+          ckbClient.getTipHeader(),
+          ckbClient.getIndexerTip(),
         ]);
-        const chainTip = parseBlockNumber(String(record(chainTipValue)["number"]));
-        const indexerTip = parseBlockNumber(String(record(indexerTipValue)["block_number"]));
-        const lag = chainTip > indexerTip ? chainTip - indexerTip : 0n;
+        const lag =
+          chainTip.number > indexerTip.blockNumber ? chainTip.number - indexerTip.blockNumber : 0n;
         if (lag > MAX_INDEX_LAG_BLOCKS) throw new Error("index lag exceeded");
         return Object.freeze({
           lagBlocks: lag.toString(),
@@ -157,7 +128,7 @@ export function createDefaultHealthProbes(
 export class HealthService {
   readonly #probes: readonly HealthProbe[];
 
-  constructor(probes: readonly HealthProbe[] = createDefaultHealthProbes(process.env)) {
+  constructor(probes: readonly HealthProbe[]) {
     const byName = new Map(probes.map((probe) => [probe.name, probe]));
     if (
       probes.length !== HEALTH_DEPENDENCIES.length ||

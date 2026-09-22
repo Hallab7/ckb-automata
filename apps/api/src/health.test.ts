@@ -2,14 +2,21 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { ServiceUnavailableException } from "@nestjs/common";
+import type { ClientBlockHeader } from "@ckb-ccc/shell";
+
+import { parseBlockNumber, parseHash32 } from "@ckb-automata/core";
 
 import {
   HEALTH_DEPENDENCIES,
   HealthController,
   HealthService,
+  createDefaultHealthProbes,
   type HealthDependencyName,
   type HealthProbe,
 } from "./health.ts";
+
+const GENESIS_HASH = "0x5a7b2eb5a3aa224edb367eb7aba742c6f60efaddb6b9536ab2a2c20e0af6cff3";
+const TIP_HASH = `0x${"22".repeat(32)}`;
 
 function probes(failing?: HealthDependencyName): readonly HealthProbe[] {
   return HEALTH_DEPENDENCIES.map((name) => ({
@@ -76,4 +83,31 @@ test("health service rejects incomplete and duplicate probe sets", () => {
     () => new HealthService([...probes(), probes()[0]!]),
     /every dependency exactly once/,
   );
+});
+
+test("default chain probes consume only the shared CKB client", async () => {
+  const defaultProbes = createDefaultHealthProbes(
+    {
+      DATABASE_URL: "postgresql://automata:test@127.0.0.1:55432/automata",
+      REDIS_URL: "redis://127.0.0.1:56379",
+      CKB_GENESIS_HASH: GENESIS_HASH,
+    },
+    {
+      getGenesisHash: async () => parseHash32(GENESIS_HASH),
+      getTipHeader: async () => ({ number: 42n, hash: TIP_HASH }) as ClientBlockHeader,
+      getIndexerTip: async () => ({
+        blockNumber: parseBlockNumber("40"),
+        blockHash: parseHash32(TIP_HASH),
+      }),
+    },
+  );
+  const rpc = defaultProbes.find(({ name }) => name === "rpc");
+  const deployment = defaultProbes.find(({ name }) => name === "deployment");
+  const indexLag = defaultProbes.find(({ name }) => name === "indexLag");
+  assert.ok(rpc && deployment && indexLag);
+  assert.deepEqual(await rpc.check(), { blockNumber: "42" });
+  assert.deepEqual(await deployment.check(), {
+    manifestSha256: "2904b44ffa3c1f292404540f2bc6c14dc96789f888e28aa7fc2527566110e1d1",
+  });
+  assert.deepEqual(await indexLag.check(), { lagBlocks: "2", maximumLagBlocks: "12" });
 });

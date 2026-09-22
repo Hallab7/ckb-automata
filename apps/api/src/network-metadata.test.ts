@@ -4,6 +4,7 @@ import { once } from "node:events";
 import test from "node:test";
 
 import { ServiceUnavailableException, type LoggerService } from "@nestjs/common";
+import type { ClientBlockHeader } from "@ckb-ccc/shell";
 
 import { parseEnvironment } from "@ckb-automata/config";
 import { deploymentRegistry } from "@ckb-automata/core";
@@ -13,7 +14,7 @@ import {
   NetworkMetadataController,
   NetworkMetadataService,
   SUPPORTED_POLICY_VERSIONS,
-  type NetworkMetadataRpc,
+  type NetworkMetadataChainClient,
 } from "./network-metadata.ts";
 
 const GENESIS_HASH = "0x5a7b2eb5a3aa224edb367eb7aba742c6f60efaddb6b9536ab2a2c20e0af6cff3";
@@ -32,9 +33,16 @@ function environment(rpcUrl = "http://127.0.0.1:58114") {
   });
 }
 
-function rpc(genesisHash = GENESIS_HASH): NetworkMetadataRpc {
-  return async (method) =>
-    method === "get_block_hash" ? genesisHash : { number: "0x2a", hash: TIP_HASH };
+function tipHeader(): ClientBlockHeader {
+  return { number: 42n, hash: TIP_HASH } as ClientBlockHeader;
+}
+
+function chainClient(genesisHash = GENESIS_HASH): NetworkMetadataChainClient {
+  return {
+    getGenesisHash: async () =>
+      genesisHash as Awaited<ReturnType<NetworkMetadataChainClient["getGenesisHash"]>>,
+    getTipHeader: async () => tipHeader(),
+  };
 }
 
 const quietLogger: LoggerService = {
@@ -46,11 +54,15 @@ const quietLogger: LoggerService = {
 
 test("metadata matches direct RPC identity, tip, and the configured manifest", async () => {
   const calls: string[] = [];
-  const directRpc = rpc();
+  const directClient = chainClient();
   const service = new NetworkMetadataService(environment(), {
-    rpc: async (method, parameters) => {
-      calls.push(`${method}:${JSON.stringify(parameters ?? [])}`);
-      return directRpc(method, parameters);
+    getGenesisHash: async () => {
+      calls.push("getGenesisHash");
+      return directClient.getGenesisHash();
+    },
+    getTipHeader: async () => {
+      calls.push("getTipHeader");
+      return directClient.getTipHeader();
     },
   });
   const metadata = await service.read();
@@ -58,7 +70,7 @@ test("metadata matches direct RPC identity, tip, and the configured manifest", a
   assert.equal(deployment.status, "ok");
   if (deployment.status !== "ok") return;
 
-  assert.deepEqual(calls.toSorted(), ['get_block_hash:["0x0"]', "get_tip_header:[]"]);
+  assert.deepEqual(calls.toSorted(), ["getGenesisHash", "getTipHeader"]);
   assert.deepEqual(metadata, {
     network: "ckb_dev",
     genesisHash: GENESIS_HASH,
@@ -69,15 +81,19 @@ test("metadata matches direct RPC identity, tip, and the configured manifest", a
   });
 });
 
-test("wrong-network and malformed RPC data fail closed without leaking evidence", async () => {
-  const failures: readonly NetworkMetadataRpc[] = [
-    rpc(`0x${"ff".repeat(32)}`),
-    async (method) =>
-      method === "get_block_hash" ? GENESIS_HASH : { number: "not-a-number", hash: TIP_HASH },
+test("wrong-network and client failures fail closed without leaking evidence", async () => {
+  const failures: readonly NetworkMetadataChainClient[] = [
+    chainClient(`0x${"ff".repeat(32)}`),
+    {
+      getGenesisHash: chainClient().getGenesisHash,
+      getTipHeader: async () => {
+        throw new Error("https://secret-token@rpc.internal");
+      },
+    },
   ];
-  for (const failedRpc of failures) {
+  for (const failedClient of failures) {
     const controller = new NetworkMetadataController(
-      new NetworkMetadataService(environment(), { rpc: failedRpc }),
+      new NetworkMetadataService(environment(), failedClient),
     );
     await assert.rejects(controller.get(), (error: unknown) => {
       assert.ok(error instanceof ServiceUnavailableException);
@@ -96,7 +112,22 @@ test("versioned HTTP endpoint returns network metadata", async () => {
     for await (const chunk of request) body += chunk;
     const payload = JSON.parse(body) as { id: number; method: string };
     const result =
-      payload.method === "get_block_hash" ? GENESIS_HASH : { number: "0x2a", hash: TIP_HASH };
+      payload.method === "get_block_hash"
+        ? GENESIS_HASH
+        : {
+            compact_target: "0x20010000",
+            dao: `0x${"00".repeat(32)}`,
+            epoch: "0x1000000000001",
+            extra_hash: `0x${"44".repeat(32)}`,
+            hash: TIP_HASH,
+            nonce: `0x${"00".repeat(16)}`,
+            number: "0x2a",
+            parent_hash: `0x${"33".repeat(32)}`,
+            proposals_hash: `0x${"00".repeat(32)}`,
+            timestamp: "0x1234",
+            transactions_root: `0x${"55".repeat(32)}`,
+            version: "0x0",
+          };
     response.writeHead(200, { "content-type": "application/json" });
     response.end(JSON.stringify({ jsonrpc: "2.0", id: payload.id, result }));
   });

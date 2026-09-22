@@ -4,6 +4,15 @@ export const API_APP_ID = `${WORKSPACE_NAME}:api` as const;
 
 export { AppModule, createAppModule } from "./app.module.ts";
 export {
+  CkbClient,
+  CkbClientError,
+  createCkbClient,
+  type CkbClientErrorCode,
+  type CkbClientOptions,
+  type CkbIndexerTip,
+  type CkbReadClient,
+} from "./ckb-client.ts";
+export {
   API_GLOBAL_PREFIX,
   DEFAULT_API_HOST,
   DEFAULT_API_PORT,
@@ -31,7 +40,7 @@ export {
   NetworkMetadataService,
   SUPPORTED_POLICY_VERSIONS,
   type NetworkMetadata,
-  type NetworkMetadataRpc,
+  type NetworkMetadataChainClient,
 } from "./network-metadata.ts";
 export * as databaseSchema from "./database/schema.ts";
 export {
