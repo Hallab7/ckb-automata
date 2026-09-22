@@ -25,6 +25,7 @@
     "contracts:deploy:local": "node scripts/deploy-local-contracts.mjs",
     "executor:verify:recurring:local": "node scripts/verify-recurring-executor-local.mjs",
     "indexer:verify:checkpoints:local": "node scripts/verify-checkpoints-local.mjs",
+    "indexer:verify:discovery:local": "node scripts/verify-job-discovery-local.mjs",
     "format": "prettier --write . && cargo fmt --all",
     "format:check": "prettier --check . && cargo fmt --all --check",
     "fixtures:generate": "node scripts/generate-creation-fixtures.mjs",

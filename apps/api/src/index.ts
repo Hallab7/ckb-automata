@@ -24,6 +24,14 @@ export {
   type CheckpointUpdate,
 } from "./indexer/checkpoints.ts";
 export {
+  JobCellDiscovery,
+  extractSupportedJobCells,
+  type DiscoveredJobCell,
+  type JobCellExtraction,
+  type JobDiscoveryResult,
+  type SupportedJobPolicyKind,
+} from "./indexer/job-discovery.ts";
+export {
   API_GLOBAL_PREFIX,
   DEFAULT_API_HOST,
   DEFAULT_API_PORT,
