@@ -56,6 +56,16 @@ export {
   type ApiBootstrapResult,
 } from "./bootstrap.ts";
 export {
+  EVENT_CONFIDENCE,
+  EVENT_SOURCES,
+  JobEventsController,
+  JobEventsService,
+  type EventConfidence,
+  type EventSource,
+  type JobEventReadModel,
+  type JobEventTimeline,
+} from "./events.ts";
+export {
   HEALTH_DEPENDENCIES,
   HealthController,
   HealthService,

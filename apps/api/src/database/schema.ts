@@ -191,7 +191,7 @@ export const jobVersions = pgTable(
 export const jobEvents = pgTable(
   "job_events",
   {
-    id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+    id: bigint("id", { mode: "bigint" }).primaryKey().generatedAlwaysAsIdentity(),
     networkId: varchar("network_id", { length: 64 }).notNull(),
     jobId: hash("job_id").notNull(),
     eventType: varchar("event_type", { length: 64 }).notNull(),
@@ -326,7 +326,7 @@ export const webhookDeliveries = pgTable(
     subscriptionId: uuid("subscription_id")
       .notNull()
       .references(() => notificationSubscriptions.id, { onDelete: "cascade" }),
-    eventId: bigint("event_id", { mode: "number" })
+    eventId: bigint("event_id", { mode: "bigint" })
       .notNull()
       .references(() => jobEvents.id, { onDelete: "cascade" }),
     attemptNumber: integer("attempt_number").notNull(),
