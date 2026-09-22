@@ -45,6 +45,10 @@ mod deadline_payload {
     include!("../../shared/deadline_payload.rs");
 }
 
+mod execution_witness {
+    include!("../../shared/execution_witness.rs");
+}
+
 use campaign_generated::CampaignDataV1;
 use error_codes::ScriptError;
 use job_generated::JobDataV1;
@@ -64,9 +68,32 @@ fn program_entry() -> Result<(), ScriptError> {
     let output_count = QueryIter::new(load_cell_capacity, Source::GroupOutput).count();
     match (input_count, output_count) {
         (0, 1) => validate_creation(),
-        (1, 0) => validate_finalization(),
+        (1, 0) => {
+            if owner_exit_requested()? {
+                Ok(())
+            } else {
+                validate_finalization()
+            }
+        }
         _ => Err(ScriptError::InvalidApplicationState),
     }
+}
+
+fn owner_exit_requested() -> Result<bool, ScriptError> {
+    let witness =
+        load_witness_args(0, Source::GroupInput).map_err(|_| ScriptError::InvalidWitnessMode)?;
+    let request = witness
+        .input_type()
+        .to_opt()
+        .ok_or(ScriptError::InvalidWitnessMode)?
+        .raw_data();
+    Ok(matches!(
+        execution_witness::parse_witness_operation(&request),
+        Some(
+            execution_witness::WitnessOperation::Cancel
+                | execution_witness::WitnessOperation::Recover
+        )
+    ))
 }
 
 fn campaign_type_hash() -> Result<[u8; 32], ScriptError> {

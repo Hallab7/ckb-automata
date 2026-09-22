@@ -73,9 +73,32 @@ fn program_entry() -> Result<(), ScriptError> {
     match (input_count, output_count) {
         (0, 1) => validate_creation(),
         (1, 1) => validate_execution(),
-        (1, 0) => validate_final_execution(),
+        (1, 0) => {
+            if owner_exit_requested()? {
+                Ok(())
+            } else {
+                validate_final_execution()
+            }
+        }
         _ => Err(ScriptError::InvalidApplicationState),
     }
+}
+
+fn owner_exit_requested() -> Result<bool, ScriptError> {
+    let witness =
+        load_witness_args(0, Source::GroupInput).map_err(|_| ScriptError::InvalidWitnessMode)?;
+    let request = witness
+        .input_type()
+        .to_opt()
+        .ok_or(ScriptError::InvalidWitnessMode)?
+        .raw_data();
+    Ok(matches!(
+        execution_witness::parse_witness_operation(&request),
+        Some(
+            execution_witness::WitnessOperation::Cancel
+                | execution_witness::WitnessOperation::Recover
+        )
+    ))
 }
 
 fn validate_creation() -> Result<(), ScriptError> {

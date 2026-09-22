@@ -1,5 +1,6 @@
 use crate::fixtures::{
-    deployed_contract, execution_witness, job_data, secp_wallet, sign_single_secp_input,
+    contract_binary, deployed_contract, execution_witness, job_data, secp_wallet,
+    sign_single_secp_input,
 };
 use ckb_testtool::{
     builtin::ALWAYS_SUCCESS,
@@ -205,6 +206,73 @@ fn build_owner_case_with_mutation(
     }
 }
 
+fn build_deployed_policy_cancellation(policy_name: &str) -> OwnerCase {
+    let mut context = Context::new_with_deterministic_rng();
+    let job_lock = deployed_contract(&mut context, "job-lock");
+    let owner = secp_wallet(&mut context, 31);
+    let owner_hash = owner.lock.calc_script_hash().unpack();
+    let policy_code = context.deploy_cell(contract_binary(policy_name));
+    let policy_args = if policy_name == "deadline-policy" {
+        Bytes::from(vec![0x77; 32])
+    } else {
+        Bytes::new()
+    };
+    let policy = context
+        .build_script_with_hash_type(&policy_code, ScriptHashType::Data1, policy_args)
+        .expect("deployed policy script");
+    let policy_hash = policy.calc_script_hash().unpack();
+    let job_cell = context.create_cell(
+        CellOutput::new_builder()
+            .capacity(JOB_CAPACITY)
+            .lock(job_lock.clone())
+            .type_(Some(policy).pack())
+            .build(),
+        job_data(owner_hash, policy_hash, REWARD, REMAINING_BUDGET, 1),
+    );
+    let owner_cell = context.create_cell(
+        CellOutput::new_builder()
+            .capacity(OWNER_CAPACITY)
+            .lock(owner.lock.clone())
+            .build(),
+        Bytes::new(),
+    );
+    let transaction = TransactionBuilder::default()
+        .input(CellInput::new_builder().previous_output(job_cell).build())
+        .input(CellInput::new_builder().previous_output(owner_cell).build())
+        .output(
+            CellOutput::new_builder()
+                .capacity(JOB_CAPACITY)
+                .lock(owner.lock.clone())
+                .build(),
+        )
+        .output(
+            CellOutput::new_builder()
+                .capacity(OWNER_CAPACITY - FEE)
+                .lock(owner.lock)
+                .build(),
+        )
+        .output_data(Bytes::new().pack())
+        .output_data(Bytes::new().pack())
+        .witness(
+            WitnessArgs::new_builder()
+                .input_type(Some(Bytes::from(vec![1])).pack())
+                .build()
+                .as_bytes()
+                .pack(),
+        )
+        .witness(WitnessArgs::default().as_bytes().pack())
+        .cell_dep(owner.data_dep)
+        .build();
+    let transaction = context.complete_tx(transaction);
+    let transaction = sign_single_secp_input(transaction, 1, &owner.key);
+    OwnerCase {
+        context,
+        job_lock,
+        transaction,
+        owner_key: owner.key,
+    }
+}
+
 fn verify_owner_case(owner_case: OwnerCase) -> Result<(), String> {
     owner_case
         .context
@@ -234,6 +302,14 @@ fn recurring_live_job_can_be_cancelled_without_a_successor() {
         ..owner_case
     })
     .expect("valid recurring cancellation");
+}
+
+#[test]
+fn deployed_policies_allow_job_lock_owner_cancellation() {
+    for policy_name in ["recurring-policy", "deadline-policy"] {
+        verify_owner_case(build_deployed_policy_cancellation(policy_name))
+            .unwrap_or_else(|error| panic!("{policy_name} cancellation failed: {error}"));
+    }
 }
 
 #[test]

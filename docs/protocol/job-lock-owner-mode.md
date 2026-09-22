@@ -51,6 +51,11 @@ application-specific preservation rules. This keeps the Job Cell refund
 independently reconstructible without an API, database, queue, or hosted
 frontend.
 
+The recurring and deadline policy adapters recognize the same canonical cancel
+and recover witness bytes on a consume-without-successor shape. They delegate
+owner authorization and the complete Job Cell refund to Job Lock; any separate
+application input still runs its own scripts normally.
+
 Execution and cancellation spend the same Job Cell outpoint. CKB's single-spend
 rule therefore resolves a race atomically: one transaction can commit, and the
 other becomes conflicted without creating a second lifecycle transition.
