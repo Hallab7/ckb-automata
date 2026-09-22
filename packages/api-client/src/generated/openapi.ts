@@ -21,6 +21,57 @@ export type paths = {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/v1/auth/challenge": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /** Issue a single-use wallet authentication challenge */
+        readonly post: operations["AuthController_issue"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/v1/auth/session": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /** Read the current off-chain settings session */
+        readonly get: operations["AuthController_current"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/v1/auth/verify": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /** Verify a CCC wallet signature and create an off-chain settings session */
+        readonly post: operations["AuthController_verify"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/v1/events/stream": {
         readonly parameters: {
             readonly query?: never;
@@ -379,6 +430,143 @@ export interface operations {
             };
             /** @description Index checkpoint changed during pagination */
             readonly 409: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly AuthController_issue: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": {
+                    readonly ownerLockHash: string;
+                };
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        /** Format: uuid */
+                        readonly challengeId: string;
+                        /** Format: uri */
+                        readonly domain: string;
+                        /** Format: date-time */
+                        readonly expiresAt: string;
+                        readonly message: string;
+                        /** @enum {string} */
+                        readonly network: "ckb_dev" | "ckb_testnet";
+                        readonly nonce: string;
+                    };
+                };
+            };
+            /** @description Malformed authentication request */
+            readonly 400: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly AuthController_current: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        /** Format: date-time */
+                        readonly expiresAt: string;
+                        /** @enum {string} */
+                        readonly network: "ckb_dev" | "ckb_testnet";
+                        readonly ownerLockHash: string;
+                        readonly scope: readonly "off_chain_settings"[];
+                    };
+                };
+            };
+            /** @description Invalid, expired, or already-used authentication proof */
+            readonly 401: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly AuthController_verify: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": {
+                    /** Format: uuid */
+                    readonly challengeId: string;
+                    readonly nonce: string;
+                    readonly ownerLock: {
+                        readonly args: string;
+                        readonly codeHash: string;
+                        /** @enum {string} */
+                        readonly hashType: "data" | "data1" | "type";
+                    };
+                    readonly signature: {
+                        readonly identity: string;
+                        readonly signature: string;
+                        /** @enum {string} */
+                        readonly signType: "CkbSecp256k1";
+                    };
+                };
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        /** Format: date-time */
+                        readonly expiresAt: string;
+                        /** @enum {string} */
+                        readonly network: "ckb_dev" | "ckb_testnet";
+                        readonly ownerLockHash: string;
+                        readonly scope: readonly "off_chain_settings"[];
+                        readonly sessionToken: string;
+                    };
+                };
+            };
+            /** @description Malformed authentication request */
+            readonly 400: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid, expired, or already-used authentication proof */
+            readonly 401: {
                 headers: {
                     readonly [name: string]: unknown;
                 };

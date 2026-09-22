@@ -381,6 +381,37 @@ export const authChallenges = pgTable(
   ],
 );
 
+export const authSessions = pgTable(
+  "auth_sessions",
+  {
+    id: uuid("id").primaryKey(),
+    networkId: varchar("network_id", { length: 64 })
+      .notNull()
+      .references(() => networks.id, { onDelete: "cascade" }),
+    ownerLockHash: hash("owner_lock_hash").notNull(),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+    scope: varchar("scope", { length: 32 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("auth_sessions_token_hash_uq").on(table.tokenHash),
+    index("auth_sessions_token_active_idx")
+      .on(table.tokenHash, table.expiresAt)
+      .where(sql`${table.revokedAt} IS NULL`),
+    index("auth_sessions_owner_idx").on(table.networkId, table.ownerLockHash, table.createdAt),
+    check("auth_sessions_owner_hash_ck", sql`${table.ownerLockHash} ~ '^0x[0-9a-f]{64}$'`),
+    check("auth_sessions_token_hash_ck", sql`${table.tokenHash} ~ '^[0-9a-f]{64}$'`),
+    check("auth_sessions_scope_ck", sql`${table.scope} = 'off_chain_settings'`),
+    check("auth_sessions_expiry_ck", sql`${table.expiresAt} > ${table.createdAt}`),
+    check(
+      "auth_sessions_revoked_ck",
+      sql`${table.revokedAt} IS NULL OR ${table.revokedAt} >= ${table.createdAt}`,
+    ),
+  ],
+);
+
 export const deadLetters = pgTable(
   "dead_letters",
   {
@@ -423,6 +454,7 @@ export const demoScenarios = pgTable(
 
 export const schema = {
   authChallenges,
+  authSessions,
   canonicalBlocks,
   deadLetters,
   demoScenarios,

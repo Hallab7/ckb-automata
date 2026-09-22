@@ -8,6 +8,7 @@ export function createOpenApiDocument(app: INestApplication): OpenAPIObject {
       .setTitle("CKB Automata API")
       .setDescription("Non-custodial CKB automation API")
       .setVersion("1")
+      .addBearerAuth({ type: "http", scheme: "bearer", bearerFormat: "opaque" }, "bearer")
       .build(),
   );
 }

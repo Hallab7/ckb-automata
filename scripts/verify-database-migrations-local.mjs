@@ -65,7 +65,7 @@ try {
 
   const emptyUrl = databaseUrl(names[0]);
   const installed = await migrateDatabase({ connectionString: emptyUrl });
-  assert.deepEqual(installed.changed, [1, 2, 3, 4]);
+  assert.deepEqual(installed.changed, [1, 2, 3, 4, 5]);
   const repeated = await migrateDatabase({ connectionString: emptyUrl });
   assert.deepEqual(repeated.changed, []);
   await withClient(names[0], async (sql) => {
@@ -74,7 +74,7 @@ try {
       FROM information_schema.tables
       WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
     `;
-    assert.equal(count, 15);
+    assert.equal(count, 16);
     await assert.rejects(
       sql`INSERT INTO networks (
         id, genesis_hash, rpc_profile, confirmation_depth, deployment_manifest_hash
@@ -83,7 +83,14 @@ try {
   });
 
   const rolledBack = await rollbackDatabase({ connectionString: emptyUrl });
-  assert.deepEqual(rolledBack.changed, [4]);
+  assert.deepEqual(rolledBack.changed, [5]);
+  await withClient(names[0], async (sql) => {
+    const [{ table_name: authSessionsTable }] =
+      await sql`SELECT to_regclass('public.auth_sessions')::text AS table_name`;
+    assert.equal(authSessionsTable, null);
+  });
+  const rolledBackCanonicality = await rollbackDatabase({ connectionString: emptyUrl });
+  assert.deepEqual(rolledBackCanonicality.changed, [4]);
   await withClient(names[0], async (sql) => {
     const [column] = await sql`
       SELECT column_name
@@ -95,7 +102,7 @@ try {
     assert.equal(column, undefined);
   });
   const reapplied = await migrateDatabase({ connectionString: emptyUrl });
-  assert.deepEqual(reapplied.changed, [4]);
+  assert.deepEqual(reapplied.changed, [4, 5]);
 
   const previousUrl = databaseUrl(names[1]);
   const previous = await migrateDatabase({ connectionString: previousUrl, targetVersion: 3 });
@@ -108,7 +115,7 @@ try {
     )`;
   });
   const upgraded = await migrateDatabase({ connectionString: previousUrl });
-  assert.deepEqual(upgraded.changed, [4]);
+  assert.deepEqual(upgraded.changed, [4, 5]);
   await withClient(names[1], async (sql) => {
     const [{ count }] =
       await sql`SELECT count(*)::integer AS count FROM networks WHERE id = 'fixture'`;
@@ -124,11 +131,11 @@ try {
   try {
     await copyMigrations(temporaryMigrations);
     await writeFile(
-      join(temporaryMigrations, "0005_forced_failure.up.sql"),
+      join(temporaryMigrations, "0006_forced_failure.up.sql"),
       "CREATE TABLE must_rollback (id integer); SELECT 1 / 0;",
     );
     await writeFile(
-      join(temporaryMigrations, "0005_forced_failure.down.sql"),
+      join(temporaryMigrations, "0006_forced_failure.down.sql"),
       "DROP TABLE must_rollback;",
     );
     const migrationsDirectory = new URL(`file:///${temporaryMigrations.replaceAll("\\", "/")}/`);
@@ -145,7 +152,7 @@ try {
     assert.equal(tableName, null);
     const [{ maximum }] =
       await sql`SELECT max(version)::integer AS maximum FROM automata_schema_migrations`;
-    assert.equal(maximum, 4);
+    assert.equal(maximum, 5);
   });
 
   console.log(

@@ -4,6 +4,19 @@ export const API_APP_ID = `${WORKSPACE_NAME}:api` as const;
 
 export { AppModule, createAppModule } from "./app.module.ts";
 export {
+  AUTH_CHALLENGE_TTL_MS,
+  AUTH_SESSION_SCOPE,
+  AUTH_SESSION_TTL_MS,
+  AuthController,
+  AuthService,
+  formatAuthChallengeMessage,
+  type AuthChallengeMessageInput,
+  type AuthChallengeResponse,
+  type AuthenticatedSession,
+  type AuthServiceOptions,
+  type AuthSessionResponse,
+} from "./auth.ts";
+export {
   CkbClient,
   CkbClientError,
   createCkbClient,

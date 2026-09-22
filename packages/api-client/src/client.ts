@@ -16,17 +16,20 @@ export type ApiQuery<Name extends OperationName> = operations[Name] extends {
   ? Query
   : never;
 
-export type ApiSuccess<Name extends OperationName> = operations[Name] extends {
-  readonly responses: {
-    readonly 200: infer Response;
-  };
+type ApiResponse<Name extends OperationName, Status extends number> = operations[Name] extends {
+  readonly responses: infer Responses;
 }
-  ? Response extends {
-      readonly content: { readonly "application/json": infer Body };
-    }
-    ? Body
-    : unknown
+  ? Status extends keyof Responses
+    ? Responses[Status] extends {
+        readonly content: { readonly "application/json": infer Body };
+      }
+      ? Body
+      : unknown
+    : never
   : never;
+
+export type ApiSuccess<Name extends OperationName> =
+  ApiResponse<Name, 200> extends never ? ApiResponse<Name, 201> : ApiResponse<Name, 200>;
 
 export type ApiJobList = ApiSuccess<"JobsController_list">;
 export type ApiJob = ApiSuccess<"JobsController_detail">;
@@ -35,6 +38,8 @@ export type ApiJobQuote = ApiSuccess<"JobQuoteController_get">;
 export type ApiTemplates = ApiSuccess<"TemplatesController_list">;
 export type ApiTransactionBuild = ApiSuccess<"TransactionController_createDeadline">;
 export type ApiTransactionValidation = ApiSuccess<"TransactionController_validateSigned">;
+export type ApiAuthChallenge = ApiSuccess<"AuthController_issue">;
+export type ApiAuthSession = ApiSuccess<"AuthController_verify">;
 
 export interface ApiClientOptions {
   readonly baseUrl: string;
@@ -83,6 +88,20 @@ export class AutomataApiClient {
 
   templates(): Promise<ApiTemplates> {
     return this.#request("v1/templates");
+  }
+
+  issueAuthChallenge(body: ApiRequestBody<"AuthController_issue">): Promise<ApiAuthChallenge> {
+    return this.#post("v1/auth/challenge", body);
+  }
+
+  verifyAuthChallenge(body: ApiRequestBody<"AuthController_verify">): Promise<ApiAuthSession> {
+    return this.#post("v1/auth/verify", body);
+  }
+
+  getAuthSession(sessionToken: string): Promise<ApiSuccess<"AuthController_current">> {
+    return this.#request("v1/auth/session", {
+      headers: { authorization: `Bearer ${sessionToken}` },
+    });
   }
 
   listJobs(query?: ApiQuery<"JobsController_list">): Promise<ApiJobList> {
@@ -153,7 +172,12 @@ export class AutomataApiClient {
 
   async #request<Result>(
     path: string,
-    options: { readonly body?: unknown; readonly method?: "POST"; readonly query?: unknown } = {},
+    options: {
+      readonly body?: unknown;
+      readonly headers?: Readonly<Record<string, string>>;
+      readonly method?: "POST";
+      readonly query?: unknown;
+    } = {},
   ): Promise<Result> {
     const url = new URL(path, this.#baseUrl);
     appendQuery(url, options.query);
@@ -161,6 +185,7 @@ export class AutomataApiClient {
       headers: {
         accept: "application/json",
         ...(options.body === undefined ? {} : { "content-type": "application/json" }),
+        ...options.headers,
       },
       method: options.method ?? "GET",
       ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),

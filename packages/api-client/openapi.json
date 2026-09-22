@@ -1,5 +1,10 @@
 {
-  "components": { "schemas": {} },
+  "components": {
+    "schemas": {},
+    "securitySchemes": {
+      "bearer": { "bearerFormat": "opaque", "scheme": "bearer", "type": "http" }
+    }
+  },
   "info": {
     "contact": {},
     "description": "Non-custodial CKB automation API",
@@ -201,6 +206,152 @@
         },
         "summary": "List indexed jobs with stable cursor pagination",
         "tags": ["jobs"]
+      }
+    },
+    "/v1/auth/challenge": {
+      "post": {
+        "operationId": "AuthController_issue",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "ownerLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+                },
+                "required": ["ownerLockHash"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "challengeId": { "format": "uuid", "type": "string" },
+                    "domain": { "format": "uri", "type": "string" },
+                    "expiresAt": { "format": "date-time", "type": "string" },
+                    "message": { "type": "string" },
+                    "network": { "enum": ["ckb_dev", "ckb_testnet"], "type": "string" },
+                    "nonce": { "pattern": "^[A-Za-z0-9_-]{43}$", "type": "string" }
+                  },
+                  "required": ["challengeId", "domain", "expiresAt", "message", "network", "nonce"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": { "description": "Malformed authentication request" }
+        },
+        "summary": "Issue a single-use wallet authentication challenge",
+        "tags": ["authentication"]
+      }
+    },
+    "/v1/auth/session": {
+      "get": {
+        "operationId": "AuthController_current",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "expiresAt": { "format": "date-time", "type": "string" },
+                    "network": { "enum": ["ckb_dev", "ckb_testnet"], "type": "string" },
+                    "ownerLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                    "scope": {
+                      "items": { "enum": ["off_chain_settings"], "type": "string" },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["expiresAt", "network", "ownerLockHash", "scope"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": { "description": "Invalid, expired, or already-used authentication proof" }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Read the current off-chain settings session",
+        "tags": ["authentication"]
+      }
+    },
+    "/v1/auth/verify": {
+      "post": {
+        "operationId": "AuthController_verify",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "challengeId": { "format": "uuid", "type": "string" },
+                  "nonce": { "pattern": "^[A-Za-z0-9_-]{43}$", "type": "string" },
+                  "ownerLock": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "args": { "pattern": "^0x[0-9a-f]{40}$", "type": "string" },
+                      "codeHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                      "hashType": { "enum": ["data", "data1", "type"], "type": "string" }
+                    },
+                    "required": ["args", "codeHash", "hashType"],
+                    "type": "object"
+                  },
+                  "signature": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "identity": { "pattern": "^0x(?:02|03)[0-9a-f]{64}$", "type": "string" },
+                      "signType": { "enum": ["CkbSecp256k1"], "type": "string" },
+                      "signature": { "pattern": "^0x[0-9a-f]{130}$", "type": "string" }
+                    },
+                    "required": ["identity", "signature", "signType"],
+                    "type": "object"
+                  }
+                },
+                "required": ["challengeId", "nonce", "ownerLock", "signature"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "expiresAt": { "format": "date-time", "type": "string" },
+                    "network": { "enum": ["ckb_dev", "ckb_testnet"], "type": "string" },
+                    "ownerLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                    "scope": {
+                      "items": { "enum": ["off_chain_settings"], "type": "string" },
+                      "type": "array"
+                    },
+                    "sessionToken": { "pattern": "^[A-Za-z0-9_-]{43}$", "type": "string" }
+                  },
+                  "required": ["expiresAt", "network", "ownerLockHash", "scope", "sessionToken"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": { "description": "Malformed authentication request" },
+          "401": { "description": "Invalid, expired, or already-used authentication proof" }
+        },
+        "summary": "Verify a CCC wallet signature and create an off-chain settings session",
+        "tags": ["authentication"]
       }
     },
     "/v1/events/stream": {

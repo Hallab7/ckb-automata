@@ -3,6 +3,7 @@ import { Module, type DynamicModule } from "@nestjs/common";
 import type { AutomataEnvironment } from "@ckb-automata/config";
 
 import { CkbClient, createCkbClient } from "./ckb-client.ts";
+import { AuthController, AuthService } from "./auth.ts";
 import { DatabaseClient, createDatabaseClient } from "./database/client.ts";
 import {
   JobEventStreamController,
@@ -32,6 +33,7 @@ export class AppModule {}
 Module({
   controllers: [
     HealthController,
+    AuthController,
     NetworkMetadataController,
     JobsController,
     AccountJobsController,
@@ -58,6 +60,12 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
       {
         provide: DatabaseClient,
         useFactory: () => createDatabaseClient(environment.DATABASE_URL),
+      },
+      {
+        provide: AuthService,
+        inject: [DatabaseClient],
+        useFactory: (databaseClient: DatabaseClient) =>
+          new AuthService(databaseClient.database, environment),
       },
       {
         provide: CanonicalCheckpointStore,
