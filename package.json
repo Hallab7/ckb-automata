@@ -37,6 +37,8 @@
     "schema:check": "node scripts/generate-schemas.mjs --check",
     "schema:generate": "node scripts/generate-schemas.mjs",
     "schema:review": "node scripts/check-job-schema.mjs && node scripts/check-campaign-schema.mjs && node scripts/check-recurring-schema.mjs",
+    "recovery": "node scripts/recovery-cli.mjs",
+    "recovery:verify:local": "node scripts/verify-recovery-cli-local.mjs",
     "secrets:check": "node scripts/check-secrets.mjs",
     "test": "node --test scripts/*.test.mjs && pnpm -r --if-present test",
     "typecheck": "pnpm -r --if-present typecheck",
