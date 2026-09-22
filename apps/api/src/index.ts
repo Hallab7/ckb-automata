@@ -12,6 +12,17 @@ export {
   type CkbIndexerTip,
   type CkbReadClient,
 } from "./ckb-client.ts";
+export { DatabaseClient, createDatabaseClient, type AutomataDatabase } from "./database/client.ts";
+export {
+  CanonicalCheckpointStore,
+  CheckpointError,
+  DEFAULT_CANONICAL_ROLLBACK_WINDOW,
+  planCheckpointTransition,
+  type CanonicalBlockInput,
+  type CanonicalPosition,
+  type CheckpointErrorCode,
+  type CheckpointUpdate,
+} from "./indexer/checkpoints.ts";
 export {
   API_GLOBAL_PREFIX,
   DEFAULT_API_HOST,

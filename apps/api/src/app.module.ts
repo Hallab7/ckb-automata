@@ -3,7 +3,9 @@ import { Module, type DynamicModule } from "@nestjs/common";
 import type { AutomataEnvironment } from "@ckb-automata/config";
 
 import { CkbClient, createCkbClient } from "./ckb-client.ts";
+import { DatabaseClient, createDatabaseClient } from "./database/client.ts";
 import { HealthController, HealthService, createDefaultHealthProbes } from "./health.ts";
+import { CanonicalCheckpointStore } from "./indexer/checkpoints.ts";
 import { NetworkMetadataController, NetworkMetadataService } from "./network-metadata.ts";
 
 // Nest uses the class identity as the root dependency-injection module token.
@@ -23,6 +25,16 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
             rpcEndpoints: [environment.CKB_RPC_URL],
             indexerEndpoints: [environment.CKB_INDEXER_URL],
           }),
+      },
+      {
+        provide: DatabaseClient,
+        useFactory: () => createDatabaseClient(environment.DATABASE_URL),
+      },
+      {
+        provide: CanonicalCheckpointStore,
+        inject: [DatabaseClient],
+        useFactory: (databaseClient: DatabaseClient) =>
+          new CanonicalCheckpointStore(databaseClient.database),
       },
       {
         provide: HealthService,

@@ -96,7 +96,7 @@ export const canonicalBlocks = pgTable(
     blockHash: hash("block_hash").notNull(),
     parentHash: hash("parent_hash").notNull(),
     blockTimestamp: uint64("block_timestamp").notNull(),
-    indexedAt: createdAt(),
+    indexedAt: timestamp("indexed_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.networkId, table.blockNumber] }),
