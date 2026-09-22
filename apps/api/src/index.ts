@@ -32,6 +32,12 @@ export {
   type SupportedJobPolicyKind,
 } from "./indexer/job-discovery.ts";
 export {
+  JobTransitionIndexer,
+  classifyJobTransition,
+  type JobTransitionKind,
+  type JobTransitionResult,
+} from "./indexer/job-transitions.ts";
+export {
   API_GLOBAL_PREFIX,
   DEFAULT_API_HOST,
   DEFAULT_API_PORT,

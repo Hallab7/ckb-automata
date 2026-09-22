@@ -178,11 +178,6 @@ export const jobVersions = pgTable(
       table.outpointTxHash,
       table.outpointIndex,
     ),
-    uniqueIndex("job_versions_network_job_sequence_uq").on(
-      table.networkId,
-      table.jobId,
-      table.sequence,
-    ),
     index("job_versions_job_idx").on(table.networkId, table.jobId, table.sequence),
     check("job_versions_status_ck", sql`${table.status} IN ('live', 'spent', 'orphaned')`),
   ],

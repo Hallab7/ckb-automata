@@ -7,6 +7,7 @@ import { DatabaseClient, createDatabaseClient } from "./database/client.ts";
 import { HealthController, HealthService, createDefaultHealthProbes } from "./health.ts";
 import { CanonicalCheckpointStore } from "./indexer/checkpoints.ts";
 import { JobCellDiscovery } from "./indexer/job-discovery.ts";
+import { JobTransitionIndexer } from "./indexer/job-transitions.ts";
 import { NetworkMetadataController, NetworkMetadataService } from "./network-metadata.ts";
 
 // Nest uses the class identity as the root dependency-injection module token.
@@ -42,6 +43,12 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
         inject: [DatabaseClient, CkbClient],
         useFactory: (databaseClient: DatabaseClient, ckbClient: CkbClient) =>
           new JobCellDiscovery(databaseClient.database, ckbClient),
+      },
+      {
+        provide: JobTransitionIndexer,
+        inject: [DatabaseClient, CkbClient],
+        useFactory: (databaseClient: DatabaseClient, ckbClient: CkbClient) =>
+          new JobTransitionIndexer(databaseClient.database, ckbClient),
       },
       {
         provide: HealthService,
