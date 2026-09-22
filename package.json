@@ -30,6 +30,7 @@
     "indexer:verify:reorg:local": "node scripts/verify-indexer-reorg-local.mjs",
     "jobs:verify:reads:local": "node scripts/verify-job-reads-local.mjs",
     "jobs:verify:events:local": "node scripts/verify-job-events-local.mjs",
+    "jobs:verify:quotes:local": "node scripts/verify-job-quotes-local.mjs",
     "format": "prettier --write . && cargo fmt --all",
     "format:check": "prettier --check . && cargo fmt --all --check",
     "fixtures:generate": "node scripts/generate-creation-fixtures.mjs",

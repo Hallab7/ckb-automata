@@ -99,6 +99,12 @@ export {
   type NetworkMetadata,
   type NetworkMetadataChainClient,
 } from "./network-metadata.ts";
+export {
+  JobQuoteController,
+  JobQuoteService,
+  type JobQuote,
+  type QuoteChainClient,
+} from "./quotes.ts";
 export * as databaseSchema from "./database/schema.ts";
 export {
   loadMigrations,

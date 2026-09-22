@@ -193,9 +193,15 @@ importers:
       '@ckb-automata/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@ckb-automata/molecule':
+        specifier: workspace:*
+        version: link:../../packages/molecule
       '@ckb-ccc/shell':
         specifier: 1.3.13
         version: 1.3.13(debug@4.4.3)(typescript@7.0.2)
+      '@nervosnetwork/ckb-sdk-utils':
+        specifier: 0.109.5
+        version: 0.109.5
       '@nestjs/common':
         specifier: 12.0.4
         version: 12.0.4(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2)
