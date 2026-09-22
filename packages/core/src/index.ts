@@ -109,3 +109,15 @@ export {
   type ScriptHashType,
   type ScriptIdentity,
 } from "./job-inspection.ts";
+
+export {
+  LOCAL_DEPLOYMENT_MANIFEST_SHA256,
+  createDeploymentRegistry,
+  deploymentRegistry,
+  hashDeploymentManifest,
+  type DeploymentRegistry,
+  type DeploymentRegistryLoadResult,
+  type HashedManifestEntry,
+  type RegisteredContract,
+  type RegisteredDeployment,
+} from "./deployment-registry.ts";
