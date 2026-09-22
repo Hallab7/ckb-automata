@@ -96,11 +96,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: contract-binaries-${{ github.sha }}
-          path: |
-            target/riscv64imac-unknown-none-elf/release/job-lock
-            target/riscv64imac-unknown-none-elf/release/deadline-policy
-            target/riscv64imac-unknown-none-elf/release/recurring-policy
-            target/riscv64imac-unknown-none-elf/release/demo-campaign-type
+          path: target/contract-artifacts
           if-no-files-found: error
           retention-days: 14
 

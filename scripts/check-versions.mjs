@@ -3,6 +3,10 @@ import { readFile } from "node:fs/promises";
 const root = new URL("../", import.meta.url);
 const packageManifest = JSON.parse(await readFile(new URL("package.json", root), "utf8"));
 const versions = JSON.parse(await readFile(new URL("config/versions.json", root), "utf8"));
+const contractBuilder = await readFile(
+  new URL("deploy/docker/contracts-builder.Dockerfile", root),
+  "utf8",
+);
 
 const failures = [];
 const exactSemver = /^\d+\.\d+\.\d+$/;
@@ -18,6 +22,10 @@ for (const [name, image] of Object.entries(versions.dockerImages)) {
   if (!digestImage.test(image)) {
     failures.push(`${name} is not pinned by an exact tag and SHA-256 digest`);
   }
+}
+
+if (!contractBuilder.replaceAll("\r\n", "\n").startsWith(`FROM ${versions.dockerImages.rust}\n`)) {
+  failures.push("contract builder image differs from the Rust image pin");
 }
 
 for (const [name, version] of Object.entries(packageManifest.devDependencies)) {

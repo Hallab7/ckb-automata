@@ -38,7 +38,24 @@ npx --yes pnpm@12.5.1 contracts:check-reproducible
 The first command runs the native contract harness. The second builds every
 script for the pinned RISC-V target in release mode. The reproducibility check
 builds into two isolated target directories and compares every binary by
-SHA-256.
+SHA-256. It publishes the verified binaries and `manifest.json` under
+`target/contract-artifacts`. The manifest binds each binary hash and size to the
+aggregate schema hash, individual schema hashes, source revision, Rust version,
+target, profile, and pinned builder image.
+
+The same pinned container can build the contracts without depending on a host
+Rust installation:
+
+```text
+docker build --file deploy/docker/contracts-builder.Dockerfile --tag ckb-automata-contracts .
+docker run --rm --volume "$PWD:/work" ckb-automata-contracts
+```
+
+The reproducibility script builds the image and runs both comparison builds
+inside it. Docker is therefore required for this check. `SOURCE_DATE_EPOCH=0`,
+incremental compilation is disabled, release symbols are stripped, and the two
+builds use separate target directories. Host builds remain useful for fast
+development and tests, but only the verified container outputs are published.
 
 ## Schema generation
 
