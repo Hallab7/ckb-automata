@@ -68,6 +68,13 @@ fn program_entry() -> Result<(), ScriptError> {
     let output_count = QueryIter::new(load_cell_capacity, Source::GroupOutput).count();
     match (input_count, output_count) {
         (0, 1) => validate_creation(),
+        (1, 1) => {
+            if owner_top_up_requested()? {
+                Ok(())
+            } else {
+                Err(ScriptError::InvalidApplicationState)
+            }
+        }
         (1, 0) => {
             if owner_exit_requested()? {
                 Ok(())
@@ -77,6 +84,20 @@ fn program_entry() -> Result<(), ScriptError> {
         }
         _ => Err(ScriptError::InvalidApplicationState),
     }
+}
+
+fn owner_top_up_requested() -> Result<bool, ScriptError> {
+    let witness =
+        load_witness_args(0, Source::GroupInput).map_err(|_| ScriptError::InvalidWitnessMode)?;
+    let request = witness
+        .input_type()
+        .to_opt()
+        .ok_or(ScriptError::InvalidWitnessMode)?
+        .raw_data();
+    Ok(matches!(
+        execution_witness::parse_witness_operation(&request),
+        Some(execution_witness::WitnessOperation::TopUp { .. })
+    ))
 }
 
 fn owner_exit_requested() -> Result<bool, ScriptError> {

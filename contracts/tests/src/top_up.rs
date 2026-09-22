@@ -11,7 +11,7 @@ use ckb_testtool::{
 use molecule::prelude::{Builder, Entity};
 
 use crate::{
-    fixtures::{deployed_contract, job_data, secp_wallet, sign_single_secp_input},
+    fixtures::{contract_binary, deployed_contract, job_data, secp_wallet, sign_single_secp_input},
     generated::JobDataV1,
 };
 
@@ -66,20 +66,23 @@ fn top_up_witness(successor_output_index: u32) -> WitnessArgs {
         .build()
 }
 
-fn build_top_up_case(mutation: Mutation) -> TopUpCase {
+fn build_top_up_case_with_policy(mutation: Mutation, deployed_policy: Option<&str>) -> TopUpCase {
     let mut context = Context::new_with_deterministic_rng();
     let job_lock = deployed_contract(&mut context, "job-lock");
     let owner = secp_wallet(&mut context, 11);
     let other = secp_wallet(&mut context, 12);
     let owner_hash = owner.lock.calc_script_hash().unpack();
 
-    let policy_code = context.deploy_cell(ALWAYS_SUCCESS.clone());
+    let policy_code = context.deploy_cell(match deployed_policy {
+        Some(name) => contract_binary(name),
+        None => ALWAYS_SUCCESS.clone(),
+    });
+    let policy_args = match deployed_policy {
+        Some("recurring-policy") => Bytes::new(),
+        _ => Bytes::from(vec![0x71; 32]),
+    };
     let policy = context
-        .build_script_with_hash_type(
-            &policy_code,
-            ScriptHashType::Data1,
-            Bytes::from(vec![0x71; 32]),
-        )
+        .build_script_with_hash_type(&policy_code, ScriptHashType::Data1, policy_args)
         .expect("policy script");
     let other_policy = context
         .build_script_with_hash_type(
@@ -215,6 +218,10 @@ fn build_top_up_case(mutation: Mutation) -> TopUpCase {
     }
 }
 
+fn build_top_up_case(mutation: Mutation) -> TopUpCase {
+    build_top_up_case_with_policy(mutation, None)
+}
+
 fn verify(case: &TopUpCase) -> Result<(), String> {
     case.context
         .verify_tx(&case.transaction, MAX_CYCLES)
@@ -234,6 +241,17 @@ fn assert_script_error(mutation: Mutation, code: i8) {
 #[test]
 fn owner_can_increase_reward_budget_and_capacity() {
     verify(&build_top_up_case(Mutation::None)).expect("valid owner top-up");
+}
+
+#[test]
+fn deployed_policies_allow_owner_top_up() {
+    for policy_name in ["recurring-policy", "deadline-policy"] {
+        verify(&build_top_up_case_with_policy(
+            Mutation::None,
+            Some(policy_name),
+        ))
+        .unwrap_or_else(|error| panic!("{policy_name} top-up failed: {error}"));
+    }
 }
 
 #[test]
