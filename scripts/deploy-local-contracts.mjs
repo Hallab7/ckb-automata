@@ -205,7 +205,24 @@ const campaign = binaries.find(({ name }) => name === "demo-campaign-type");
 if (!campaign) throw new Error("demo campaign contract artifact is missing");
 const campaignLock = binaries.find(({ name }) => name === "campaign-lock");
 if (!campaignLock) throw new Error("campaign lock artifact is missing");
-const campaignId = new Uint8Array(32).fill(0x11);
+const campaignAnchor = concatBytes(
+  new Uint8Array(Buffer.from(deployTxHash.slice(2), "hex")),
+  littleEndian(binaries.length, 4),
+);
+const campaignIdBody = concatBytes(campaignAnchor, littleEndian(0, 4));
+const campaignId = new Uint8Array(
+  Buffer.from(
+    ckbHash(
+      concatBytes(
+        new TextEncoder().encode("ckb-automata/campaign-id/v1"),
+        new Uint8Array([0]),
+        littleEndian(campaignIdBody.length, 4),
+        campaignIdBody,
+      ),
+    ).slice(2),
+    "hex",
+  ),
+);
 const records = concatBytes(
   new Uint8Array(32).fill(0x01),
   littleEndian(0, 4),

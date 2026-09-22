@@ -13,8 +13,8 @@
     "warning": "Public local-development fixture only"
   },
   "artifacts": {
-    "sourceRevision": "b58008d237628b3de3fc9f629d0d8f9932a5048d",
-    "schemaSha256": "3e7c161fd3781500d740d5b14ffb3e6f74e02b5e1912dba48389d3dda7165380",
+    "sourceRevision": "282654634917fc04597977a6baf73d077b62a504",
+    "schemaSha256": "466ee9a672969544715ec6c12e14a2a0b2dfdb3907b53d7ce5ac9fbd8c8b6f3d",
     "builder": {
       "baseImage": "rust:1.93.1-bookworm@sha256:7c4ae649a84014c467d79319bbf17ce2632ae8b8be123ac2fb2ea5be46823f31",
       "dockerfileSha256": "6528426d04c00b9d22294c14184b34c3097d75031c44e8f2f95756b5096cb16b",
@@ -36,8 +36,8 @@
     }
   },
   "deployment": {
-    "transactionHash": "0xf42cd8c1c4af8ae7fda6a69a4649fb782d022149aa6dd7aeba393ab329eb5416",
-    "blockHash": "0x39fde4774880eae667785e3899f2e2e058a6bd09383f2e9dde247102cae9fedd"
+    "transactionHash": "0xd628c870e908ad4721d48216f21a0ac89f8415cead67e05036e29ecfbdb54b90",
+    "blockHash": "0x7f40b0b02fc71aa069d66911f9c85b0fe4e4f52747869baf7bdf6191ba5f8218"
   },
   "contracts": {
     "job-lock": {
@@ -45,7 +45,7 @@
       "hashType": "data1",
       "cellDep": {
         "outPoint": {
-          "txHash": "0xf42cd8c1c4af8ae7fda6a69a4649fb782d022149aa6dd7aeba393ab329eb5416",
+          "txHash": "0xd628c870e908ad4721d48216f21a0ac89f8415cead67e05036e29ecfbdb54b90",
           "index": "0x0"
         },
         "depType": "code"
@@ -54,24 +54,24 @@
       "sizeBytes": 25792
     },
     "deadline-policy": {
-      "codeHash": "0x613d3d0b820444ddab17f8d36f605715927716537e03f873d1771344c891d0c8",
+      "codeHash": "0xf2116184d3590d77edf69cccf076354b90ffdce6adcf32859b3aa78240985d06",
       "hashType": "data1",
       "cellDep": {
         "outPoint": {
-          "txHash": "0xf42cd8c1c4af8ae7fda6a69a4649fb782d022149aa6dd7aeba393ab329eb5416",
+          "txHash": "0xd628c870e908ad4721d48216f21a0ac89f8415cead67e05036e29ecfbdb54b90",
           "index": "0x1"
         },
         "depType": "code"
       },
-      "binarySha256": "d9b12ea60487d1fce8d1f7bd13119453587487c6f6b3dfad0ab8c1835ea5bac9",
-      "sizeBytes": 31136
+      "binarySha256": "8af602de1a23719805b4e34ae61de49417f9d58c28075c71a3e64c3011e8d075",
+      "sizeBytes": 30904
     },
     "recurring-policy": {
       "codeHash": "0xd671a134cc96ba214696eba27bab6f7ad3436a980e6b1a3916cabcf5e358da57",
       "hashType": "data1",
       "cellDep": {
         "outPoint": {
-          "txHash": "0xf42cd8c1c4af8ae7fda6a69a4649fb782d022149aa6dd7aeba393ab329eb5416",
+          "txHash": "0xd628c870e908ad4721d48216f21a0ac89f8415cead67e05036e29ecfbdb54b90",
           "index": "0x2"
         },
         "depType": "code"
@@ -80,24 +80,24 @@
       "sizeBytes": 35224
     },
     "demo-campaign-type": {
-      "codeHash": "0x6220c518ced03601cc26c6594c754c560ee56624de94e8a901d25d1f737e9c10",
+      "codeHash": "0x3fbd29a852f1776b63267c46343a27bba39827fbd91bc8da2b637f43f854d04e",
       "hashType": "data1",
       "cellDep": {
         "outPoint": {
-          "txHash": "0xf42cd8c1c4af8ae7fda6a69a4649fb782d022149aa6dd7aeba393ab329eb5416",
+          "txHash": "0xd628c870e908ad4721d48216f21a0ac89f8415cead67e05036e29ecfbdb54b90",
           "index": "0x3"
         },
         "depType": "code"
       },
-      "binarySha256": "6531ce179592c3322aff3dc83b61f6f599c339819165da082801a3b2f966b915",
-      "sizeBytes": 31584
+      "binarySha256": "8820aa9a2aa2904176028ec171b88615bf52f66fa838f45a4b0dca0765554a8e",
+      "sizeBytes": 31944
     },
     "campaign-lock": {
       "codeHash": "0xbb3d6a52abbb77449eff9e19e71a4caf68643927d032e3e039c7500e36513874",
       "hashType": "data1",
       "cellDep": {
         "outPoint": {
-          "txHash": "0xf42cd8c1c4af8ae7fda6a69a4649fb782d022149aa6dd7aeba393ab329eb5416",
+          "txHash": "0xd628c870e908ad4721d48216f21a0ac89f8415cead67e05036e29ecfbdb54b90",
           "index": "0x4"
         },
         "depType": "code"
@@ -108,8 +108,8 @@
   },
   "verification": {
     "kind": "campaign-creation",
-    "transactionHash": "0x1d5e99c960f994a5daf0106977ec08e576a7e224785ec62e4de14bef29eaf22b",
-    "blockHash": "0xcac45b1caee265abc5bf48c52655b9c55cf99b24d274b985e54726dce9998960",
+    "transactionHash": "0xc553536576ad0424ac2d1b290fc3e6a3ae024e34daf8aa5a2a01c5bef49ed53f",
+    "blockHash": "0x8778dd3b26ff092b022950b7db98658bfcdd49da0411d1526a56233d45eeb03d",
     "contract": "demo-campaign-type",
     "status": "committed"
   }
