@@ -5,6 +5,7 @@ export default [
     ignores: [
       "**/.next/**",
       "**/coverage/**",
+      "**/dist/**",
       "**/generated/**",
       "**/node_modules/**",
       "**/target/**",
