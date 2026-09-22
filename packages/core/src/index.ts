@@ -184,3 +184,16 @@ export {
   type LiveCellResolver,
   type ResolvedLiveCell,
 } from "./cancellation.ts";
+
+export {
+  RECOVERY_OPERATION,
+  RECOVERY_REASONS,
+  RecoveryBuildError,
+  assertRecoveryCompletion,
+  buildRecovery,
+  type RecoveryBuild,
+  type RecoveryErrorCode,
+  type RecoveryInput,
+  type RecoveryOutputPreview,
+  type RecoveryReason,
+} from "./recovery.ts";
