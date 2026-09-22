@@ -186,6 +186,69 @@ export class JobCellDiscovery {
       await transaction.execute(
         sql`SELECT pg_advisory_xact_lock(hashtextextended(${deployment.network}, 0))`,
       );
+      const persistEvidence = async (cell: DiscoveredJobCell): Promise<void> => {
+        const rawData = dataBuffer(cell.data);
+        const [existingVersion] = await transaction
+          .select({ id: jobVersions.id, status: jobVersions.status })
+          .from(jobVersions)
+          .where(
+            and(
+              eq(jobVersions.networkId, cell.networkId),
+              eq(jobVersions.outpointTxHash, cell.outPoint.txHash),
+              eq(jobVersions.outpointIndex, cell.outPoint.index.toString()),
+            ),
+          )
+          .limit(1);
+        if (existingVersion) {
+          if (existingVersion.status !== "orphaned") {
+            throw new Error("canonical Job Cell version already exists for a revived job");
+          }
+          await transaction
+            .update(jobVersions)
+            .set({
+              status: "live",
+              sequence: cell.sequence.toString(),
+              capacity: cell.capacity.toString(),
+              data: rawData,
+              observedBlockNumber: cell.provenance.blockNumber.toString(),
+              observedBlockHash: cell.provenance.blockHash,
+              transactionIndex: cell.provenance.transactionIndex.toString(),
+              spentTxHash: null,
+            })
+            .where(eq(jobVersions.id, existingVersion.id));
+        } else {
+          await transaction.insert(jobVersions).values({
+            networkId: cell.networkId,
+            jobId: cell.jobId,
+            sequence: cell.sequence.toString(),
+            outpointTxHash: cell.outPoint.txHash,
+            outpointIndex: cell.outPoint.index.toString(),
+            status: "live",
+            capacity: cell.capacity.toString(),
+            data: rawData,
+            observedBlockNumber: cell.provenance.blockNumber.toString(),
+            observedBlockHash: cell.provenance.blockHash,
+            transactionIndex: cell.provenance.transactionIndex.toString(),
+          });
+        }
+        await transaction.insert(jobEvents).values({
+          networkId: cell.networkId,
+          jobId: cell.jobId,
+          eventType: "job_discovered",
+          source: "indexed",
+          blockNumber: cell.provenance.blockNumber.toString(),
+          blockHash: cell.provenance.blockHash,
+          txHash: cell.outPoint.txHash,
+          payload: {
+            outputIndex: cell.outPoint.index.toString(),
+            policyKind: cell.policyKind,
+            sequence: cell.sequence.toString(),
+            transactionIndex: cell.provenance.transactionIndex.toString(),
+          },
+          occurredAt: eventDate(cell.provenance.timestamp),
+        });
+      };
+
       for (const cell of extraction.cells) {
         const [inserted] = await transaction
           .insert(jobs)
@@ -210,46 +273,42 @@ export class JobCellDiscovery {
 
         if (!inserted) {
           const [knownJob] = await transaction
-            .select({ jobId: jobs.jobId })
+            .select({ jobId: jobs.jobId, state: jobs.state })
             .from(jobs)
             .where(and(eq(jobs.networkId, cell.networkId), eq(jobs.jobId, cell.jobId)))
             .limit(1);
           if (!knownJob) {
             throw new Error("job source outpoint is already assigned to another job");
           }
+          if (knownJob.state === "orphaned") {
+            await transaction
+              .update(jobs)
+              .set({
+                outpointTxHash: cell.outPoint.txHash,
+                outpointIndex: cell.outPoint.index.toString(),
+                sequence: cell.sequence.toString(),
+                ownerLockHash: cell.ownerLockHash,
+                policyScriptHash: cell.policyScriptHash,
+                policyKind: cell.policyKind,
+                state: "live",
+                capacity: cell.capacity.toString(),
+                data: dataBuffer(cell.data),
+                blockNumber: cell.provenance.blockNumber.toString(),
+                blockHash: cell.provenance.blockHash,
+                transactionIndex: cell.provenance.transactionIndex.toString(),
+                updatedAt: new Date(),
+              })
+              .where(and(eq(jobs.networkId, cell.networkId), eq(jobs.jobId, cell.jobId)));
+            await persistEvidence(cell);
+            insertedJobs += 1;
+            continue;
+          }
           existingJobs += 1;
           continue;
         }
 
         insertedJobs += 1;
-        const rawData = dataBuffer(cell.data);
-        await transaction.insert(jobVersions).values({
-          networkId: cell.networkId,
-          jobId: cell.jobId,
-          sequence: cell.sequence.toString(),
-          outpointTxHash: cell.outPoint.txHash,
-          outpointIndex: cell.outPoint.index.toString(),
-          status: "live",
-          capacity: cell.capacity.toString(),
-          data: rawData,
-          observedBlockNumber: cell.provenance.blockNumber.toString(),
-          observedBlockHash: cell.provenance.blockHash,
-        });
-        await transaction.insert(jobEvents).values({
-          networkId: cell.networkId,
-          jobId: cell.jobId,
-          eventType: "job_discovered",
-          source: "indexed",
-          blockNumber: cell.provenance.blockNumber.toString(),
-          blockHash: cell.provenance.blockHash,
-          txHash: cell.outPoint.txHash,
-          payload: {
-            outputIndex: cell.outPoint.index.toString(),
-            policyKind: cell.policyKind,
-            sequence: cell.sequence.toString(),
-          },
-          occurredAt: eventDate(cell.provenance.timestamp),
-        });
+        await persistEvidence(cell);
       }
     });
 

@@ -27,6 +27,7 @@
     "indexer:verify:checkpoints:local": "node scripts/verify-checkpoints-local.mjs",
     "indexer:verify:discovery:local": "node scripts/verify-job-discovery-local.mjs",
     "indexer:verify:transitions:local": "node scripts/verify-job-transitions-local.mjs",
+    "indexer:verify:reorg:local": "node scripts/verify-indexer-reorg-local.mjs",
     "format": "prettier --write . && cargo fmt --all",
     "format:check": "prettier --check . && cargo fmt --all --check",
     "fixtures:generate": "node scripts/generate-creation-fixtures.mjs",

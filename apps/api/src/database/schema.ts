@@ -165,6 +165,7 @@ export const jobVersions = pgTable(
     data: bytea("data").notNull(),
     observedBlockNumber: uint64("observed_block_number").notNull(),
     observedBlockHash: hash("observed_block_hash").notNull(),
+    transactionIndex: uint32("transaction_index").notNull().default("0"),
     spentTxHash: hash("spent_tx_hash"),
     createdAt: createdAt(),
   },
@@ -180,6 +181,10 @@ export const jobVersions = pgTable(
     ),
     index("job_versions_job_idx").on(table.networkId, table.jobId, table.sequence),
     check("job_versions_status_ck", sql`${table.status} IN ('live', 'spent', 'orphaned')`),
+    check(
+      "job_versions_transaction_index_ck",
+      sql`${table.transactionIndex} BETWEEN 0 AND 4294967295`,
+    ),
   ],
 );
 
@@ -196,6 +201,8 @@ export const jobEvents = pgTable(
     txHash: hash("tx_hash"),
     payload: jsonb("payload").notNull().default({}),
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    canonical: boolean("canonical").notNull().default(true),
+    orphanedAt: timestamp("orphaned_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
   (table) => [
@@ -209,10 +216,17 @@ export const jobEvents = pgTable(
       table.occurredAt,
       table.id,
     ),
+    index("job_events_canonical_block_idx")
+      .on(table.networkId, table.canonical, table.blockNumber)
+      .where(sql`${table.source} = 'indexed'`),
     check("job_events_source_ck", sql`${table.source} IN ('indexed', 'operational')`),
     check(
       "job_events_block_pair_ck",
       sql`(${table.blockNumber} IS NULL) = (${table.blockHash} IS NULL)`,
+    ),
+    check(
+      "job_events_canonicality_ck",
+      sql`(${table.canonical} AND ${table.orphanedAt} IS NULL) OR (NOT ${table.canonical} AND ${table.orphanedAt} IS NOT NULL)`,
     ),
   ],
 );

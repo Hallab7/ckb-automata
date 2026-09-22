@@ -38,6 +38,12 @@ export {
   type JobTransitionResult,
 } from "./indexer/job-transitions.ts";
 export {
+  CanonicalBlockProjector,
+  JobProjectionRollback,
+  type CanonicalBlockProjectionResult,
+  type ReorgRollbackResult,
+} from "./indexer/reorg.ts";
+export {
   API_GLOBAL_PREFIX,
   DEFAULT_API_HOST,
   DEFAULT_API_PORT,

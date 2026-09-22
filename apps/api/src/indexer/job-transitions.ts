@@ -176,6 +176,7 @@ export class JobTransitionIndexer {
               data: dataBuffer(successor.data),
               observedBlockNumber: successor.provenance.blockNumber.toString(),
               observedBlockHash: successor.provenance.blockHash,
+              transactionIndex: successor.provenance.transactionIndex.toString(),
             });
             await databaseTransaction
               .update(jobs)
@@ -220,6 +221,7 @@ export class JobTransitionIndexer {
             blockHash,
             txHash,
             payload: {
+              transactionIndex: transactionIndex.toString(),
               previousOutpoint: {
                 txHash: consumed.outpointTxHash,
                 index: consumed.outpointIndex,
