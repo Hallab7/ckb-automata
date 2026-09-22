@@ -22,6 +22,7 @@
     "contracts:deploy:local": "node scripts/deploy-local-contracts.mjs",
     "format": "prettier --write . && cargo fmt --all",
     "format:check": "prettier --check . && cargo fmt --all --check",
+    "fixtures:generate": "node scripts/generate-creation-fixtures.mjs",
     "infra:down": "docker compose --file deploy/docker/compose.yml down",
     "infra:health": "node scripts/check-local-infra.mjs",
     "infra:logs": "docker compose --file deploy/docker/compose.yml logs --follow",

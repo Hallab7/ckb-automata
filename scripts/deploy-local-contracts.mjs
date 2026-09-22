@@ -100,11 +100,6 @@ async function verifyExistingDeployment(manifest, artifactManifest, genesisHash)
     artifactManifest.binaries.map((binary) => [binary.name, binary.sha256]),
   );
   for (const [name, contract] of Object.entries(manifest.contracts ?? {})) {
-    if (expectedBinaries.get(name) !== contract.binarySha256) {
-      throw new Error(
-        "the local chain contains different contract artifacts; reset its dedicated volume before redeploying",
-      );
-    }
     const liveCell = await rpc("get_live_cell", [
       {
         tx_hash: contract.cellDep.outPoint.txHash,
@@ -113,6 +108,11 @@ async function verifyExistingDeployment(manifest, artifactManifest, genesisHash)
       false,
     ]);
     if (liveCell.status !== "live") return false;
+    if (expectedBinaries.get(name) !== contract.binarySha256) {
+      throw new Error(
+        "the local chain contains different contract artifacts; reset its dedicated volume before redeploying",
+      );
+    }
   }
   if (expectedBinaries.size !== Object.keys(manifest.contracts ?? {}).length) return false;
   const deployment = await rpc("get_transaction", [manifest.deployment.transactionHash]);
