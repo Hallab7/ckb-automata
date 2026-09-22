@@ -202,7 +202,7 @@ export function createDeploymentRegistry(
 }
 
 export const LOCAL_DEPLOYMENT_MANIFEST_SHA256 =
-  "ca41fe8d58964588ee3482e466feab8d48c4895057c145f974914e20fee0c187" as const;
+  "a292c55cec8cb507bb35a6361a0dc9df95aec971eba0a073621668e19b04d41c" as const;
 
 export const deploymentRegistry = createDeploymentRegistry([
   {

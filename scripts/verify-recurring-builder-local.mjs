@@ -71,7 +71,7 @@ const build = buildRecurringCreation({
 });
 assert.equal(
   build.intent.policyScriptHash,
-  "0xe0c7df1f5d5665cd704f8e6da6762fb503be380ebf87ca4c7cbb4dfe98953015",
+  "0xea9ca5ea3b513411e4b74e75239941548acffc039143020ae7c5a5f796ce99e3",
 );
 
 const inputCapacity = BigInt(live.cell.output.capacity);
