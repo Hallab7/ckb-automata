@@ -4,6 +4,7 @@ members = [
   "contracts/deadline-policy",
   "contracts/recurring-policy",
   "contracts/demo-campaign-type",
+  "contracts/campaign-lock",
   "contracts/tests",
 ]
 resolver = "3"

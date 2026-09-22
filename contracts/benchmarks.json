@@ -59,19 +59,19 @@
     {
       "id": "deadline.finalize-success.valid",
       "outcome": "valid",
-      "measuredCycles": 1955516,
+      "measuredCycles": 1955273,
       "budgetCycles": 2500000
     },
     {
       "id": "deadline.finalize-refund.valid",
       "outcome": "valid",
-      "measuredCycles": 2015125,
-      "budgetCycles": 2600000
+      "measuredCycles": 1978298,
+      "budgetCycles": 2500000
     },
     {
       "id": "deadline.finalize.invalid-mixed-output",
       "outcome": "rejected",
-      "measuredCycles": 1986738,
+      "measuredCycles": 1990973,
       "budgetCycles": 2500000
     },
     {
@@ -113,7 +113,7 @@
     {
       "id": "campaign-cell-v1",
       "dataBytes": 167,
-      "occupiedShannons": "29300000000"
+      "occupiedShannons": "27300000000"
     }
   ],
   "payloads": [

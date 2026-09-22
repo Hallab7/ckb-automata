@@ -1,5 +1,4 @@
 use ckb_testtool::{
-    builtin::ALWAYS_SUCCESS,
     ckb_types::{
         bytes::Bytes,
         core::{Capacity, ScriptHashType, TransactionBuilder, TransactionView},
@@ -115,14 +114,7 @@ fn build_success_case(mutation: Mutation) -> SuccessCase {
         )
         .expect("deadline policy");
     let deadline_policy_hash = deadline_policy.calc_script_hash().unpack();
-    let campaign_lock_code = context.deploy_cell(ALWAYS_SUCCESS.clone());
-    let campaign_lock = context
-        .build_script_with_hash_type(
-            &campaign_lock_code,
-            ScriptHashType::Data1,
-            Bytes::from(vec![0x77; 20]),
-        )
-        .expect("campaign lock");
+    let campaign_lock = deployed_contract(&mut context, "campaign-lock");
     let success_recipient = crate::fixtures::seeded_script(0x81, ScriptHashType::Type, &[0x82; 20]);
     let success_hash = success_recipient.calc_script_hash().unpack();
     let refund_one = crate::fixtures::seeded_script(0x83, ScriptHashType::Type, &[0x84; 20]);

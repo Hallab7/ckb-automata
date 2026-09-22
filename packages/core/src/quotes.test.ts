@@ -66,11 +66,11 @@ test("deadline quote separates campaign value, reward budget, and retained marke
   assert.equal(quote.applicationAmount.total, 20_000_000_000n);
   assert.equal(quote.rewards.total, 10_000_000_000n);
   assert.equal(quote.remainingBudget, 10_000_000_000n);
-  assert.equal(quote.occupiedCapacity.total, 67_400_000_000n);
+  assert.equal(quote.occupiedCapacity.total, 65_400_000_000n);
   assert.equal(quote.residualRefund, 38_100_000_000n);
-  assert.equal(quote.retainedTerminalCapacity, 29_300_000_000n);
-  assert.equal(quote.maximumLockedTotal, 97_400_000_000n);
-  assert.equal(quote.maximumOwnerFunding, 97_400_001_800n);
+  assert.equal(quote.retainedTerminalCapacity, 27_300_000_000n);
+  assert.equal(quote.maximumLockedTotal, 95_400_000_000n);
+  assert.equal(quote.maximumOwnerFunding, 95_400_001_800n);
 });
 
 test("fee estimates round upward at shannons per thousand bytes", () => {

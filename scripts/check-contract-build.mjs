@@ -5,7 +5,13 @@ import { fileURLToPath } from "node:url";
 
 const root = new URL("../", import.meta.url);
 const target = "riscv64imac-unknown-none-elf";
-const binaries = ["job-lock", "deadline-policy", "recurring-policy", "demo-campaign-type"];
+const binaries = [
+  "job-lock",
+  "deadline-policy",
+  "recurring-policy",
+  "demo-campaign-type",
+  "campaign-lock",
+];
 const comparisonRoot = new URL("target/reproducibility/", root);
 const artifactRoot = new URL("target/contract-artifacts/", root);
 const artifactBinRoot = new URL("bin/", artifactRoot);

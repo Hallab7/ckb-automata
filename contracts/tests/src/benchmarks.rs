@@ -175,6 +175,7 @@ fn occupied(output: CellOutput, data: &Bytes) -> u64 {
 
 fn capacity_measurements() -> (Vec<CapacityMeasurement>, Vec<PayloadMeasurement>) {
     let wallet_lock = seeded_script(0x11, ScriptHashType::Type, &[0x22; 20]);
+    let permissionless_lock = seeded_script(0x12, ScriptHashType::Data1, &[]);
     let job_lock = seeded_script(0x33, ScriptHashType::Data1, &[]);
     let policy = seeded_script(0x44, ScriptHashType::Data1, &[0x55; 32]);
     let job = job_data([0x66; 32], policy.calc_script_hash().unpack(), 1, 1, 1);
@@ -209,7 +210,7 @@ fn capacity_measurements() -> (Vec<CapacityMeasurement>, Vec<PayloadMeasurement>
         .type_(Some(policy.clone()).pack())
         .build();
     let campaign_output = CellOutput::new_builder()
-        .lock(wallet_lock)
+        .lock(permissionless_lock)
         .type_(Some(policy).pack())
         .build();
 

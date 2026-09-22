@@ -94,6 +94,9 @@ mod top_up;
 mod campaign_state;
 
 #[cfg(test)]
+mod campaign_lock;
+
+#[cfg(test)]
 mod campaign_creation;
 
 #[cfg(test)]

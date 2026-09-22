@@ -203,6 +203,8 @@ const deployBlockHash = await waitForCommitted(deployTxHash);
 
 const campaign = binaries.find(({ name }) => name === "demo-campaign-type");
 if (!campaign) throw new Error("demo campaign contract artifact is missing");
+const campaignLock = binaries.find(({ name }) => name === "campaign-lock");
+if (!campaignLock) throw new Error("campaign lock artifact is missing");
 const campaignId = new Uint8Array(32).fill(0x11);
 const records = concatBytes(
   new Uint8Array(32).fill(0x01),
@@ -235,7 +237,8 @@ const campaignData = CampaignDataV1.pack({
   refund_commitment: [...Buffer.from(refundCommitment.slice(2), "hex")],
 });
 const campaignType = { codeHash: campaign.codeHash, hashType: "data1", args: hex(campaignId) };
-const campaignOutputBase = { capacity: "0x0", lock: genesis.lock, type: campaignType };
+const campaignLockScript = { codeHash: campaignLock.codeHash, hashType: "data1", args: "0x" };
+const campaignOutputBase = { capacity: "0x0", lock: campaignLockScript, type: campaignType };
 const campaignCapacity = occupiedShannons(campaignOutputBase, campaignData) + 10_000_000_000n;
 const campaignChange = deployChangeCapacity - campaignCapacity - transactionFee;
 const campaignTransaction = makeTransaction({
@@ -243,6 +246,13 @@ const campaignTransaction = makeTransaction({
     genesis.secpCellDep,
     {
       outPoint: { txHash: deployTxHash, index: `0x${binaries.indexOf(campaign).toString(16)}` },
+      depType: "code",
+    },
+    {
+      outPoint: {
+        txHash: deployTxHash,
+        index: `0x${binaries.indexOf(campaignLock).toString(16)}`,
+      },
       depType: "code",
     },
   ],

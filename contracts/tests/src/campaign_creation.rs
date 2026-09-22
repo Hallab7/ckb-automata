@@ -12,7 +12,7 @@ use molecule::prelude::{Builder, Entity};
 
 use crate::{
     campaign::refund_commitment,
-    fixtures::{contract_binary, create_cell},
+    fixtures::{contract_binary, create_cell, deployed_contract},
     generated_campaign::CampaignDataV1,
 };
 
@@ -21,7 +21,7 @@ const PLEDGED: u64 = 10_000_000_000;
 const CHANGE: u64 = 10_000_000_000;
 const FEE: u64 = 1_000_000;
 const CREATION_TRANSACTION_HASH: &str =
-    "0x25257c3d7f9c66722d2e3a7257a5f6c95e47463cc416e7dd8426e261dac634bd";
+    "0xc0f2df681266a74c5018d6315641673b4c9252616f753528d9a61e0c9e623186";
 
 #[derive(Clone, Copy)]
 enum Mutation {
@@ -70,6 +70,7 @@ fn build_creation_case(mutation: Mutation) -> CreationCase {
             Bytes::copy_from_slice(&campaign_id),
         )
         .expect("campaign type script");
+    let campaign_lock = deployed_contract(&mut context, "campaign-lock");
     let funding_code = context.deploy_cell(ALWAYS_SUCCESS.clone());
     let funding_lock = context
         .build_script_with_hash_type(
@@ -107,7 +108,7 @@ fn build_creation_case(mutation: Mutation) -> CreationCase {
     let campaign_data = builder.build().as_bytes();
 
     let empty_campaign_output = CellOutput::new_builder()
-        .lock(funding_lock.clone())
+        .lock(campaign_lock)
         .type_(Some(campaign_type).pack())
         .build();
     let occupied = empty_campaign_output
