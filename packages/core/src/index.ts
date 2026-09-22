@@ -121,3 +121,16 @@ export {
   type RegisteredContract,
   type RegisteredDeployment,
 } from "./deployment-registry.ts";
+
+export {
+  calculateDeadlineQuote,
+  calculateRecurringQuote,
+  estimateTransactionFeeRange,
+  type DeadlineQuote,
+  type DeadlineQuoteInput,
+  type EstimatedFeeRange,
+  type FeeRangeInput,
+  type QuoteAmounts,
+  type RecurringQuote,
+  type RecurringQuoteInput,
+} from "./quotes.ts";
