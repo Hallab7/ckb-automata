@@ -67,6 +67,22 @@ export {
   type ReadinessReport,
 } from "./health.ts";
 export {
+  AccountJobsController,
+  JOB_STATES,
+  JOB_TEMPLATE_CATALOG,
+  JOB_TEMPLATES,
+  JobReadService,
+  JobsController,
+  TemplatesController,
+  type JobListQuery,
+  type JobListResponse,
+  type JobReadModel,
+  type JobSourceProvenance,
+  type JobState,
+  type JobTemplate,
+  type JobTemplateId,
+} from "./jobs.ts";
+export {
   NetworkMetadataController,
   NetworkMetadataService,
   SUPPORTED_POLICY_VERSIONS,

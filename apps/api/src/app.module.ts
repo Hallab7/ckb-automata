@@ -9,13 +9,27 @@ import { CanonicalCheckpointStore } from "./indexer/checkpoints.ts";
 import { JobCellDiscovery } from "./indexer/job-discovery.ts";
 import { JobTransitionIndexer } from "./indexer/job-transitions.ts";
 import { CanonicalBlockProjector, JobProjectionRollback } from "./indexer/reorg.ts";
+import {
+  AccountJobsController,
+  JobReadService,
+  JobsController,
+  TemplatesController,
+} from "./jobs.ts";
 import { NetworkMetadataController, NetworkMetadataService } from "./network-metadata.ts";
 
 // Nest uses the class identity as the root dependency-injection module token.
 // oxlint-disable-next-line typescript/no-extraneous-class
 export class AppModule {}
 
-Module({ controllers: [HealthController, NetworkMetadataController] })(AppModule);
+Module({
+  controllers: [
+    HealthController,
+    NetworkMetadataController,
+    JobsController,
+    AccountJobsController,
+    TemplatesController,
+  ],
+})(AppModule);
 
 export function createAppModule(environment: AutomataEnvironment): DynamicModule {
   return {
@@ -84,6 +98,12 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
         provide: NetworkMetadataService,
         inject: [CkbClient],
         useFactory: (ckbClient: CkbClient) => new NetworkMetadataService(environment, ckbClient),
+      },
+      {
+        provide: JobReadService,
+        inject: [DatabaseClient],
+        useFactory: (databaseClient: DatabaseClient) =>
+          new JobReadService(databaseClient.database, environment.CKB_NETWORK),
       },
     ],
   };
