@@ -121,11 +121,15 @@ mod tests {
     use serde::Deserialize;
 
     use super::{
+        campaign::refund_commitment,
+        campaign_identity::derive_campaign_id,
+        deadline_payload::deadline_campaign_payload_hash,
         error_codes::ScriptError,
         fixtures::{executor_identity, golden_transaction},
         generated::JobDataV1,
         job_identity::{CreationAnchor, derive_job_id},
         native_harness_ready,
+        recurring::absolute_block_trigger_hash,
     };
 
     const GOLDEN_TRANSACTION_HASH: &str =
@@ -166,6 +170,31 @@ mod tests {
         creator_nonce: String,
         policy_script_hash: String,
         expected_job_id: String,
+    }
+
+    #[derive(Deserialize)]
+    struct DeadlinePledgeFixture {
+        tx_hash: String,
+        index: String,
+        refund_lock_hash: String,
+        amount: String,
+    }
+
+    #[derive(Deserialize)]
+    struct DeadlineExpectedFixture {
+        campaign_id: String,
+        campaign_type_hash: String,
+        policy_script_hash: String,
+        payload_hash: String,
+        trigger_params_hash: String,
+        refund_commitment: String,
+    }
+
+    #[derive(Deserialize)]
+    struct DeadlineCreationFixture {
+        pledges: Vec<DeadlinePledgeFixture>,
+        deadline_block: String,
+        expected: DeadlineExpectedFixture,
     }
 
     fn decode_hex(value: &str) -> Vec<u8> {
@@ -249,6 +278,52 @@ mod tests {
             &byte32(&fixture.policy_script_hash),
         );
         assert_eq!(actual, byte32(&fixture.expected_job_id));
+    }
+
+    #[test]
+    fn rust_deadline_hashes_match_cross_language_creation_fixture() {
+        let fixture: DeadlineCreationFixture =
+            serde_json::from_str(include_str!("../../fixtures/deadline_creation_v1.json")).unwrap();
+        let mut pledges = fixture.pledges;
+        pledges.sort_by(|left, right| {
+            left.tx_hash.cmp(&right.tx_hash).then_with(|| {
+                left.index
+                    .parse::<u32>()
+                    .unwrap()
+                    .cmp(&right.index.parse().unwrap())
+            })
+        });
+        let anchor = &pledges[0];
+        let mut anchor_out_point = [0_u8; 36];
+        anchor_out_point[..32].copy_from_slice(&decode_hex(&anchor.tx_hash));
+        anchor_out_point[32..].copy_from_slice(&anchor.index.parse::<u32>().unwrap().to_le_bytes());
+        assert_eq!(
+            derive_campaign_id(&anchor_out_point, 0),
+            byte32(&fixture.expected.campaign_id)
+        );
+
+        let mut records = Vec::with_capacity(pledges.len() * 76);
+        for pledge in &pledges {
+            records.extend_from_slice(&decode_hex(&pledge.tx_hash));
+            records.extend_from_slice(&pledge.index.parse::<u32>().unwrap().to_le_bytes());
+            records.extend_from_slice(&decode_hex(&pledge.refund_lock_hash));
+            records.extend_from_slice(&pledge.amount.parse::<u64>().unwrap().to_le_bytes());
+        }
+        assert_eq!(
+            refund_commitment(pledges.len() as u32, &records),
+            byte32(&fixture.expected.refund_commitment)
+        );
+        assert_eq!(
+            absolute_block_trigger_hash(fixture.deadline_block.parse().unwrap()),
+            byte32(&fixture.expected.trigger_params_hash)
+        );
+        assert_eq!(
+            deadline_campaign_payload_hash(
+                &byte32(&fixture.expected.policy_script_hash),
+                &byte32(&fixture.expected.campaign_type_hash),
+            ),
+            byte32(&fixture.expected.payload_hash)
+        );
     }
 
     #[test]

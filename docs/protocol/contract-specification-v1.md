@@ -121,6 +121,7 @@ The detailed transition rules are indexed in
 [`job-lock-top-up.md`](job-lock-top-up.md),
 [`recurring-payout-validation.md`](recurring-payout-validation.md),
 [`campaign-creation.md`](campaign-creation.md),
+[`deadline-creation-builder.md`](deadline-creation-builder.md),
 [`campaign-success-finalization.md`](campaign-success-finalization.md), and
 [`campaign-failure-finalization.md`](campaign-failure-finalization.md).
 

@@ -28,6 +28,10 @@ export function ckbHash(value) {
   return `0x${hasher.digest("hex")}`;
 }
 
+export function scriptHash(script) {
+  return scriptToHash(script);
+}
+
 export function littleEndian(value, byteLength) {
   let remaining = BigInt(value);
   const result = new Uint8Array(byteLength);

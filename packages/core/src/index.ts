@@ -53,11 +53,24 @@ export {
 } from "./contract-costs.ts";
 
 export {
+  CAMPAIGN_ID_DOMAIN,
+  CAMPAIGN_REFUNDS_DOMAIN,
   CAMPAIGN_STATES,
+  DEADLINE_PAYLOAD_VERSION,
+  deriveCampaignId,
+  deriveDeadlinePayloadHash,
+  deriveRefundCommitment,
   determineCampaignOutcome,
+  encodeOutPoint,
   isAbsoluteBlockDeadline,
   type CampaignOutcome,
 } from "./campaign.ts";
+
+export {
+  ABSOLUTE_BLOCK_TRIGGER_KIND,
+  TRIGGER_PARAMS_DOMAIN,
+  deriveAbsoluteBlockTriggerHash,
+} from "./triggers.ts";
 
 export {
   JOB_ID_DOMAIN,
@@ -134,3 +147,17 @@ export {
   type RecurringQuote,
   type RecurringQuoteInput,
 } from "./quotes.ts";
+
+export {
+  DEADLINE_CREATION_INTENT_DOMAIN,
+  assertDeadlineCompletion,
+  buildDeadlineCreation,
+  type DeadlineCompletionContract,
+  type DeadlineCreationBuild,
+  type DeadlineCreationInput,
+  type DeadlinePledgeInput,
+  type NormalizedDeadlineIntent,
+  type UnsignedCellInput,
+  type UnsignedCellOutput,
+  type UnsignedDeadlineTransaction,
+} from "./deadline-creation.ts";
