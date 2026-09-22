@@ -17,6 +17,10 @@ Configure branch protection to require these stable job names:
 The contract build uploads the four RISC-V binaries as a 14-day artifact named
 with the source revision. Missing binaries fail the job.
 
+The contract test job also regenerates cycle and occupied-capacity measurements
+in memory and compares them with `contracts/benchmarks.json`. See
+`docs/testing/contract-benchmarks.md` for the intentional update procedure.
+
 ## Local parity
 
 Run the complete deterministic foundation suite with:

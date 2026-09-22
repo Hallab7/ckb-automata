@@ -1,6 +1,13 @@
 export const WORKSPACE_NAME = "ckb-automata" as const;
 
 export {
+  CONTRACT_CAPACITY,
+  minimumCampaignCellCapacity,
+  minimumJobCellCapacity,
+  type ContractCapacityId,
+} from "./contract-costs.ts";
+
+export {
   CAMPAIGN_STATES,
   determineCampaignOutcome,
   isAbsoluteBlockDeadline,

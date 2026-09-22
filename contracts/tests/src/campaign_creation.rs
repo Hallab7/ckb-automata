@@ -224,3 +224,20 @@ fn campaign_creation_binds_identity_state_and_recipients() {
     assert_script_error(Mutation::RefundCommitment, 10);
     assert_script_error(Mutation::RefundRecords, 19);
 }
+
+pub(crate) fn benchmark_cases() -> Vec<crate::benchmarks::BenchmarkCase> {
+    [
+        ("campaign.create.valid", Mutation::None, None),
+        (
+            "campaign.create.invalid-refund-records",
+            Mutation::RefundRecords,
+            Some(19),
+        ),
+    ]
+    .into_iter()
+    .map(|(id, mutation, expected_error)| {
+        let case = build_creation_case(mutation);
+        crate::benchmarks::BenchmarkCase::new(id, case.context, case.transaction, expected_error)
+    })
+    .collect()
+}

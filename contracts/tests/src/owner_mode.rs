@@ -571,3 +571,28 @@ fn malformed_execution_mode_is_rejected() {
     .expect_err("unsupported mode must fail");
     assert!(error.contains("15"), "unexpected error: {error}");
 }
+
+pub(crate) fn benchmark_cases() -> Vec<crate::benchmarks::BenchmarkCase> {
+    [
+        ("job-lock.cancel.valid", OwnerOperation::Cancel, false, None),
+        (
+            "job-lock.recover.valid",
+            OwnerOperation::Recover,
+            false,
+            None,
+        ),
+        (
+            "job-lock.cancel.invalid-capacity",
+            OwnerOperation::Cancel,
+            true,
+            Some(28),
+        ),
+    ]
+    .into_iter()
+    .map(|(id, operation, alter_refund, expected_error)| {
+        let case = build_owner_case(operation, true, false, alter_refund);
+        let transaction = sign_single_secp_input(case.transaction, 1, &case.owner_key);
+        crate::benchmarks::BenchmarkCase::new(id, case.context, transaction, expected_error)
+    })
+    .collect()
+}

@@ -383,3 +383,20 @@ fn copied_transaction_cannot_redirect_reward() {
         .build();
     verify(&execution).expect_err("redirected copied transaction must fail");
 }
+
+pub(crate) fn benchmark_cases() -> Vec<crate::benchmarks::BenchmarkCase> {
+    [
+        ("job-lock.execute.one-shot.valid", Mutation::None, None),
+        (
+            "job-lock.execute.one-shot.invalid-capacity",
+            Mutation::RefundAmount,
+            Some(28),
+        ),
+    ]
+    .into_iter()
+    .map(|(id, mutation, expected_error)| {
+        let case = build_execution_case(mutation);
+        crate::benchmarks::BenchmarkCase::new(id, case.context, case.transaction, expected_error)
+    })
+    .collect()
+}

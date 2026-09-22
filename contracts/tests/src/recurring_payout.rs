@@ -295,3 +295,20 @@ proptest! {
         prop_assert!(error.contains("32"), "unexpected error: {error}");
     }
 }
+
+pub(crate) fn benchmark_cases() -> Vec<crate::benchmarks::BenchmarkCase> {
+    [
+        ("recurring.payout-successor.valid", Mutation::None, None),
+        (
+            "recurring.payout-successor.invalid-duplicate",
+            Mutation::Duplicate,
+            Some(32),
+        ),
+    ]
+    .into_iter()
+    .map(|(id, mutation, expected_error)| {
+        let case = build_case(mutation);
+        crate::benchmarks::BenchmarkCase::new(id, case.context, case.transaction, expected_error)
+    })
+    .collect()
+}

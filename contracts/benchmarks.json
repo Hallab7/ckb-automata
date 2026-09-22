@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "measurement": "ckb-testtool 1.1.1 CKB-VM fixture run",
+  "cycles": [
+    {
+      "id": "job-lock.execute.one-shot.valid",
+      "outcome": "valid",
+      "measuredCycles": 1771134,
+      "budgetCycles": 2300000
+    },
+    {
+      "id": "job-lock.execute.one-shot.invalid-capacity",
+      "outcome": "rejected",
+      "measuredCycles": 1762864,
+      "budgetCycles": 2300000
+    },
+    {
+      "id": "job-lock.cancel.valid",
+      "outcome": "valid",
+      "measuredCycles": 1749061,
+      "budgetCycles": 2200000
+    },
+    {
+      "id": "job-lock.recover.valid",
+      "outcome": "valid",
+      "measuredCycles": 1715983,
+      "budgetCycles": 2200000
+    },
+    {
+      "id": "job-lock.cancel.invalid-capacity",
+      "outcome": "rejected",
+      "measuredCycles": 46112,
+      "budgetCycles": 100000
+    },
+    {
+      "id": "job-lock.top-up.valid",
+      "outcome": "valid",
+      "measuredCycles": 1779041,
+      "budgetCycles": 2300000
+    },
+    {
+      "id": "job-lock.top-up.invalid-budget",
+      "outcome": "rejected",
+      "measuredCycles": 1787056,
+      "budgetCycles": 2300000
+    },
+    {
+      "id": "campaign.create.valid",
+      "outcome": "valid",
+      "measuredCycles": 64891,
+      "budgetCycles": 100000
+    },
+    {
+      "id": "campaign.create.invalid-refund-records",
+      "outcome": "rejected",
+      "measuredCycles": 50035,
+      "budgetCycles": 100000
+    },
+    {
+      "id": "deadline.finalize-success.valid",
+      "outcome": "valid",
+      "measuredCycles": 1955516,
+      "budgetCycles": 2500000
+    },
+    {
+      "id": "deadline.finalize-refund.valid",
+      "outcome": "valid",
+      "measuredCycles": 2015125,
+      "budgetCycles": 2600000
+    },
+    {
+      "id": "deadline.finalize.invalid-mixed-output",
+      "outcome": "rejected",
+      "measuredCycles": 1986738,
+      "budgetCycles": 2500000
+    },
+    {
+      "id": "recurring.payout-successor.valid",
+      "outcome": "valid",
+      "measuredCycles": 1950862,
+      "budgetCycles": 2500000
+    },
+    {
+      "id": "recurring.payout-successor.invalid-duplicate",
+      "outcome": "rejected",
+      "measuredCycles": 1934758,
+      "budgetCycles": 2500000
+    },
+    {
+      "id": "recurring.final-run.valid",
+      "outcome": "valid",
+      "measuredCycles": 1873574,
+      "budgetCycles": 2400000
+    },
+    {
+      "id": "recurring.final-run.invalid-residual",
+      "outcome": "rejected",
+      "measuredCycles": 1754357,
+      "budgetCycles": 2200000
+    }
+  ],
+  "capacities": [
+    {
+      "id": "plain-wallet-cell",
+      "dataBytes": 0,
+      "occupiedShannons": 6100000000
+    },
+    {
+      "id": "job-cell-v1",
+      "dataBytes": 275,
+      "occupiedShannons": 38100000000
+    },
+    {
+      "id": "campaign-cell-v1",
+      "dataBytes": 167,
+      "occupiedShannons": 29300000000
+    }
+  ],
+  "payloads": [
+    {
+      "id": "job-data-v1",
+      "encodedBytes": 275
+    },
+    {
+      "id": "campaign-data-v1",
+      "encodedBytes": 167
+    },
+    {
+      "id": "recurring-payload-v1",
+      "encodedBytes": 143
+    },
+    {
+      "id": "deadline-campaign-payload-v1",
+      "encodedBytes": 68
+    }
+  ]
+}

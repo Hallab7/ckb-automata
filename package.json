@@ -13,6 +13,8 @@
     "check:workspace": "node scripts/check-workspace.mjs",
     "commit:check": "node scripts/check-commit-message.mjs",
     "contracts:build": "cargo build-contracts --locked",
+    "contracts:bench": "cargo test-native --locked benchmarks::measured_contract_costs_match_the_committed_report -- --exact",
+    "contracts:bench:update": "node scripts/update-contract-benchmarks.mjs",
     "contracts:test": "cargo test-native --locked",
     "contracts:check-reproducible": "node scripts/check-contract-build.mjs",
     "contracts:fuzz:long": "node scripts/run-contract-fuzz.mjs --seconds 300",

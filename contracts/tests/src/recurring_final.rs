@@ -235,3 +235,20 @@ fn final_run_rejects_residual_and_payout_mutations() {
     assert_fails(Mutation::RedirectResidual, 32);
     assert_fails(Mutation::MissingPayout, 32);
 }
+
+pub(crate) fn benchmark_cases() -> Vec<crate::benchmarks::BenchmarkCase> {
+    [
+        ("recurring.final-run.valid", Mutation::None, None),
+        (
+            "recurring.final-run.invalid-residual",
+            Mutation::ResidualHigh,
+            Some(28),
+        ),
+    ]
+    .into_iter()
+    .map(|(id, mutation, expected_error)| {
+        let case = build_case(mutation);
+        crate::benchmarks::BenchmarkCase::new(id, case.context, case.transaction, expected_error)
+    })
+    .collect()
+}

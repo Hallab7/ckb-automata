@@ -525,3 +525,21 @@ fn deadline_adapter_binds_policy_payload_reward_and_termination() {
 fn campaign_contract_rejects_a_cross_wired_terminal_fixture() {
     assert_fails(Mutation::CrossWiredTerminal, 25);
 }
+
+pub(crate) fn benchmark_cases() -> Vec<crate::benchmarks::BenchmarkCase> {
+    [
+        ("deadline.finalize-success.valid", Mutation::None, None),
+        ("deadline.finalize-refund.valid", Mutation::Refund, None),
+        (
+            "deadline.finalize.invalid-mixed-output",
+            Mutation::RefundMixed,
+            Some(32),
+        ),
+    ]
+    .into_iter()
+    .map(|(id, mutation, expected_error)| {
+        let case = build_success_case(mutation);
+        crate::benchmarks::BenchmarkCase::new(id, case.context, case.transaction, expected_error)
+    })
+    .collect()
+}

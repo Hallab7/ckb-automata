@@ -76,6 +76,9 @@ pub mod output_match {
 mod execution_mode;
 
 #[cfg(test)]
+mod benchmarks;
+
+#[cfg(test)]
 mod owner_mode;
 
 #[cfg(test)]

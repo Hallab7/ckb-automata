@@ -274,3 +274,20 @@ fn top_up_only_increases_funded_reward_or_budget() {
     assert_script_error(Mutation::BudgetExceedsCapacity, 28);
     assert_script_error(Mutation::CapacityDecrease, 28);
 }
+
+pub(crate) fn benchmark_cases() -> Vec<crate::benchmarks::BenchmarkCase> {
+    [
+        ("job-lock.top-up.valid", Mutation::None, None),
+        (
+            "job-lock.top-up.invalid-budget",
+            Mutation::BudgetExceedsCapacity,
+            Some(28),
+        ),
+    ]
+    .into_iter()
+    .map(|(id, mutation, expected_error)| {
+        let case = build_top_up_case(mutation);
+        crate::benchmarks::BenchmarkCase::new(id, case.context, case.transaction, expected_error)
+    })
+    .collect()
+}
