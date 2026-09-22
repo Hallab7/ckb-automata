@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { deriveRecurringPayloadHash, isValidRecurringSchedule } from "./recurring.ts";
+import { parseBlockNumber, parseRunCount, parseShannons } from "./chain-values.ts";
+import {
+  deriveRecurringPayloadHash,
+  isValidRecurringSchedule,
+  type RecurringSchedule,
+} from "./recurring.ts";
 
 interface RecurringFixture {
   policy_script_hash: string;
@@ -22,6 +27,22 @@ function encodeHex(value: Uint8Array): string {
   return `0x${Array.from(value, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
 }
 
+function makeSchedule(
+  amount: bigint,
+  intervalBlocks: bigint,
+  firstNotBefore: bigint,
+  totalRuns: bigint,
+  finalRefundKind: number,
+) {
+  return {
+    amount: parseShannons(amount),
+    intervalBlocks: parseBlockNumber(intervalBlocks),
+    firstNotBefore: parseBlockNumber(firstNotBefore),
+    totalRuns: parseRunCount(totalRuns),
+    finalRefundKind,
+  };
+}
+
 test("recurring payload hash matches the Rust vector", async () => {
   const fixture = JSON.parse(
     await readFile(
@@ -37,24 +58,25 @@ test("recurring payload hash matches the Rust vector", async () => {
 });
 
 test("recurring schedule validation covers every reserved boundary", () => {
+  assert.equal(isValidRecurringSchedule(makeSchedule(1n, 1n, 1n, 1n, 0)), true);
+  for (const candidate of [
+    makeSchedule(0n, 1n, 1n, 1n, 0),
+    makeSchedule(1n, 0n, 1n, 1n, 0),
+    makeSchedule(1n, 1n, 0n, 1n, 0),
+    makeSchedule(1n, 1n, 1n << 56n, 1n, 0),
+    makeSchedule(1n, 1n, 1n, 0n, 0),
+    makeSchedule(1n, 1n, 1n, 1n, 1),
+  ]) {
+    assert.equal(isValidRecurringSchedule(candidate), false);
+  }
   assert.equal(
     isValidRecurringSchedule({
-      amount: 1n,
-      intervalBlocks: 1n,
-      firstNotBefore: 1n,
+      amount: 1,
+      intervalBlocks: 1,
+      firstNotBefore: 1,
       totalRuns: 1,
       finalRefundKind: 0,
-    }),
-    true,
+    } as unknown as RecurringSchedule),
+    false,
   );
-  for (const schedule of [
-    { amount: 0n, intervalBlocks: 1n, firstNotBefore: 1n, totalRuns: 1, finalRefundKind: 0 },
-    { amount: 1n, intervalBlocks: 0n, firstNotBefore: 1n, totalRuns: 1, finalRefundKind: 0 },
-    { amount: 1n, intervalBlocks: 1n, firstNotBefore: 0n, totalRuns: 1, finalRefundKind: 0 },
-    { amount: 1n, intervalBlocks: 1n, firstNotBefore: 1n << 56n, totalRuns: 1, finalRefundKind: 0 },
-    { amount: 1n, intervalBlocks: 1n, firstNotBefore: 1n, totalRuns: 0, finalRefundKind: 0 },
-    { amount: 1n, intervalBlocks: 1n, firstNotBefore: 1n, totalRuns: 1, finalRefundKind: 1 },
-  ]) {
-    assert.equal(isValidRecurringSchedule(schedule), false);
-  }
 });

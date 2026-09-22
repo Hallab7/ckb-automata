@@ -103,17 +103,17 @@
     {
       "id": "plain-wallet-cell",
       "dataBytes": 0,
-      "occupiedShannons": 6100000000
+      "occupiedShannons": "6100000000"
     },
     {
       "id": "job-cell-v1",
       "dataBytes": 275,
-      "occupiedShannons": 38100000000
+      "occupiedShannons": "38100000000"
     },
     {
       "id": "campaign-cell-v1",
       "dataBytes": 167,
-      "occupiedShannons": 29300000000
+      "occupiedShannons": "29300000000"
     }
   ],
   "payloads": [

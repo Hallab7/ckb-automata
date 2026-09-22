@@ -10,7 +10,7 @@ use ckb_testtool::{
     context::Context,
 };
 use molecule::prelude::{Builder, Entity};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _};
 
 use crate::{
     campaign_creation, campaign_success, execution_mode,
@@ -70,7 +70,27 @@ struct CycleMeasurement {
 struct CapacityMeasurement {
     id: String,
     data_bytes: usize,
+    #[serde(
+        serialize_with = "serialize_u64_string",
+        deserialize_with = "deserialize_u64_string"
+    )]
     occupied_shannons: u64,
+}
+
+fn serialize_u64_string<S>(value: &u64, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&value.to_string())
+}
+
+fn deserialize_u64_string<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    String::deserialize(deserializer)?
+        .parse()
+        .map_err(D::Error::custom)
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]

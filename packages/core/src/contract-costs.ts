@@ -1,13 +1,15 @@
 import benchmarkReport from "../../../contracts/benchmarks.json" with { type: "json" };
 
+import { parseShannons, type Shannons } from "./chain-values.ts";
+
 export type ContractCapacityId = "plain-wallet-cell" | "job-cell-v1" | "campaign-cell-v1";
 
-function measuredCapacity(id: ContractCapacityId): bigint {
+function measuredCapacity(id: ContractCapacityId): Shannons {
   const measurement = benchmarkReport.capacities.find((entry) => entry.id === id);
   if (!measurement) {
     throw new Error(`missing contract capacity measurement: ${id}`);
   }
-  return BigInt(measurement.occupiedShannons);
+  return parseShannons(measurement.occupiedShannons);
 }
 
 export const CONTRACT_CAPACITY = {
@@ -16,16 +18,10 @@ export const CONTRACT_CAPACITY = {
   campaignCellV1: measuredCapacity("campaign-cell-v1"),
 } as const;
 
-export function minimumJobCellCapacity(spendableBudget: bigint): bigint {
-  if (spendableBudget < 0n) {
-    throw new RangeError("spendableBudget must not be negative");
-  }
-  return CONTRACT_CAPACITY.jobCellV1 + spendableBudget;
+export function minimumJobCellCapacity(spendableBudget: Shannons): Shannons {
+  return parseShannons(CONTRACT_CAPACITY.jobCellV1 + spendableBudget);
 }
 
-export function minimumCampaignCellCapacity(pledged: bigint): bigint {
-  if (pledged < 0n) {
-    throw new RangeError("pledged must not be negative");
-  }
-  return CONTRACT_CAPACITY.campaignCellV1 + pledged;
+export function minimumCampaignCellCapacity(pledged: Shannons): Shannons {
+  return parseShannons(CONTRACT_CAPACITY.campaignCellV1 + pledged);
 }

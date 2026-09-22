@@ -1,3 +1,10 @@
+import {
+  parseBlockNumber,
+  parseShannons,
+  type BlockNumber,
+  type Shannons,
+} from "./chain-values.ts";
+
 export const CAMPAIGN_STATES = {
   OPEN: 0,
   SUCCEEDED: 1,
@@ -6,17 +13,17 @@ export const CAMPAIGN_STATES = {
 
 export type CampaignOutcome = "SUCCEEDED" | "REFUNDING";
 
-export function determineCampaignOutcome(pledged: bigint, target: bigint): CampaignOutcome {
-  if (pledged < 0n) {
-    throw new RangeError("pledged must not be negative");
-  }
-  if (target <= 0n) {
+export function determineCampaignOutcome(pledged: Shannons, target: Shannons): CampaignOutcome {
+  const pledgedValue = parseShannons(pledged);
+  const targetValue = parseShannons(target);
+  if (targetValue <= 0n) {
     throw new RangeError("target must be greater than zero");
   }
-  return pledged >= target ? "SUCCEEDED" : "REFUNDING";
+  return pledgedValue >= targetValue ? "SUCCEEDED" : "REFUNDING";
 }
 
-export function isAbsoluteBlockDeadline(deadlineSince: bigint): boolean {
+export function isAbsoluteBlockDeadline(deadlineSince: BlockNumber): boolean {
+  const deadline = parseBlockNumber(deadlineSince);
   const maximumAbsoluteBlock = (1n << 56n) - 1n;
-  return deadlineSince > 0n && deadlineSince <= maximumAbsoluteBlock;
+  return deadline > 0n && deadline <= maximumAbsoluteBlock;
 }

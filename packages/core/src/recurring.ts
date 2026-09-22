@@ -1,9 +1,19 @@
 import { PERSONAL, blake2b } from "@nervosnetwork/ckb-sdk-utils";
 
+import {
+  parseBlockNumber,
+  parseRunCount,
+  parseShannons,
+  type BlockNumber,
+  type RunCount,
+  type Shannons,
+} from "./chain-values.ts";
+
 export const POLICY_PAYLOAD_DOMAIN = "ckb-automata/policy-payload/v1" as const;
 
 const BYTE32_LENGTH = 32;
 const MAX_UINT32 = 0xffff_ffff;
+const MAX_UINT32_BIGINT = 0xffff_ffffn;
 const MAX_ABSOLUTE_BLOCK_NUMBER = (1n << 56n) - 1n;
 
 function requireByte32(value: Uint8Array, name: string): Uint8Array {
@@ -35,22 +45,29 @@ export function deriveRecurringPayloadHash(
 }
 
 export interface RecurringSchedule {
-  readonly amount: bigint;
-  readonly intervalBlocks: bigint;
-  readonly firstNotBefore: bigint;
-  readonly totalRuns: number;
+  readonly amount: Shannons;
+  readonly intervalBlocks: BlockNumber;
+  readonly firstNotBefore: BlockNumber;
+  readonly totalRuns: RunCount;
   readonly finalRefundKind: number;
 }
 
 export function isValidRecurringSchedule(schedule: RecurringSchedule): boolean {
-  return (
-    schedule.amount > 0n &&
-    schedule.intervalBlocks > 0n &&
-    schedule.firstNotBefore > 0n &&
-    schedule.firstNotBefore <= MAX_ABSOLUTE_BLOCK_NUMBER &&
-    Number.isInteger(schedule.totalRuns) &&
-    schedule.totalRuns > 0 &&
-    schedule.totalRuns <= MAX_UINT32 &&
-    schedule.finalRefundKind === 0
-  );
+  try {
+    const amount = parseShannons(schedule.amount);
+    const intervalBlocks = parseBlockNumber(schedule.intervalBlocks);
+    const firstNotBefore = parseBlockNumber(schedule.firstNotBefore);
+    const totalRuns = parseRunCount(schedule.totalRuns);
+    return (
+      amount > 0n &&
+      intervalBlocks > 0n &&
+      firstNotBefore > 0n &&
+      firstNotBefore <= MAX_ABSOLUTE_BLOCK_NUMBER &&
+      totalRuns > 0n &&
+      totalRuns <= MAX_UINT32_BIGINT &&
+      schedule.finalRefundKind === 0
+    );
+  } catch {
+    return false;
+  }
 }
