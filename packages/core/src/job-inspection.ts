@@ -20,6 +20,7 @@ export const DEPLOYED_CONTRACT_NAMES = [
   "deadline-policy",
   "recurring-policy",
   "demo-campaign-type",
+  "campaign-lock",
 ] as const;
 
 export type DeployedContractName = (typeof DEPLOYED_CONTRACT_NAMES)[number];

@@ -22,6 +22,7 @@ import {
 
 const root = new URL("../", import.meta.url);
 const rpcUrl = process.env.CKB_RPC_URL ?? "http://127.0.0.1:58114";
+const minerContainer = process.env.CKB_MINER_CONTAINER;
 const composeFile = fileURLToPath(new URL("deploy/docker/compose.yml", root));
 const artifactRoot = new URL("target/contract-artifacts/", root);
 const deploymentManifestUrl = new URL("deploy/manifests/local.json", root);
@@ -53,24 +54,23 @@ async function waitForRpc() {
 }
 
 function mineBlocks(count = 20) {
-  execFileSync(
-    "docker",
-    [
-      "compose",
-      "--file",
-      composeFile,
-      "exec",
-      "--no-TTY",
-      "ckb",
-      "ckb",
-      "miner",
-      "-C",
-      "/var/lib/ckb",
-      "--limit",
-      String(count),
-    ],
-    { stdio: "inherit" },
-  );
+  const minerArguments = minerContainer
+    ? ["exec", minerContainer, "ckb", "miner", "-C", "/var/lib/ckb", "--limit", String(count)]
+    : [
+        "compose",
+        "--file",
+        composeFile,
+        "exec",
+        "--no-TTY",
+        "ckb",
+        "ckb",
+        "miner",
+        "-C",
+        "/var/lib/ckb",
+        "--limit",
+        String(count),
+      ];
+  execFileSync("docker", minerArguments, { stdio: "inherit" });
 }
 
 async function waitForCommitted(txHash) {

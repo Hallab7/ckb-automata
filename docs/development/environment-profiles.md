@@ -30,7 +30,7 @@ design and must never be funded or reused outside this disposable chain.
 
 Build clean reproducible contract artifacts, then run
 `npm run contracts:deploy:local`. The command discovers the genesis system
-dependencies, deploys all four binaries, mines them to commitment, and submits
+dependencies, deploys all five binaries, mines them to commitment, and submits
 a campaign-creation transaction that executes the deployed type script. It
 writes the SDK target to `deploy/manifests/local.json` only after both
 transactions are committed.

@@ -88,7 +88,13 @@ test("deployment schema and reproduction vectors point to checked artifacts", as
   assert.equal(manifest.schemaVersion, 1);
   assert.match(manifest.genesisHash, /^0x[0-9a-f]{64}$/);
   assert.equal(manifest.verification.status, "committed");
-  for (const name of ["job-lock", "deadline-policy", "recurring-policy", "demo-campaign-type"]) {
+  for (const name of [
+    "job-lock",
+    "deadline-policy",
+    "recurring-policy",
+    "demo-campaign-type",
+    "campaign-lock",
+  ]) {
     assert.equal(manifest.contracts[name].hashType, "data1");
     assert.ok(spec.includes(`\`${name}\``));
   }

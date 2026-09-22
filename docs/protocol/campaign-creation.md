@@ -6,6 +6,11 @@ no inputs and exactly one output. The output data must be canonical
 This gives every campaign a distinct type-script identity for later pledge and
 terminal transitions.
 
+The campaign output uses the deployed zero-argument Campaign Lock. That lock
+grants no owner-only authority; the campaign type script on the same input is
+the authoritative transition guard. Any compatible executor can therefore
+finalize the campaign, while the type script rejects an invalid value path.
+
 Creation accepts only an open V1 campaign with:
 
 - a non-zero target;

@@ -6,9 +6,9 @@ as operational or advisory. The checked-in Molecule files remain the only inputs
 binding generation, and the Rust scripts remain authoritative when prose and code
 cannot be reconciled.
 
-The deployed scripts are `job-lock`, `deadline-policy`, `recurring-policy`, and
-`demo-campaign-type`. V1 is for local development and CKB testnet evaluation; no
-mainnet deployment is supported.
+The deployed scripts are `job-lock`, `deadline-policy`, `recurring-policy`,
+`demo-campaign-type`, and `campaign-lock`. V1 is for local development and CKB
+testnet evaluation; no mainnet deployment is supported.
 
 ## Encoding and Hashing
 
@@ -200,6 +200,10 @@ binary hash mismatch, missing contract, or malformed outpoint.
 
 The public fixture wallet warning is metadata, not an SDK credential. Never fund
 that key on another chain.
+
+The deployed `campaign-lock` is intentionally permissionless and has empty
+args. It is used only on a cell whose `demo-campaign-type` script independently
+enforces every allowed transition.
 
 ## Recovery Recipes
 

@@ -14,7 +14,7 @@ Configure branch protection to require these stable job names:
 - `contract-test`
 - `contract-fuzz-smoke`
 
-The contract build uploads the four verified RISC-V binaries plus their build
+The contract build uploads the five verified RISC-V binaries plus their build
 manifest as a 14-day artifact named with the source revision. The manifest
 contains binary and schema hashes, the source revision, and the pinned builder
 base image and Dockerfile hash. Missing files, dirty CI source, or non-identical
