@@ -13,7 +13,7 @@
     "warning": "Public local-development fixture only"
   },
   "artifacts": {
-    "sourceRevision": "4abb6abff990bbc47c85c68d507786754c863189",
+    "sourceRevision": "826814d378d6da685d690ae84e91e44a4e5356d5",
     "schemaSha256": "466ee9a672969544715ec6c12e14a2a0b2dfdb3907b53d7ce5ac9fbd8c8b6f3d",
     "builder": {
       "baseImage": "rust:1.93.1-bookworm@sha256:7c4ae649a84014c467d79319bbf17ce2632ae8b8be123ac2fb2ea5be46823f31",
@@ -36,8 +36,8 @@
     }
   },
   "deployment": {
-    "transactionHash": "0x98224a6cf199dd8d6f2b493e30c8067022c3633a40bf257ee20ccde1f6f7394c",
-    "blockHash": "0xaeef9f03c34eff7c08196c628ebdd9cf90d30c3ea9035c2a8cc55e5f711956db"
+    "transactionHash": "0xacfbe9cb41f9f2b9a6590322e978875dbb9b6f8832f3239e51e1f56728f7f202",
+    "blockHash": "0x01efa2b09a015fa89a8d2b00a82b8603e504d82cfd20770d65f20f8f0e66fce5"
   },
   "contracts": {
     "job-lock": {
@@ -45,7 +45,7 @@
       "hashType": "data1",
       "cellDep": {
         "outPoint": {
-          "txHash": "0x98224a6cf199dd8d6f2b493e30c8067022c3633a40bf257ee20ccde1f6f7394c",
+          "txHash": "0xacfbe9cb41f9f2b9a6590322e978875dbb9b6f8832f3239e51e1f56728f7f202",
           "index": "0x0"
         },
         "depType": "code"
@@ -54,37 +54,37 @@
       "sizeBytes": 25792
     },
     "deadline-policy": {
-      "codeHash": "0x1130d99e56430f18f1011383b0d0896af619f8be20763ef4365f4e92d779445f",
+      "codeHash": "0x12268b4339b2d62693b936d98cdee071a0e9172e864115d1b2f0993b19cc5a2c",
       "hashType": "data1",
       "cellDep": {
         "outPoint": {
-          "txHash": "0x98224a6cf199dd8d6f2b493e30c8067022c3633a40bf257ee20ccde1f6f7394c",
+          "txHash": "0xacfbe9cb41f9f2b9a6590322e978875dbb9b6f8832f3239e51e1f56728f7f202",
           "index": "0x1"
         },
         "depType": "code"
       },
-      "binarySha256": "ce7ca411d77839cca096b626bd477f804a3182283b5f0f286877db529749ac7d",
-      "sizeBytes": 31824
+      "binarySha256": "2587080e421a4a92614c2aff8fadee8e3f4b0c61856c2e040a3f2c512354b43b",
+      "sizeBytes": 32224
     },
     "recurring-policy": {
-      "codeHash": "0x682c448c7d9a663b52971f432a85ac33395e44e33fec25f02ba40d6f34bba458",
+      "codeHash": "0x8347cb0e818caccd9c449d942006bc0be68129ed8e9731967b87e0634af0d552",
       "hashType": "data1",
       "cellDep": {
         "outPoint": {
-          "txHash": "0x98224a6cf199dd8d6f2b493e30c8067022c3633a40bf257ee20ccde1f6f7394c",
+          "txHash": "0xacfbe9cb41f9f2b9a6590322e978875dbb9b6f8832f3239e51e1f56728f7f202",
           "index": "0x2"
         },
         "depType": "code"
       },
-      "binarySha256": "20be5694c3417f6674b5285e388244ba626cea1de97de924096ff15a37051f3f",
-      "sizeBytes": 35288
+      "binarySha256": "86caf4840c3f5dc8c1f3c2dcc0caa78e7efe87b984ba51a77a071ec422281f33",
+      "sizeBytes": 35536
     },
     "demo-campaign-type": {
       "codeHash": "0x3fbd29a852f1776b63267c46343a27bba39827fbd91bc8da2b637f43f854d04e",
       "hashType": "data1",
       "cellDep": {
         "outPoint": {
-          "txHash": "0x98224a6cf199dd8d6f2b493e30c8067022c3633a40bf257ee20ccde1f6f7394c",
+          "txHash": "0xacfbe9cb41f9f2b9a6590322e978875dbb9b6f8832f3239e51e1f56728f7f202",
           "index": "0x3"
         },
         "depType": "code"
@@ -97,7 +97,7 @@
       "hashType": "data1",
       "cellDep": {
         "outPoint": {
-          "txHash": "0x98224a6cf199dd8d6f2b493e30c8067022c3633a40bf257ee20ccde1f6f7394c",
+          "txHash": "0xacfbe9cb41f9f2b9a6590322e978875dbb9b6f8832f3239e51e1f56728f7f202",
           "index": "0x4"
         },
         "depType": "code"
@@ -108,8 +108,8 @@
   },
   "verification": {
     "kind": "campaign-creation",
-    "transactionHash": "0x8f845b2f4e9285147c806c1acbc275bf4fcdbba66ec5515e8c62b7288320d2d9",
-    "blockHash": "0x1953546e35c9e2b5de2a04473f7c253f9ff83704c8002154bbf96f7bb658cfb4",
+    "transactionHash": "0x08d3c10cb8b2112352ddc565936fe44df023bc9957a20c26db15cf7ecdb856aa",
+    "blockHash": "0xcf614dbe8769629f3cf9391d89317f049cc5ac4b647986b346c7d8393f9ff59a",
     "contract": "demo-campaign-type",
     "status": "committed"
   }
