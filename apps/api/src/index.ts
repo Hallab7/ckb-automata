@@ -26,3 +26,12 @@ export {
   type LivenessReport,
   type ReadinessReport,
 } from "./health.ts";
+export * as databaseSchema from "./database/schema.ts";
+export {
+  loadMigrations,
+  migrateDatabase,
+  rollbackDatabase,
+  type AppliedMigration,
+  type DatabaseMigration,
+  type MigrationResult,
+} from "./database/migrator.ts";

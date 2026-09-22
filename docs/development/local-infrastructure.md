@@ -16,6 +16,21 @@ interfere with existing local projects. Override `POSTGRES_PORT` or `REDIS_PORT`
 when needed. `deploy/docker/.env.example` contains only local, non-secret sample
 values.
 
+Schema changes are explicit and never run during API startup. Set `DATABASE_URL`
+and apply all pending migrations before starting the API:
+
+```text
+npx --yes pnpm@12.5.1 database:migrate
+```
+
+Each migration runs transactionally under a PostgreSQL advisory lock and is
+recorded with a checksum in `automata_schema_migrations`. Roll back the latest
+migration, when its committed down script supports reversal, with:
+
+```text
+npx --yes pnpm@12.5.1 database:rollback
+```
+
 Data persists in the named `ckb-automata-postgres-data` and
 `ckb-automata-redis-data` volumes. Stop containers without deleting data:
 
