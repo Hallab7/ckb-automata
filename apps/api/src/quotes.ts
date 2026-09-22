@@ -46,7 +46,7 @@ const HASH_PATTERN = /^0x[0-9a-f]{64}$/;
 const MAX_LINEAGE_DEPTH = 128;
 const TARGET_BLOCK_SECONDS = 10n;
 
-const QUOTE_ASSUMPTIONS = Object.freeze({
+export const JOB_QUOTE_ASSUMPTIONS = Object.freeze({
   deadline: Object.freeze({
     transactionBytes: Object.freeze({ minimum: "700", maximum: "900" }),
     feeRatePerKilobyte: Object.freeze({ minimum: "1000", maximum: "2000" }),
@@ -96,7 +96,7 @@ export interface JobQuote {
     readonly afterBlock: string;
     readonly condition: "tip_or_job_snapshot_change";
   };
-  readonly assumptions: (typeof QUOTE_ASSUMPTIONS)[keyof typeof QUOTE_ASSUMPTIONS];
+  readonly assumptions: (typeof JOB_QUOTE_ASSUMPTIONS)[keyof typeof JOB_QUOTE_ASSUMPTIONS];
 }
 
 type JobRow = typeof jobs.$inferSelect;
@@ -278,7 +278,7 @@ function quoteBody(
   if (template !== "deadline" && template !== "recurring") {
     throw new Error("indexed job has an unsupported quote template");
   }
-  const assumptions = QUOTE_ASSUMPTIONS[template];
+  const assumptions = JOB_QUOTE_ASSUMPTIONS[template];
   const sdkQuote =
     template === "recurring"
       ? calculateRecurringQuote({

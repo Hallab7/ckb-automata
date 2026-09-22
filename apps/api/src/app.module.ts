@@ -18,6 +18,7 @@ import {
 } from "./jobs.ts";
 import { NetworkMetadataController, NetworkMetadataService } from "./network-metadata.ts";
 import { JobQuoteController, JobQuoteService } from "./quotes.ts";
+import { TransactionBuildService, TransactionController } from "./transactions.ts";
 
 // Nest uses the class identity as the root dependency-injection module token.
 // oxlint-disable-next-line typescript/no-extraneous-class
@@ -32,6 +33,7 @@ Module({
     TemplatesController,
     JobEventsController,
     JobQuoteController,
+    TransactionController,
   ],
 })(AppModule);
 
@@ -120,6 +122,12 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
         inject: [DatabaseClient, CkbClient],
         useFactory: (databaseClient: DatabaseClient, ckbClient: CkbClient) =>
           new JobQuoteService(databaseClient.database, environment.CKB_NETWORK, ckbClient),
+      },
+      {
+        provide: TransactionBuildService,
+        inject: [JobQuoteService, CkbClient],
+        useFactory: (quotes: JobQuoteService, ckbClient: CkbClient) =>
+          new TransactionBuildService(quotes, ckbClient, environment.CKB_GENESIS_HASH),
       },
     ],
   };

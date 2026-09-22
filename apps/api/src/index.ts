@@ -100,11 +100,21 @@ export {
   type NetworkMetadataChainClient,
 } from "./network-metadata.ts";
 export {
+  JOB_QUOTE_ASSUMPTIONS,
   JobQuoteController,
   JobQuoteService,
   type JobQuote,
   type QuoteChainClient,
 } from "./quotes.ts";
+export {
+  TRANSACTION_OPERATIONS,
+  TransactionBuildService,
+  TransactionController,
+  type SignedTransactionValidation,
+  type TransactionBuildResponse,
+  type TransactionChainClient,
+  type TransactionOperation,
+} from "./transactions.ts";
 export * as databaseSchema from "./database/schema.ts";
 export {
   loadMigrations,
