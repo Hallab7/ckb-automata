@@ -197,3 +197,16 @@ export {
   type RecoveryOutputPreview,
   type RecoveryReason,
 } from "./recovery.ts";
+
+export {
+  TOP_UP_OPERATION,
+  TopUpBuildError,
+  assertTopUpCompletion,
+  buildTopUp,
+  inspectTopUpDiff,
+  type JobCellSnapshot,
+  type TopUpBuild,
+  type TopUpDiff,
+  type TopUpErrorCode,
+  type TopUpInput,
+} from "./top-up.ts";
