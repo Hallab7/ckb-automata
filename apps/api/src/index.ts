@@ -26,6 +26,13 @@ export {
   type LivenessReport,
   type ReadinessReport,
 } from "./health.ts";
+export {
+  NetworkMetadataController,
+  NetworkMetadataService,
+  SUPPORTED_POLICY_VERSIONS,
+  type NetworkMetadata,
+  type NetworkMetadataRpc,
+} from "./network-metadata.ts";
 export * as databaseSchema from "./database/schema.ts";
 export {
   loadMigrations,
