@@ -60,7 +60,19 @@ export function occupiedShannons(output, data) {
   return BigInt(occupiedBytes) * SHANNONS_PER_BYTE;
 }
 
-export function signSingleInput(transaction, witnessArgs, privateKey = LOCAL_PRIVATE_KEY) {
+export function signSingleInput(
+  transaction,
+  witnessArgs,
+  privateKey = LOCAL_PRIVATE_KEY,
+  inputIndex = 0,
+) {
+  if (
+    !Number.isSafeInteger(inputIndex) ||
+    inputIndex < 0 ||
+    inputIndex >= transaction.inputs.length
+  ) {
+    throw new RangeError("inputIndex must identify a transaction input");
+  }
   const zeroedWitness = serializeWitnessArgs({ ...witnessArgs, lock: EMPTY_SECP_SIG });
   const txHash = rawTransactionToHash(transaction);
   const signingHasher = blake2b(32, null, null, PERSONAL);
@@ -68,10 +80,18 @@ export function signSingleInput(transaction, witnessArgs, privateKey = LOCAL_PRI
   const witnessBytes = hexToBytes(zeroedWitness);
   signingHasher.update(littleEndian(witnessBytes.length, 8));
   signingHasher.update(witnessBytes);
+  const witnesses = [...transaction.witnesses];
+  while (witnesses.length < transaction.inputs.length) witnesses.push("0x");
+  for (const witness of witnesses.slice(transaction.inputs.length)) {
+    const extra = hexToBytes(witness);
+    signingHasher.update(littleEndian(extra.length, 8));
+    signingHasher.update(extra);
+  }
   const signature = new ECPair(privateKey).signRecoverable(signingHasher.digest());
+  witnesses[inputIndex] = serializeWitnessArgs({ ...witnessArgs, lock: signature });
   return {
     ...transaction,
-    witnesses: [serializeWitnessArgs({ ...witnessArgs, lock: signature })],
+    witnesses,
   };
 }
 

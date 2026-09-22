@@ -172,3 +172,15 @@ export {
   type RecurringCreationInput,
   type RecurringDisplayIntent,
 } from "./recurring-creation.ts";
+
+export {
+  CANCELLATION_OPERATION,
+  CancellationBuildError,
+  assertCancellationCompletion,
+  buildCancellation,
+  type CancellationBuild,
+  type CancellationErrorCode,
+  type CancellationInput,
+  type LiveCellResolver,
+  type ResolvedLiveCell,
+} from "./cancellation.ts";
