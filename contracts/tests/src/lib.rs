@@ -116,6 +116,9 @@ mod recurring_payout;
 mod recurring_final;
 
 #[cfg(test)]
+mod conformance;
+
+#[cfg(test)]
 mod tests {
     use molecule::prelude::{Builder, Entity};
     use serde::Deserialize;

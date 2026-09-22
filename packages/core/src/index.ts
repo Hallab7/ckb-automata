@@ -1,6 +1,12 @@
 export const WORKSPACE_NAME = "ckb-automata" as const;
 
 export {
+  validateSdkConformanceFixture,
+  type SdkConformanceCaseResult,
+  type SdkConformanceResult,
+} from "./conformance.ts";
+
+export {
   MAX_EPOCH_COMPONENT,
   MAX_EPOCH_NUMBER,
   MAX_EPOCH_VALUE,

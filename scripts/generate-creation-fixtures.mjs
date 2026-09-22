@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import { Buffer } from "node:buffer";
 import { readFile, writeFile } from "node:fs/promises";
 
 import {
@@ -8,12 +9,14 @@ import {
   parseHash32,
   parseOutPoint,
 } from "../packages/core/src/index.ts";
+import { JobDataV1 } from "../packages/molecule/src/index.ts";
 
 const requireFromCore = createRequire(new URL("../packages/core/package.json", import.meta.url));
 const { serializeRawTransaction } = requireFromCore("@nervosnetwork/ckb-sdk-utils");
 
 const deadlineUrl = new URL("../contracts/fixtures/deadline_creation_v1.json", import.meta.url);
 const recurringUrl = new URL("../contracts/fixtures/recurring_creation_v1.json", import.meta.url);
+const conformanceUrl = new URL("../contracts/fixtures/sdk_conformance_v1.json", import.meta.url);
 
 async function readJson(url) {
   return JSON.parse(await readFile(url, "utf8"));
@@ -93,4 +96,75 @@ recurring.expected = {
 };
 await writeJson(recurringUrl, recurring);
 
-console.log("Regenerated deadline and recurring creation fixtures");
+function jsonView(data, policy) {
+  const job = JobDataV1.unpack(Buffer.from(data.slice(2), "hex"));
+  return {
+    job_id: `0x${Buffer.from(job.job_id).toString("hex")}`,
+    sequence: job.sequence.toString(),
+    remaining_runs: job.remaining_runs.toString(),
+    policy,
+  };
+}
+
+const recurringJob = JobDataV1.unpack(Buffer.from(recurring.expected.job_data.slice(2), "hex"));
+const unsupportedBinary = `0x${Buffer.from(
+  JobDataV1.pack({ ...recurringJob, version: 2 }),
+).toString("hex")}`;
+const recurringJson = jsonView(recurring.expected.job_data, "recurring");
+const deadlineJson = jsonView(deadline.expected.job_data, "deadline");
+await writeJson(conformanceUrl, {
+  version: 1,
+  cases: [
+    {
+      id: "recurring-creation-valid",
+      policy: "recurring",
+      policy_args: "0x",
+      json: recurringJson,
+      binary: recurring.expected.job_data,
+      transaction: recurring.expected.raw_transaction,
+      expected: { json_matches_binary: true, binary_status: "ok", transaction_valid: true },
+    },
+    {
+      id: "deadline-creation-valid",
+      policy: "deadline",
+      policy_args: deadline.expected.campaign_type_hash,
+      json: deadlineJson,
+      binary: deadline.expected.job_data,
+      transaction: deadline.expected.raw_transaction,
+      expected: { json_matches_binary: true, binary_status: "ok", transaction_valid: true },
+    },
+    {
+      id: "json-sequence-mismatch",
+      policy: "recurring",
+      policy_args: "0x",
+      json: { ...recurringJson, sequence: "1" },
+      binary: recurring.expected.job_data,
+      transaction: recurring.expected.raw_transaction,
+      expected: { json_matches_binary: false, binary_status: "ok", transaction_valid: true },
+    },
+    {
+      id: "unsupported-job-version",
+      policy: "recurring",
+      policy_args: "0x",
+      json: recurringJson,
+      binary: unsupportedBinary,
+      transaction: "0x00",
+      expected: {
+        json_matches_binary: false,
+        binary_status: "unsupported_version",
+        transaction_valid: false,
+      },
+    },
+    {
+      id: "truncated-deadline-transaction",
+      policy: "deadline",
+      policy_args: deadline.expected.campaign_type_hash,
+      json: deadlineJson,
+      binary: deadline.expected.job_data,
+      transaction: deadline.expected.raw_transaction.slice(0, -2),
+      expected: { json_matches_binary: true, binary_status: "ok", transaction_valid: false },
+    },
+  ],
+});
+
+console.log("Regenerated creation and SDK conformance fixtures");
