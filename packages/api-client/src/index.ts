@@ -1,5 +1,23 @@
 import { CANONICAL_TRANSACTION_STATES } from "@ckb-automata/core";
 
+export {
+  ApiClientError,
+  AutomataApiClient,
+  createApiClient,
+  type ApiClientOptions,
+  type ApiJob,
+  type ApiJobEvents,
+  type ApiJobList,
+  type ApiJobQuote,
+  type ApiQuery,
+  type ApiRequestBody,
+  type ApiSuccess,
+  type ApiTemplates,
+  type ApiTransactionBuild,
+  type ApiTransactionValidation,
+} from "./client.ts";
+export type { components, operations, paths, webhooks } from "./generated/openapi.ts";
+
 export const API_CLIENT_PACKAGE_READY = true;
 
 export const API_TRANSACTION_STATE_VALUES = CANONICAL_TRANSACTION_STATES;

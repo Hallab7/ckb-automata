@@ -1,0 +1,76 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { ApiClientError, createApiClient } from "./client.ts";
+
+const jsonHeaders = { "content-type": "application/json" };
+
+test("encodes path and query parameters", async () => {
+  const requests: Request[] = [];
+  const client = createApiClient({
+    baseUrl: "https://api.example.test/root/",
+    fetch: async (input, init) => {
+      requests.push(new Request(input, init));
+      return new Response(JSON.stringify({ items: [], page: { limit: 20, nextCursor: null } }), {
+        headers: jsonHeaders,
+      });
+    },
+  });
+
+  await client.listJobEvents("job/value", { cursor: "next value", limit: 20, source: "indexed" });
+
+  assert.equal(requests.length, 1);
+  assert.equal(
+    requests[0]?.url,
+    "https://api.example.test/root/v1/jobs/job%2Fvalue/events?cursor=next+value&limit=20&source=indexed",
+  );
+  assert.equal(requests[0]?.method, "GET");
+});
+
+test("serializes generated transaction request bodies", async () => {
+  let request: Request | undefined;
+  const client = createApiClient({
+    baseUrl: "https://api.example.test/",
+    fetch: async (input, init) => {
+      request = new Request(input, init);
+      return new Response(JSON.stringify({ intentHash: "0x01" }), { headers: jsonHeaders });
+    },
+  });
+  const body = {
+    amount: "100",
+    creatorNonce: `0x${"01".repeat(32)}`,
+    firstNotBefore: "200",
+    intervalBlocks: "10",
+    ownerLockHash: `0x${"02".repeat(32)}`,
+    recipientLockHash: `0x${"03".repeat(32)}`,
+    reward: "20",
+    totalRuns: "3",
+  } as const;
+
+  await client.createRecurringJob(body);
+
+  assert.equal(request?.method, "POST");
+  assert.equal(request?.headers.get("content-type"), "application/json");
+  assert.deepEqual(await request?.json(), body);
+});
+
+test("exposes structured API failures", async () => {
+  const client = createApiClient({
+    baseUrl: "https://api.example.test/",
+    fetch: async () =>
+      new Response(JSON.stringify({ error: "stale_quote" }), {
+        headers: jsonHeaders,
+        status: 409,
+      }),
+  });
+
+  await assert.rejects(
+    () => client.getJobQuote("job"),
+    (error: unknown) => {
+      assert.ok(error instanceof ApiClientError);
+      assert.equal(error.status, 409);
+      assert.deepEqual(error.body, { error: "stale_quote" });
+      return true;
+    },
+  );
+});

@@ -44,6 +44,8 @@
     "lint:js": "eslint . --max-warnings 0",
     "lint:rust": "cargo clippy -p automata-contract-tests --all-targets --locked -- -D warnings && cargo clippy --workspace --exclude automata-contract-tests --target riscv64imac-unknown-none-elf --release --locked -- -D warnings",
     "lint:ts": "oxlint --deny-warnings .",
+    "openapi:check": "node scripts/generate-openapi-client.mjs --check",
+    "openapi:generate": "node scripts/generate-openapi-client.mjs",
     "quality": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm commit:check",
     "quality:self-test": "node scripts/check-quality-failures.mjs",
     "schema:check": "node scripts/generate-schemas.mjs --check",
@@ -54,7 +56,7 @@
     "secrets:check": "node scripts/check-secrets.mjs",
     "test": "node --test scripts/*.test.mjs && pnpm -r --if-present test",
     "typecheck": "pnpm -r --if-present typecheck",
-    "verify": "pnpm check:versions && pnpm check:workspace && pnpm schema:review && pnpm schema:check && pnpm secrets:check && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm contracts:build && pnpm contracts:test",
+    "verify": "pnpm check:versions && pnpm check:workspace && pnpm schema:review && pnpm schema:check && pnpm openapi:check && pnpm secrets:check && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm contracts:build && pnpm contracts:test",
     "verify:workspace": "pnpm check:versions && pnpm check:workspace && pnpm typecheck"
   },
   "devDependencies": {

@@ -26,6 +26,8 @@ jobs:
         run: npm exec --yes --package=pnpm@12.5.1 -- pnpm check:versions
       - name: Validate workspace links
         run: npm exec --yes --package=pnpm@12.5.1 -- pnpm check:workspace
+      - name: Generate and check OpenAPI client
+        run: npm exec --yes --package=pnpm@12.5.1 -- pnpm openapi:check
 
   lint:
     name: lint

@@ -5,9 +5,12 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./openapi": "./src/generated/openapi.ts",
     "./package.json": "./package.json"
   },
   "scripts": {
+    "generate": "node ../../scripts/generate-openapi-client.mjs",
+    "generate:check": "node ../../scripts/generate-openapi-client.mjs --check",
     "test": "node --test src/**/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

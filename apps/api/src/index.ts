@@ -99,6 +99,7 @@ export {
   type NetworkMetadata,
   type NetworkMetadataChainClient,
 } from "./network-metadata.ts";
+export { createOpenApiDocument } from "./openapi.ts";
 export {
   JOB_QUOTE_ASSUMPTIONS,
   JobQuoteController,
