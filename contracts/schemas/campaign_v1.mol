@@ -4,8 +4,9 @@
 // shannons. deadline_since is a non-zero absolute block-number since encoding.
 // version: 1 is CampaignDataV1; every other value is reserved.
 // state: 0 = OPEN, 1 = SUCCEEDED, 2 = REFUNDING; 3..255 are reserved.
-// campaign_id binds the creation transaction using the same network-bound
-// identity construction used by JobDataV1.
+// campaign_id = H("ckb-automata/campaign-id/v1",
+//   input_0_previous_outpoint || uint32_le(campaign_output_index)). The consumed
+// anchor is network-bound and one-use, so the resulting type script is unique.
 // pledged is the exact sum of the canonical pledge records represented by
 // refund_commitment; pledge_count is the number of those records.
 // target MUST be greater than zero.

@@ -247,7 +247,7 @@ fn capacity_measurements() -> (Vec<CapacityMeasurement>, Vec<PayloadMeasurement>
             },
             PayloadMeasurement {
                 id: "deadline-campaign-payload-v1".to_owned(),
-                encoded_bytes: 68,
+                encoded_bytes: 33,
             },
         ],
     )

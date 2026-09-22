@@ -2,9 +2,11 @@
 
 The demo campaign type script recognizes creation only when its type group has
 no inputs and exactly one output. The output data must be canonical
-`CampaignDataV1`, and the 32-byte type-script args must equal `campaign_id`.
-This gives every campaign a distinct type-script identity for later pledge and
-terminal transitions.
+`CampaignDataV1`. Its 32-byte type-script args and `campaign_id` field must both
+equal the domain-separated hash of input 0's previous outpoint and the campaign
+output index. A CKB outpoint can be consumed only once, so this gives every
+campaign a distinct type-script identity for later pledge and terminal
+transitions without depending on the still-unknown creation transaction hash.
 
 The campaign output uses the deployed zero-argument Campaign Lock. That lock
 grants no owner-only authority; the campaign type script on the same input is
@@ -37,7 +39,7 @@ acting as an accidental unrestricted update path.
 ## Verification Status
 
 - Fixture-backed CKB-VM: a deterministic creation transaction passes with the
-  compiled campaign type script. Mutations cover version, state, type identity,
+  compiled campaign type script. Mutations cover version, state, derived type identity,
   zero target, zero and wrong-metric deadlines, pledge count, success recipient,
   refund commitment and record mutation, and capacity one shannon below or above
   the commitment.

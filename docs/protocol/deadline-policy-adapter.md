@@ -14,14 +14,15 @@ this canonical body:
 policy_script_hash     32 bytes
 adapter_version         1 byte, value 1
 campaign_type_hash     32 bytes
-campaign_outpoint      36 bytes, canonical packed OutPoint
 ```
 
-The exact input outpoint prevents a job from being executed against another
-cell carrying an otherwise identical campaign type script. The adapter
-recomputes the hash from the live policy script, its args, and the located
-campaign input. It also requires `policy_script_hash` to equal its own script
-hash.
+The campaign type hash is unique because campaign creation derives its script
+args from a one-use input outpoint and the campaign output index. The adapter
+recomputes the payload from the live policy script and its args, locates exactly
+one input with that type hash, and requires `policy_script_hash` to equal its
+own script hash. Omitting the future campaign outpoint lets one transaction
+create the campaign and its Job Cell without a circular transaction-hash
+dependency.
 
 ## Atomic Validation
 
@@ -41,7 +42,7 @@ success or refund value path.
 
 - Fixture-backed CKB-VM: success and refund transactions pass with the Job
   Lock, deadline adapter, and campaign type script together.
-- Mutation coverage: payload hash, campaign outpoint, policy hash, reward
+- Mutation coverage: payload hash, policy hash, reward
   amount, Job Cell successor, and cross-wired terminal campaign identity.
 - Local chain: not exercised in this implementation unit.
 - Public testnet: not exercised or claimed in this implementation unit.

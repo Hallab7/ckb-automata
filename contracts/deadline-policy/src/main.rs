@@ -6,7 +6,7 @@ use ckb_std::{
     default_alloc, entry,
     high_level::{
         QueryIter, load_cell_capacity, load_cell_data, load_cell_lock_hash, load_cell_type_hash,
-        load_input, load_script, load_script_hash, load_witness_args,
+        load_script, load_script_hash, load_witness_args,
     },
 };
 use molecule::prelude::Entity;
@@ -125,18 +125,8 @@ fn validate_finalization() -> Result<(), ScriptError> {
         load_cell_data(campaign_index, Source::Input).map_err(|_| ScriptError::InvalidData)?;
     let campaign =
         CampaignDataV1::from_slice(&campaign_data).map_err(|_| ScriptError::InvalidData)?;
-    let campaign_input = load_input(campaign_index, Source::Input)
-        .map_err(|_| ScriptError::InvalidApplicationState)?;
-    let campaign_out_point: [u8; 36] = campaign_input
-        .previous_output()
-        .as_slice()
-        .try_into()
-        .map_err(|_| ScriptError::InvalidData)?;
-    let expected_payload = deadline_payload::deadline_campaign_payload_hash(
-        &script_hash,
-        &expected_campaign_type,
-        &campaign_out_point,
-    );
+    let expected_payload =
+        deadline_payload::deadline_campaign_payload_hash(&script_hash, &expected_campaign_type);
     if job.payload_hash().as_slice() != expected_payload {
         return Err(ScriptError::PayloadHashMismatch);
     }

@@ -47,7 +47,6 @@ enum Mutation {
     RefundOrder,
     RefundMixed,
     PayloadHash,
-    CrossWiredCampaign,
     PolicyCommitment,
     RewardAmount,
     JobSuccessor,
@@ -200,18 +199,8 @@ fn build_success_case(mutation: Mutation) -> SuccessCase {
     if matches!(mutation, Mutation::PolicyCommitment) {
         committed_policy_hash = [0x91; 32];
     }
-    let mut campaign_out_point: [u8; 36] = campaign_cell
-        .as_slice()
-        .try_into()
-        .expect("campaign outpoint");
-    if matches!(mutation, Mutation::CrossWiredCampaign) {
-        campaign_out_point[0] ^= 1;
-    }
-    let mut payload_hash = deadline_campaign_payload_hash(
-        &deadline_policy_hash,
-        &campaign_type_hash,
-        &campaign_out_point,
-    );
+    let mut payload_hash =
+        deadline_campaign_payload_hash(&deadline_policy_hash, &campaign_type_hash);
     if matches!(mutation, Mutation::PayloadHash) {
         payload_hash = [0x92; 32];
     }
@@ -507,7 +496,6 @@ fn refund_outputs_are_bound_to_committed_recipient_amount_and_order() {
 #[test]
 fn deadline_adapter_binds_policy_payload_reward_and_termination() {
     assert_fails(Mutation::PayloadHash, 19);
-    assert_fails(Mutation::CrossWiredCampaign, 19);
     assert_fails(Mutation::PolicyCommitment, 17);
     assert_fails(Mutation::RewardAmount, 29);
     assert_fails(Mutation::JobSuccessor, 24);

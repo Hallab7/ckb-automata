@@ -6,17 +6,17 @@ generated Rust and TypeScript bindings are checked into the repository.
 
 ## State
 
-| Field               | Rule                                              |
-| ------------------- | ------------------------------------------------- |
-| `version`           | Must be `1`                                       |
-| `state`             | `0` open, `1` succeeded, `2` refunding            |
-| `campaign_id`       | Stable network-bound campaign identity            |
-| `pledged`           | Exact sum of committed pledge records in shannons |
-| `pledge_count`      | Exact number of committed pledge records          |
-| `target`            | Non-zero success threshold in shannons            |
-| `deadline_since`    | Non-zero absolute block-number `since` value      |
-| `success_lock_hash` | Full script hash of the only success recipient    |
-| `refund_commitment` | Hash of the canonical ordered pledge records      |
+| Field               | Rule                                               |
+| ------------------- | -------------------------------------------------- |
+| `version`           | Must be `1`                                        |
+| `state`             | `0` open, `1` succeeded, `2` refunding             |
+| `campaign_id`       | Hash of input 0 outpoint and campaign output index |
+| `pledged`           | Exact sum of committed pledge records in shannons  |
+| `pledge_count`      | Exact number of committed pledge records           |
+| `target`            | Non-zero success threshold in shannons             |
+| `deadline_since`    | Non-zero absolute block-number `since` value       |
+| `success_lock_hash` | Full script hash of the only success recipient     |
+| `refund_commitment` | Hash of the canonical ordered pledge records       |
 
 Each pledge record contains its source outpoint, full refund lock hash, and
 amount. Records are ordered by transaction hash and output index before the

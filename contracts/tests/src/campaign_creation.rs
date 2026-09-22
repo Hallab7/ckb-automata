@@ -12,6 +12,7 @@ use molecule::prelude::{Builder, Entity};
 
 use crate::{
     campaign::refund_commitment,
+    campaign_identity::derive_campaign_id,
     fixtures::{contract_binary, create_cell, deployed_contract},
     generated_campaign::CampaignDataV1,
 };
@@ -21,7 +22,7 @@ const PLEDGED: u64 = 10_000_000_000;
 const CHANGE: u64 = 10_000_000_000;
 const FEE: u64 = 1_000_000;
 const CREATION_TRANSACTION_HASH: &str =
-    "0xc0f2df681266a74c5018d6315641673b4c9252616f753528d9a61e0c9e623186";
+    "0xa835e27cc69ef2f0d7e4d20eb3ce1b83de1925567e33ead535bd3bc0ffe08de9";
 
 #[derive(Clone, Copy)]
 enum Mutation {
@@ -29,6 +30,7 @@ enum Mutation {
     Version,
     State,
     CampaignId,
+    CreationAnchor,
     Target,
     DeadlineZero,
     DeadlineMetric,
@@ -61,13 +63,12 @@ fn pledge_records() -> Vec<u8> {
 
 fn build_creation_case(mutation: Mutation) -> CreationCase {
     let mut context = Context::new_with_deterministic_rng();
-    let campaign_id = [0x11; 32];
     let campaign_code = context.deploy_cell(contract_binary("demo-campaign-type"));
-    let campaign_type = context
+    let placeholder_campaign_type = context
         .build_script_with_hash_type(
             &campaign_code,
             ScriptHashType::Data1,
-            Bytes::copy_from_slice(&campaign_id),
+            Bytes::from(vec![0; 32]),
         )
         .expect("campaign type script");
     let campaign_lock = deployed_contract(&mut context, "campaign-lock");
@@ -82,45 +83,27 @@ fn build_creation_case(mutation: Mutation) -> CreationCase {
 
     let records = pledge_records();
     let commitment = refund_commitment(2, &records);
-
-    let mut builder = CampaignDataV1::new_builder()
+    let placeholder_data = CampaignDataV1::new_builder()
         .version(1_u16.to_le_bytes())
         .state(0)
-        .campaign_id(campaign_id)
+        .campaign_id([0; 32])
         .pledged(PLEDGED.to_le_bytes())
         .pledge_count(2_u32.to_le_bytes())
         .target(15_000_000_000_u64.to_le_bytes())
         .deadline_since(42_u64.to_le_bytes())
         .success_lock_hash([0x22; 32])
-        .refund_commitment(commitment);
-    builder = match mutation {
-        Mutation::Version => builder.version(2_u16.to_le_bytes()),
-        Mutation::State => builder.state(1),
-        Mutation::CampaignId => builder.campaign_id([0x12; 32]),
-        Mutation::Target => builder.target(0_u64.to_le_bytes()),
-        Mutation::DeadlineZero => builder.deadline_since(0_u64.to_le_bytes()),
-        Mutation::DeadlineMetric => builder.deadline_since(((1_u64 << 61) | 42).to_le_bytes()),
-        Mutation::PledgeCount => builder.pledge_count(0_u32.to_le_bytes()),
-        Mutation::SuccessRecipient => builder.success_lock_hash([0; 32]),
-        Mutation::RefundCommitment => builder.refund_commitment([0; 32]),
-        _ => builder,
-    };
-    let campaign_data = builder.build().as_bytes();
-
-    let empty_campaign_output = CellOutput::new_builder()
-        .lock(campaign_lock)
-        .type_(Some(campaign_type).pack())
+        .refund_commitment(commitment)
+        .build()
+        .as_bytes();
+    let placeholder_output = CellOutput::new_builder()
+        .lock(campaign_lock.clone())
+        .type_(Some(placeholder_campaign_type).pack())
         .build();
-    let occupied = empty_campaign_output
-        .occupied_capacity(Capacity::bytes(campaign_data.len()).expect("campaign data capacity"))
+    let occupied = placeholder_output
+        .occupied_capacity(Capacity::bytes(placeholder_data.len()).expect("campaign data capacity"))
         .expect("campaign occupied capacity")
         .as_u64();
     let expected_capacity = occupied + PLEDGED;
-    let campaign_capacity = match mutation {
-        Mutation::CapacityLow => expected_capacity - 1,
-        Mutation::CapacityHigh => expected_capacity + 1,
-        _ => expected_capacity,
-    };
     let funding_capacity = expected_capacity + CHANGE + FEE + 1;
     let empty_funding_output = CellOutput::new_builder().lock(funding_lock.clone()).build();
     let funding_minimum = empty_funding_output
@@ -135,6 +118,64 @@ fn build_creation_case(mutation: Mutation) -> CreationCase {
         Bytes::new(),
         funding_capacity - funding_minimum,
     );
+    let anchor_out_point: [u8; 36] = funding
+        .input
+        .previous_output()
+        .as_slice()
+        .try_into()
+        .expect("funding outpoint");
+    let derived_campaign_id = derive_campaign_id(&anchor_out_point, 0);
+    let campaign_id = if matches!(mutation, Mutation::CreationAnchor) {
+        [0x12; 32]
+    } else {
+        derived_campaign_id
+    };
+    let campaign_type = context
+        .build_script_with_hash_type(
+            &campaign_code,
+            ScriptHashType::Data1,
+            Bytes::copy_from_slice(&campaign_id),
+        )
+        .expect("campaign type script");
+
+    let mut builder = CampaignDataV1::new_builder()
+        .version(1_u16.to_le_bytes())
+        .state(0)
+        .campaign_id(campaign_id)
+        .pledged(PLEDGED.to_le_bytes())
+        .pledge_count(2_u32.to_le_bytes())
+        .target(15_000_000_000_u64.to_le_bytes())
+        .deadline_since(42_u64.to_le_bytes())
+        .success_lock_hash([0x22; 32])
+        .refund_commitment(commitment);
+    builder = match mutation {
+        Mutation::Version => builder.version(2_u16.to_le_bytes()),
+        Mutation::State => builder.state(1),
+        Mutation::CampaignId => builder.campaign_id([0x13; 32]),
+        Mutation::Target => builder.target(0_u64.to_le_bytes()),
+        Mutation::DeadlineZero => builder.deadline_since(0_u64.to_le_bytes()),
+        Mutation::DeadlineMetric => builder.deadline_since(((1_u64 << 61) | 42).to_le_bytes()),
+        Mutation::PledgeCount => builder.pledge_count(0_u32.to_le_bytes()),
+        Mutation::SuccessRecipient => builder.success_lock_hash([0; 32]),
+        Mutation::RefundCommitment => builder.refund_commitment([0; 32]),
+        _ => builder,
+    };
+    let campaign_data = builder.build().as_bytes();
+
+    let empty_campaign_output = CellOutput::new_builder()
+        .lock(campaign_lock)
+        .type_(Some(campaign_type).pack())
+        .build();
+    let actual_occupied = empty_campaign_output
+        .occupied_capacity(Capacity::bytes(campaign_data.len()).expect("campaign data capacity"))
+        .expect("campaign occupied capacity")
+        .as_u64();
+    assert_eq!(actual_occupied, occupied);
+    let campaign_capacity = match mutation {
+        Mutation::CapacityLow => expected_capacity - 1,
+        Mutation::CapacityHigh => expected_capacity + 1,
+        _ => expected_capacity,
+    };
     let change_capacity = funding_capacity - campaign_capacity - FEE;
 
     let mut witness_records = records;
@@ -221,6 +262,7 @@ fn campaign_creation_binds_identity_state_and_recipients() {
     assert_script_error(Mutation::Version, 11);
     assert_script_error(Mutation::State, 13);
     assert_script_error(Mutation::CampaignId, 20);
+    assert_script_error(Mutation::CreationAnchor, 20);
     assert_script_error(Mutation::SuccessRecipient, 10);
     assert_script_error(Mutation::RefundCommitment, 10);
     assert_script_error(Mutation::RefundRecords, 19);

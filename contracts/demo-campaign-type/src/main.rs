@@ -6,8 +6,8 @@ use ckb_std::{
     default_alloc, entry,
     high_level::{
         QueryIter, load_cell_capacity, load_cell_data, load_cell_lock_hash,
-        load_cell_occupied_capacity, load_cell_type_hash, load_input_since, load_script,
-        load_script_hash, load_witness_args,
+        load_cell_occupied_capacity, load_cell_type_hash, load_input, load_input_since,
+        load_script, load_script_hash, load_witness_args,
     },
 };
 use molecule::prelude::Entity;
@@ -28,6 +28,10 @@ mod generated {
 #[allow(dead_code)]
 mod campaign {
     include!("../../shared/campaign.rs");
+}
+
+mod campaign_identity {
+    include!("../../shared/campaign_identity.rs");
 }
 
 mod error_codes {
@@ -71,6 +75,22 @@ fn validate_creation() -> Result<(), ScriptError> {
     let script = load_script().map_err(|_| ScriptError::InvalidData)?;
     let args = script.args().raw_data();
     if args.len() != 32 || args.as_ref() != campaign.campaign_id().as_slice() {
+        return Err(ScriptError::JobIdMismatch);
+    }
+    let script_hash = load_script_hash().map_err(|_| ScriptError::InvalidData)?;
+    let output_index = QueryIter::new(load_cell_type_hash, Source::Output)
+        .position(|type_hash| type_hash == Some(script_hash))
+        .and_then(|index| u32::try_from(index).ok())
+        .ok_or(ScriptError::InvalidApplicationState)?;
+    let anchor_input = load_input(0, Source::Input).map_err(|_| ScriptError::InvalidData)?;
+    let anchor_out_point: [u8; 36] = anchor_input
+        .previous_output()
+        .as_slice()
+        .try_into()
+        .map_err(|_| ScriptError::InvalidData)?;
+    if campaign.campaign_id().as_slice()
+        != campaign_identity::derive_campaign_id(&anchor_out_point, output_index)
+    {
         return Err(ScriptError::JobIdMismatch);
     }
 

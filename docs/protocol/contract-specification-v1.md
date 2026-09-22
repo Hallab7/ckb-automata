@@ -103,10 +103,11 @@ their domain-separated hash equals `refund_commitment`.
 
 ### Deadline Policy and Campaign
 
-- Deadline policy args are the full type-script hash of the one campaign it may
-  finalize. The payload additionally binds that campaign's exact input outpoint.
-- Campaign creation has one type-group output, type args equal to `campaign_id`,
-  canonical pledge records, and spendable capacity exactly equal to `pledged`.
+- Deadline policy args and payload bind the full type-script hash of the one
+  campaign it may finalize.
+- Campaign creation has one type-group output. Its type args and `campaign_id`
+  equal the hash of input 0's outpoint and the campaign output index; it also
+  has canonical pledge records and spendable capacity exactly equal to `pledged`.
 - Finalization co-spends the open campaign and one-shot deadline Job Cell at the
   committed absolute block lower bound.
 - `pledged >= target` deterministically selects success; success pays the exact

@@ -44,6 +44,10 @@ pub mod campaign {
     include!("../../shared/campaign.rs");
 }
 
+pub mod campaign_identity {
+    include!("../../shared/campaign_identity.rs");
+}
+
 pub mod deadline_payload {
     include!("../../shared/deadline_payload.rs");
 }
