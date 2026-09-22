@@ -161,3 +161,14 @@ export {
   type UnsignedCellOutput,
   type UnsignedDeadlineTransaction,
 } from "./deadline-creation.ts";
+
+export {
+  RECURRING_CREATION_INTENT_DOMAIN,
+  assertRecurringCompletion,
+  buildRecurringCreation,
+  reconstructRecurringDisplayIntent,
+  type NormalizedRecurringIntent,
+  type RecurringCreationBuild,
+  type RecurringCreationInput,
+  type RecurringDisplayIntent,
+} from "./recurring-creation.ts";

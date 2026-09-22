@@ -122,6 +122,7 @@ The detailed transition rules are indexed in
 [`recurring-payout-validation.md`](recurring-payout-validation.md),
 [`campaign-creation.md`](campaign-creation.md),
 [`deadline-creation-builder.md`](deadline-creation-builder.md),
+[`recurring-creation-builder.md`](recurring-creation-builder.md),
 [`campaign-success-finalization.md`](campaign-success-finalization.md), and
 [`campaign-failure-finalization.md`](campaign-failure-finalization.md).
 
