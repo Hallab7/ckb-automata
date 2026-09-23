@@ -10,6 +10,7 @@ Configure branch protection to require these stable job names:
 - `lint`
 - `typecheck`
 - `unit-test`
+- `backend-integration`
 - `contract-build`
 - `contract-test`
 - `contract-fuzz-smoke`
@@ -43,6 +44,10 @@ Remove-Item Env:AUTOMATA_CI_BREAK
 
 The middle command must exit nonzero. Run it again without the environment
 variable to verify the successful path.
+
+The `backend-integration` job runs the same composed NestJS suite against a fresh database and an
+upgrade from migration 3. It uses isolated PostgreSQL and Redis services plus in-process CKB RPC and
+webhook receivers; no live chain or external webhook is contacted.
 
 The fuzz smoke job exercises the contract parsers and arithmetic helpers with
 fixed seeds on every foundation run. The separate `Contract Fuzz` workflow runs
