@@ -104,6 +104,28 @@ test("executor fee-cell configuration is public, canonical, and lossless", () =>
   );
 });
 
+test("executor simulation limits and fee key are canonical and lossless", () => {
+  const privateKey = `0x${"01".repeat(32)}`;
+  const configured = parseEnvironment({
+    ...validEnvironment("local"),
+    EXECUTOR_FEE_PRIVATE_KEY: privateKey,
+    EXECUTOR_MAX_CYCLES: "10000000",
+    EXECUTOR_MIN_MARGIN: "5000000",
+  });
+  assert.equal(configured.EXECUTOR_FEE_PRIVATE_KEY, privateKey);
+  assert.equal(configured.EXECUTOR_MAX_CYCLES, "10000000");
+  assert.equal(configured.EXECUTOR_MIN_MARGIN, "5000000");
+
+  for (const invalid of [
+    { EXECUTOR_FEE_PRIVATE_KEY: `0x${"AB".repeat(32)}` },
+    { EXECUTOR_MAX_CYCLES: "0" },
+    { EXECUTOR_MAX_CYCLES: "01" },
+    { EXECUTOR_MIN_MARGIN: "01" },
+  ]) {
+    assert.throws(() => parseEnvironment({ ...validEnvironment("local"), ...invalid }));
+  }
+});
+
 test("user signing material fails startup validation", () => {
   assert.throws(
     () =>

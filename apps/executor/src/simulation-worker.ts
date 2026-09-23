@@ -1,0 +1,81 @@
+import type { OnApplicationBootstrap, OnModuleDestroy } from "@nestjs/common";
+import { Worker, type Job } from "bullmq";
+
+import { parseHash32 } from "@ckb-automata/core";
+
+import {
+  SimulationGateService,
+  type SimulationQueuePayload,
+  type SimulationStore,
+} from "./simulation.ts";
+import { DEFAULT_QUEUE_PREFIX, parseRedisConnection, type QueueJobEnvelope } from "./queues.ts";
+import type { ExecutorEventLogger, ExecutorRuntime } from "./runtime.ts";
+
+function payload(job: Job<QueueJobEnvelope<SimulationQueuePayload>>): SimulationQueuePayload {
+  const value = job.data.payload;
+  if (
+    job.name !== "dry-run-transaction" ||
+    job.data.schemaVersion !== 1 ||
+    typeof value !== "object" ||
+    value === null
+  ) {
+    throw new TypeError("simulation queue envelope is invalid");
+  }
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+      value.attemptId,
+    )
+  ) {
+    throw new TypeError("simulation attempt ID is invalid");
+  }
+  return Object.freeze({
+    attemptId: value.attemptId,
+    intentHash: parseHash32(value.intentHash),
+  });
+}
+
+export class SimulationCoordinator implements OnApplicationBootstrap, OnModuleDestroy {
+  readonly #runtime: ExecutorRuntime;
+  readonly #store: SimulationStore & { close(): Promise<void> };
+  readonly #service: SimulationGateService;
+  readonly #redisUrl: string;
+  readonly #prefix: string;
+  readonly #logger: ExecutorEventLogger;
+  #worker: Worker<QueueJobEnvelope<SimulationQueuePayload>, unknown, string> | undefined;
+
+  constructor(options: {
+    readonly runtime: ExecutorRuntime;
+    readonly store: SimulationStore & { close(): Promise<void> };
+    readonly service: SimulationGateService;
+    readonly redisUrl: string;
+    readonly prefix?: string;
+    readonly logger: ExecutorEventLogger;
+  }) {
+    this.#runtime = options.runtime;
+    this.#store = options.store;
+    this.#service = options.service;
+    this.#redisUrl = options.redisUrl;
+    this.#prefix = options.prefix ?? DEFAULT_QUEUE_PREFIX;
+    this.#logger = options.logger;
+  }
+
+  async onApplicationBootstrap(): Promise<void> {
+    this.#worker = new Worker<QueueJobEnvelope<SimulationQueuePayload>, unknown, string>(
+      "submit",
+      (job) => this.#runtime.run(() => this.#service.evaluate(payload(job))),
+      {
+        connection: parseRedisConnection(this.#redisUrl),
+        prefix: this.#prefix,
+      },
+    );
+    await this.#worker.waitUntilReady();
+    this.#logger.info("executor.simulation.started", "Dry-run and profitability worker is ready");
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    await this.#worker?.close();
+    this.#worker = undefined;
+    await this.#store.close();
+    this.#logger.info("executor.simulation.stopped", "Dry-run and profitability worker stopped");
+  }
+}

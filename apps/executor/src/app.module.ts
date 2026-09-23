@@ -20,6 +20,10 @@ import {
   type ExecutorEventLogger,
   type ExecutorQueueReadiness,
 } from "./runtime.ts";
+import { SimulationGateService } from "./simulation.ts";
+import { PostgresSimulationStore } from "./simulation-store.ts";
+import { SimulationCoordinator } from "./simulation-worker.ts";
+import { operatorLockArgs } from "./signing.ts";
 
 export const EXECUTOR_ADAPTERS = Symbol("EXECUTOR_ADAPTERS");
 export const EXECUTOR_ENVIRONMENT = Symbol("EXECUTOR_ENVIRONMENT");
@@ -42,6 +46,7 @@ export interface ExecutorModuleDependencies {
   readonly createChainClient?: (environment: AutomataEnvironment) => ExecutorChainClient;
   readonly enableBuildWorkers?: boolean;
   readonly enableEligibilityWorkers?: boolean;
+  readonly enableSimulationWorkers?: boolean;
   readonly logger: ExecutorEventLogger;
   readonly queuePrefix?: string;
   readonly queues?: ExecutorQueueReadiness;
@@ -180,6 +185,81 @@ export function createExecutorModule(
             },
           },
         ];
+  const simulationValues = [
+    environment.EXECUTOR_FEE_PRIVATE_KEY,
+    environment.EXECUTOR_MAX_CYCLES,
+    environment.EXECUTOR_MIN_MARGIN,
+  ];
+  const hasSimulationConfiguration = hasBuildConfiguration && simulationValues.every(Boolean);
+  if (simulationValues.some(Boolean) && !hasSimulationConfiguration) {
+    throw new Error("complete executor simulation configuration is required");
+  }
+  if (dependencies.enableSimulationWorkers === true && !hasSimulationConfiguration) {
+    throw new Error("executor simulation worker configuration is required");
+  }
+  const simulationProviders: Provider[] =
+    dependencies.enableSimulationWorkers === false || !hasSimulationConfiguration
+      ? []
+      : [
+          {
+            provide: SimulationCoordinator,
+            inject: [EXECUTOR_ENVIRONMENT, ExecutorRuntime, EXECUTOR_LOGGER],
+            useFactory: async (
+              configured: AutomataEnvironment,
+              runtime: ExecutorRuntime,
+              logger: ExecutorEventLogger,
+            ) => {
+              const loaded = await deploymentRegistry.load(configured.CKB_GENESIS_HASH);
+              if (loaded.status !== "ok") {
+                throw new Error("executor deployment is unavailable for simulation");
+              }
+              const lockArgs = configured.EXECUTOR_LOCK_ARGS;
+              const transactionFee = configured.EXECUTOR_TRANSACTION_FEE;
+              const privateKey = configured.EXECUTOR_FEE_PRIVATE_KEY;
+              const maxCycles = configured.EXECUTOR_MAX_CYCLES;
+              const minimumMargin = configured.EXECUTOR_MIN_MARGIN;
+              if (
+                lockArgs === undefined ||
+                transactionFee === undefined ||
+                privateKey === undefined ||
+                maxCycles === undefined ||
+                minimumMargin === undefined
+              ) {
+                throw new Error("executor simulation worker configuration is unavailable");
+              }
+              const secp = loaded.deployment.manifest.secp256k1Blake160;
+              const rewardLock = Object.freeze({
+                codeHash: secp.codeHash,
+                hashType: secp.hashType,
+                args: lockArgs as `0x${string}`,
+              });
+              if (operatorLockArgs(privateKey) !== rewardLock.args) {
+                throw new Error("operator private key does not match the configured reward lock");
+              }
+              const store = new PostgresSimulationStore(configured.DATABASE_URL);
+              return new SimulationCoordinator({
+                runtime,
+                store,
+                service: new SimulationGateService({
+                  store,
+                  chain: {
+                    dryRun: (transaction) => runtime.dryRun(transaction as never),
+                  },
+                  rewardLock,
+                  privateKey,
+                  transactionFee: parseShannons(transactionFee),
+                  maxCycles: BigInt(maxCycles),
+                  minimumMargin: parseShannons(minimumMargin),
+                }),
+                redisUrl: configured.REDIS_URL,
+                logger,
+                ...(dependencies.queuePrefix === undefined
+                  ? {}
+                  : { prefix: dependencies.queuePrefix }),
+              });
+            },
+          },
+        ];
   return {
     module: ExecutorModule,
     imports,
@@ -228,6 +308,7 @@ export function createExecutorModule(
       },
       ...eligibilityProviders,
       ...buildProviders,
+      ...simulationProviders,
     ],
     exports: [ExecutorAdapterRegistry, ExecutorRuntime, EXECUTOR_QUEUES],
   };

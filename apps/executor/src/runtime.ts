@@ -26,6 +26,7 @@ export interface ExecutorReadinessReport {
 export type ExecutorChainClient = Pick<
   CkbClient,
   | "close"
+  | "dryRun"
   | "findCellsPaged"
   | "getCellLive"
   | "getGenesisHash"
@@ -80,6 +81,11 @@ export class ExecutorRuntime implements OnApplicationBootstrap, OnModuleDestroy 
   getTipHeader(): ReturnType<ExecutorChainClient["getTipHeader"]> {
     if (this.#state !== "ready") throw new Error("executor chain reads require ready state");
     return this.#chain.getTipHeader();
+  }
+
+  dryRun(...args: Parameters<ExecutorChainClient["dryRun"]>) {
+    if (this.#state !== "ready") throw new Error("executor chain reads require ready state");
+    return this.#chain.dryRun(...args);
   }
 
   getCellLive(...args: Parameters<ExecutorChainClient["getCellLive"]>) {

@@ -16,6 +16,7 @@ function configuredSecrets(environment: AutomataEnvironment): readonly string[] 
     environment.DATABASE_URL,
     environment.REDIS_URL,
     environment.WEBHOOK_ENCRYPTION_KEY,
+    environment.EXECUTOR_FEE_PRIVATE_KEY,
     environment.ERROR_TRACKING_DSN,
     environment.OTEL_EXPORTER_OTLP_HEADERS,
   ].filter((value): value is string => value !== undefined && value !== "");
@@ -100,6 +101,7 @@ export interface ExecutorBootstrapDependencies {
   readonly createChainClient?: ExecutorModuleDependencies["createChainClient"];
   readonly enableBuildWorkers?: boolean;
   readonly enableEligibilityWorkers?: boolean;
+  readonly enableSimulationWorkers?: boolean;
   readonly logger?: ExecutorLogger;
   readonly queuePrefix?: string;
   readonly queues?: ExecutorModuleDependencies["queues"];
@@ -134,6 +136,9 @@ export async function createExecutorApplication(
     ...(dependencies.enableEligibilityWorkers === undefined
       ? {}
       : { enableEligibilityWorkers: dependencies.enableEligibilityWorkers }),
+    ...(dependencies.enableSimulationWorkers === undefined
+      ? {}
+      : { enableSimulationWorkers: dependencies.enableSimulationWorkers }),
     ...(dependencies.queuePrefix === undefined ? {} : { queuePrefix: dependencies.queuePrefix }),
     ...(dependencies.queues === undefined ? {} : { queues: dependencies.queues }),
   });
@@ -156,5 +161,6 @@ export async function startExecutor(
   return createExecutorApplication(input, {
     ...dependencies,
     enableBuildWorkers: dependencies.enableBuildWorkers ?? true,
+    enableSimulationWorkers: dependencies.enableSimulationWorkers ?? true,
   });
 }

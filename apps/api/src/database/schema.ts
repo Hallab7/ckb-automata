@@ -245,6 +245,7 @@ export const transactionAttempts = pgTable(
     chainSnapshot: jsonb("chain_snapshot"),
     intentHash: hash("intent_hash"),
     unsignedTransaction: jsonb("unsigned_transaction"),
+    simulation: jsonb("simulation"),
     buildClaimToken: uuid("build_claim_token"),
     buildClaimExpiresAt: timestamp("build_claim_expires_at", { withTimezone: true }),
     unsignedTxHash: hash("unsigned_tx_hash"),
@@ -270,7 +271,7 @@ export const transactionAttempts = pgTable(
     uniqueIndex("transaction_attempts_active_execute_uq")
       .on(table.networkId, table.jobId, table.sequence)
       .where(
-        sql`${table.operation} = 'execute' AND ${table.sequence} IS NOT NULL AND ${table.state} IN ('draft', 'submitted', 'proposed', 'committed', 'confirmed')`,
+        sql`${table.operation} = 'execute' AND ${table.sequence} IS NOT NULL AND ${table.state} IN ('draft', 'awaiting_signature', 'submitted', 'proposed', 'committed', 'confirmed')`,
       ),
     check(
       "transaction_attempts_operation_ck",

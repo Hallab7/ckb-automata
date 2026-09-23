@@ -14,6 +14,9 @@ export const AUTOMATA_ENV_KEYS = [
   "REDIS_URL",
   "EXECUTOR_LOCK_ARGS",
   "EXECUTOR_TRANSACTION_FEE",
+  "EXECUTOR_FEE_PRIVATE_KEY",
+  "EXECUTOR_MAX_CYCLES",
+  "EXECUTOR_MIN_MARGIN",
   "PUBLIC_APP_ORIGIN",
   "WEBHOOK_ENCRYPTION_KEY",
   "ERROR_TRACKING_DSN",
@@ -51,6 +54,27 @@ const commonFields = {
       .optional(),
   ),
   EXECUTOR_TRANSACTION_FEE: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z
+      .string()
+      .regex(/^(0|[1-9][0-9]*)$/, "must be a canonical decimal shannon amount")
+      .optional(),
+  ),
+  EXECUTOR_FEE_PRIVATE_KEY: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z
+      .string()
+      .regex(/^0x[0-9a-f]{64}$/, "must be a canonical 32-byte private key")
+      .optional(),
+  ),
+  EXECUTOR_MAX_CYCLES: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z
+      .string()
+      .regex(/^[1-9][0-9]*$/, "must be a positive canonical decimal cycle count")
+      .optional(),
+  ),
+  EXECUTOR_MIN_MARGIN: z.preprocess(
     (value) => (value === "" ? undefined : value),
     z
       .string()

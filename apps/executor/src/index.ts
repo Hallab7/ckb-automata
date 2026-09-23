@@ -71,6 +71,18 @@ export {
   type ExecutorReadinessReport,
   type ExecutorRuntimeState,
 } from "./runtime.ts";
+export { operatorLockArgs, signOperatorFeeInput } from "./signing.ts";
+export {
+  SimulationGateService,
+  type SimulationAttempt,
+  type SimulationChain,
+  type SimulationQueuePayload,
+  type SimulationRecord,
+  type SimulationResult,
+  type SimulationStore,
+} from "./simulation.ts";
+export { PostgresSimulationStore } from "./simulation-store.ts";
+export { SimulationCoordinator } from "./simulation-worker.ts";
 
 export {
   ExecutorAdapterError,

@@ -35,6 +35,9 @@ function chainFixture() {
     async getGenesisHash() {
       return genesisHash;
     },
+    async dryRun() {
+      throw new Error("dry run is disabled in the queue integration test");
+    },
     async getTipHeader() {
       throw new Error("chain reads are disabled in the queue integration test");
     },

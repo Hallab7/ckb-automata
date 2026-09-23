@@ -67,7 +67,9 @@ export class PostgresBuildAttemptStore implements BuildAttemptStore {
           AND job_id = ${jobId}
           AND sequence = ${sequence}
           AND operation = 'execute'
-          AND state IN ('draft', 'submitted', 'proposed', 'committed', 'confirmed')
+          AND state IN (
+            'draft', 'awaiting_signature', 'submitted', 'proposed', 'committed', 'confirmed'
+          )
         LIMIT 1
         FOR UPDATE
       `;

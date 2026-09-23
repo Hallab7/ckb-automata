@@ -3,7 +3,8 @@ import test from "node:test";
 
 import { parseHash32 } from "@ckb-automata/core";
 
-import { createExecutorApplication, startExecutor } from "./bootstrap.ts";
+import { ExecutorLogger, createExecutorApplication, startExecutor } from "./bootstrap.ts";
+import { parseEnvironment } from "@ckb-automata/config";
 
 const GENESIS_HASH = parseHash32(`0x${"1".repeat(64)}`);
 
@@ -28,6 +29,9 @@ function chainFixture(genesisHash = GENESIS_HASH) {
     client: {
       async getGenesisHash() {
         return genesisHash;
+      },
+      async dryRun() {
+        throw new Error("dry run is not used by bootstrap tests");
       },
       async getTipHeader() {
         throw new Error("tip header is not used by bootstrap tests");
@@ -132,6 +136,21 @@ test("invalid configuration prevents context creation", async () => {
     }),
   );
   assert.equal(creations, 0);
+});
+
+test("executor fee signing material is redacted from structured and free-form logs", () => {
+  const privateKey = `0x${"01".repeat(32)}`;
+  const lines: string[] = [];
+  const logger = new ExecutorLogger(
+    parseEnvironment(environment({ EXECUTOR_FEE_PRIVATE_KEY: privateKey })),
+    (line) => lines.push(line),
+  );
+  logger.info("executor.test", `configured ${privateKey}`, {
+    executorFeePrivateKey: privateKey,
+  });
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0]?.includes(privateKey), false);
+  assert.equal(lines[0]?.includes("[REDACTED]"), true);
 });
 
 test("the production entrypoint requires public fee-cell configuration", async () => {

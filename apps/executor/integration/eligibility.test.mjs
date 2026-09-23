@@ -17,6 +17,7 @@ import { AUTOMATA_QUEUES } from "@ckb-automata/telemetry";
 
 import { migrateDatabase } from "../../api/src/database/migrator.ts";
 import { PostgresBuildAttemptStore } from "../src/build-store.ts";
+import { PostgresSimulationStore } from "../src/simulation-store.ts";
 import { createExecutorApplication } from "../src/bootstrap.ts";
 import { DurableQueueRegistry, parseRedisConnection } from "../src/queues.ts";
 
@@ -128,6 +129,9 @@ function chainFixture(state) {
     async getGenesisHash() {
       return deployment.genesisHash;
     },
+    async dryRun() {
+      throw new Error("simulation worker is not configured by this test");
+    },
     async getTipHeader() {
       return {
         hash: hash(Number(state.tip)),
@@ -212,6 +216,7 @@ test(
 test("concurrent build deliveries share one durable operational attempt", async () => {
   const database = await createDatabase();
   let store;
+  let simulationStore;
   try {
     const job = await seedJob(database.url);
     store = new PostgresBuildAttemptStore(database.url, deployment.network);
@@ -236,18 +241,37 @@ test("concurrent build deliveries share one durable operational attempt", async 
     assert.equal(replay.attemptId, claimed.claim.attemptId);
     assert.equal(replay.intentHash, hash(72));
 
+    simulationStore = new PostgresSimulationStore(database.url);
+    const simulationAttempt = await simulationStore.load(claimed.claim.attemptId, hash(72));
+    assert.ok(simulationAttempt);
+    assert.equal(
+      await simulationStore.approve(simulationAttempt, {
+        cycles: "1000",
+        fee: "1000000",
+        reward: "5000000000",
+        margin: "4999000000",
+        intentHash: hash(72),
+      }),
+      true,
+    );
+    const afterApproval = await store.claim(payload);
+    assert.equal(afterApproval.status, "duplicate");
+    assert.equal(afterApproval.attemptId, claimed.claim.attemptId);
+
     const sql = postgres(database.url, { max: 1, onnotice: () => undefined });
     try {
-      const [count] = await sql`
-        SELECT count(*)::integer AS value
+      const [attempt] = await sql`
+        SELECT count(*)::integer AS value, min(state)::text AS state,
+               min(simulation->>'cycles') AS cycles
         FROM transaction_attempts
         WHERE job_id = ${job.jobId} AND sequence = ${job.sequence}
       `;
-      assert.equal(count.value, 1);
+      assert.deepEqual(attempt, { value: 1, state: "awaiting_signature", cycles: "1000" });
     } finally {
       await sql.end({ timeout: 2 });
     }
   } finally {
+    if (simulationStore) await simulationStore.close();
     if (store) await store.close();
     await database.admin.unsafe(`DROP DATABASE IF EXISTS "${database.name}" WITH (FORCE)`);
     await database.admin.end({ timeout: 2 });
