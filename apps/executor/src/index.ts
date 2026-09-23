@@ -3,6 +3,29 @@ import { WORKSPACE_NAME } from "@ckb-automata/core";
 export const EXECUTOR_APP_ID = `${WORKSPACE_NAME}:executor` as const;
 
 export {
+  EXECUTOR_ADAPTERS,
+  EXECUTOR_ENVIRONMENT,
+  EXECUTOR_LOGGER,
+  ExecutorModule,
+  createExecutorModule,
+  type ExecutorModuleDependencies,
+} from "./app.module.ts";
+export {
+  ExecutorLogger,
+  createExecutorApplication,
+  startExecutor,
+  type ExecutorBootstrapDependencies,
+  type ExecutorBootstrapResult,
+} from "./bootstrap.ts";
+export {
+  ExecutorRuntime,
+  type ExecutorChainClient,
+  type ExecutorEventLogger,
+  type ExecutorReadinessReport,
+  type ExecutorRuntimeState,
+} from "./runtime.ts";
+
+export {
   ExecutorAdapterError,
   ExecutorAdapterRegistry,
   defineExecutorAdapter,

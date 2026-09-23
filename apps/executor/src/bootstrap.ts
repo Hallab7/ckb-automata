@@ -1,0 +1,145 @@
+import type { INestApplicationContext, LoggerService } from "@nestjs/common";
+import { NestFactory } from "@nestjs/core";
+
+import { parseEnvironment, type AutomataEnvironment } from "@ckb-automata/config";
+import { CorrelatedLogger, type LogWriter } from "@ckb-automata/telemetry";
+
+import { createExecutorModule, type ExecutorModuleDependencies } from "./app.module.ts";
+import { ExecutorRuntime, type ExecutorEventLogger } from "./runtime.ts";
+
+const SERVICE_NAME = "ckb-automata-executor";
+const SERVICE_VERSION = "0.0.0";
+type EntryNestModule = Parameters<typeof NestFactory.createApplicationContext>[0];
+
+function configuredSecrets(environment: AutomataEnvironment): readonly string[] {
+  return [
+    environment.DATABASE_URL,
+    environment.REDIS_URL,
+    environment.WEBHOOK_ENCRYPTION_KEY,
+    environment.ERROR_TRACKING_DSN,
+    environment.OTEL_EXPORTER_OTLP_HEADERS,
+  ].filter((value): value is string => value !== undefined && value !== "");
+}
+
+export class ExecutorLogger implements LoggerService, ExecutorEventLogger {
+  readonly #logger: CorrelatedLogger;
+
+  constructor(environment: AutomataEnvironment, writer?: LogWriter) {
+    this.#logger = new CorrelatedLogger({
+      configuredSecrets: configuredSecrets(environment),
+      release: environment.RELEASE_VERSION ?? SERVICE_VERSION,
+      revision: environment.RELEASE_REVISION ?? "unversioned",
+      service: SERVICE_NAME,
+      ...(writer === undefined ? {} : { writer }),
+    });
+  }
+
+  log(message: unknown, ...optional: unknown[]): void {
+    this.#framework("info", message, optional);
+  }
+
+  error(message: unknown, ...optional: unknown[]): void;
+  error(event: string, message: string, fields?: Readonly<Record<string, unknown>>): void;
+  error(first: unknown, ...optional: unknown[]): void {
+    if (
+      typeof first === "string" &&
+      typeof optional[0] === "string" &&
+      /^[a-z][a-z0-9_.-]{0,95}$/.test(first)
+    ) {
+      this.#logger.error(first, optional[0], optional[1] as Readonly<Record<string, unknown>>);
+      return;
+    }
+    this.#framework("error", first, optional);
+  }
+
+  warn(message: unknown, ...optional: unknown[]): void {
+    this.#framework("warn", message, optional);
+  }
+
+  debug(message: unknown, ...optional: unknown[]): void {
+    this.#framework("debug", message, optional);
+  }
+
+  verbose(message: unknown, ...optional: unknown[]): void {
+    this.#framework("debug", message, optional);
+  }
+
+  fatal(message: unknown, ...optional: unknown[]): void {
+    this.#framework("fatal", message, optional);
+  }
+
+  info(event: string, message: string, fields?: Readonly<Record<string, unknown>>): void {
+    this.#logger.info(event, message, fields);
+  }
+
+  #framework(
+    level: "debug" | "info" | "warn" | "error" | "fatal",
+    message: unknown,
+    optional: readonly unknown[],
+  ): void {
+    this.#logger.write(
+      level,
+      `nestjs.${level}`,
+      typeof message === "string" ? message : "framework event",
+      optional.length === 0 ? {} : { context: optional },
+    );
+  }
+}
+
+export interface ExecutorBootstrapResult {
+  readonly app: INestApplicationContext;
+  readonly environment: AutomataEnvironment;
+  readonly runtime: ExecutorRuntime;
+}
+
+export interface ExecutorBootstrapDependencies {
+  readonly createApplicationContext?: (
+    module: EntryNestModule,
+    logger: LoggerService,
+  ) => Promise<INestApplicationContext>;
+  readonly createChainClient?: ExecutorModuleDependencies["createChainClient"];
+  readonly logger?: ExecutorLogger;
+  readonly writer?: LogWriter;
+}
+
+async function createNestApplicationContext(
+  module: EntryNestModule,
+  logger: LoggerService,
+): Promise<INestApplicationContext> {
+  return NestFactory.createApplicationContext(module, {
+    abortOnError: true,
+    bufferLogs: true,
+    logger,
+  });
+}
+
+export async function createExecutorApplication(
+  input: Readonly<Record<string, string | undefined>>,
+  dependencies: ExecutorBootstrapDependencies = {},
+): Promise<ExecutorBootstrapResult> {
+  const environment = parseEnvironment(input);
+  const logger = dependencies.logger ?? new ExecutorLogger(environment, dependencies.writer);
+  const module = createExecutorModule(environment, {
+    logger,
+    ...(dependencies.createChainClient === undefined
+      ? {}
+      : { createChainClient: dependencies.createChainClient }),
+  });
+  const app = await (dependencies.createApplicationContext ?? createNestApplicationContext)(
+    module,
+    logger,
+  );
+  app.enableShutdownHooks();
+  return Object.freeze({
+    app,
+    environment,
+    runtime: app.get(ExecutorRuntime),
+  });
+}
+
+export async function startExecutor(
+  input: Readonly<Record<string, string | undefined>> = process.env,
+  dependencies: ExecutorBootstrapDependencies = {},
+): Promise<ExecutorBootstrapResult> {
+  return createExecutorApplication(input, dependencies);
+}

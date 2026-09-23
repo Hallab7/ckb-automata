@@ -4,13 +4,21 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
     "test": "node --test src/**/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@ckb-automata/ccc": "workspace:*",
+    "@ckb-automata/config": "workspace:*",
     "@ckb-automata/core": "workspace:*",
     "@ckb-automata/molecule": "workspace:*",
     "@ckb-automata/telemetry": "workspace:*",
-    "@nervosnetwork/ckb-sdk-utils": "0.109.5"
+    "@nervosnetwork/ckb-sdk-utils": "0.109.5",
+    "@nestjs/common": "12.0.4",
+    "@nestjs/core": "12.0.4",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2"
   }
 }
