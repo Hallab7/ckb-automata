@@ -92,6 +92,22 @@
   max-width: 42rem;
 }
 
+.setup-form-grid {
+  display: grid;
+  gap: var(--ui-space-5);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.setup-address-field {
+  align-content: start;
+  display: grid;
+  gap: var(--ui-space-3);
+}
+
+.setup-address-field .ui-button {
+  justify-self: start;
+}
+
 .setup-step h2 {
   font-size: 1.125rem;
   margin: 0;
@@ -113,6 +129,10 @@
 }
 
 @media (max-width: 30rem) {
+  .setup-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .setup-step {
     min-height: 15rem;
     padding: var(--ui-space-4);

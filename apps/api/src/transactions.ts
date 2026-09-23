@@ -40,10 +40,10 @@ import {
   buildRecurringCreation,
   buildTopUp,
   deploymentRegistry,
+  parseDeadlineCreationRequest,
   parseHash32,
   parseOutPoint,
   type LiveCellResolver,
-  type OutPoint,
   type RegisteredDeployment,
   type ScriptIdentity,
   type UnsignedDeadlineTransaction,
@@ -155,15 +155,6 @@ function script(value: unknown, name: string): ScriptIdentity {
     codeHash: hash(parsed["codeHash"], `${name}.codeHash`),
     hashType,
     args: bytes(parsed["args"], `${name}.args`),
-  });
-}
-
-function outPoint(value: unknown, name: string): OutPoint {
-  const parsed = record(value, name);
-  exact(parsed, ["txHash", "index"], name);
-  return parseOutPoint({
-    txHash: hash(parsed["txHash"], `${name}.txHash`),
-    index: decimal(parsed["index"], `${name}.index`),
   });
 }
 
@@ -495,46 +486,23 @@ export class TransactionBuildService {
   }
 
   async #deadline(input: unknown, deployment: RegisteredDeployment): Promise<BuiltArtifact> {
-    const request = record(input, "deadline request");
-    exact(
-      request,
-      [
-        "pledges",
-        "target",
-        "deadlineBlock",
-        "successLockHash",
-        "cancelLockHash",
-        "reward",
-        "creatorNonce",
-      ],
-      "deadline request",
-    );
-    if (!Array.isArray(request["pledges"])) throw new TypeError("pledges must be an array");
-    const pledges = request["pledges"].map((item, index) => {
-      const pledge = record(item, `pledges[${index}]`);
-      exact(pledge, ["outPoint", "refundLockHash", "amount"], `pledges[${index}]`);
-      return {
-        outPoint: outPoint(pledge["outPoint"], `pledges[${index}].outPoint`),
-        refundLockHash: hash(pledge["refundLockHash"], `pledges[${index}].refundLockHash`),
-        amount: decimal(pledge["amount"], `pledges[${index}].amount`),
-      };
-    });
+    const request = parseDeadlineCreationRequest(input);
     const build = buildDeadlineCreation({
       deployment,
-      pledges,
-      target: decimal(request["target"], "target"),
-      deadlineBlock: decimal(request["deadlineBlock"], "deadlineBlock"),
-      successLockHash: hash(request["successLockHash"], "successLockHash"),
-      cancelLockHash: hash(request["cancelLockHash"], "cancelLockHash"),
-      reward: decimal(request["reward"], "reward"),
-      creatorNonce: decimal(request["creatorNonce"], "creatorNonce"),
+      pledges: request.pledges,
+      target: request.target,
+      deadlineBlock: request.deadlineBlock,
+      successLockHash: request.successLockHash,
+      cancelLockHash: request.cancelLockHash,
+      reward: request.reward,
+      creatorNonce: request.creatorNonce,
       creationFee: JOB_QUOTE_ASSUMPTIONS.deadline,
     });
     const tip = await this.#chain.getTipHeader();
     const response = envelope({
       operation: "create_deadline_job",
       transaction: build.transaction,
-      signingEntries: creationSigningEntries("create_deadline_job", pledges.length),
+      signingEntries: creationSigningEntries("create_deadline_job", request.pledges.length),
       intent: build.intent,
       protocolIntentHash: build.intentHash,
       chainSnapshot: creationSnapshot(tip, deployment),

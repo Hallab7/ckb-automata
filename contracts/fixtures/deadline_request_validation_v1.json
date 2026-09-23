@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "valid": {
+    "pledges": [
+      {
+        "outPoint": {
+          "txHash": "0x1111111111111111111111111111111111111111111111111111111111111111",
+          "index": "0"
+        },
+        "refundLockHash": "0x2222222222222222222222222222222222222222222222222222222222222222",
+        "amount": "8000000000"
+      }
+    ],
+    "target": "15000000000",
+    "deadlineBlock": "500",
+    "successLockHash": "0x3333333333333333333333333333333333333333333333333333333333333333",
+    "cancelLockHash": "0x4444444444444444444444444444444444444444444444444444444444444444",
+    "reward": "6100000000",
+    "creatorNonce": "7"
+  },
+  "invalid": [
+    {
+      "name": "zero target",
+      "patch": { "target": "0" }
+    },
+    {
+      "name": "zero deadline",
+      "patch": { "deadlineBlock": "0" }
+    },
+    {
+      "name": "noncanonical reward",
+      "patch": { "reward": "06100000000" }
+    },
+    {
+      "name": "zero success recipient",
+      "patch": {
+        "successLockHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "name": "undersized pledge",
+      "pledgePatch": { "amount": "6099999999" }
+    },
+    {
+      "name": "zero refund recipient",
+      "pledgePatch": {
+        "refundLockHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "name": "noncanonical output index",
+      "outPointPatch": { "index": "00" }
+    }
+  ]
+}

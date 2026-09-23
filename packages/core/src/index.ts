@@ -169,6 +169,12 @@ export {
 } from "./deadline-creation.ts";
 
 export {
+  parseDeadlineCreationRequest,
+  type DeadlineCreationRequest,
+  type DeadlineRequestPledge,
+} from "./deadline-request.ts";
+
+export {
   RECURRING_CREATION_INTENT_DOMAIN,
   assertRecurringCompletion,
   buildRecurringCreation,

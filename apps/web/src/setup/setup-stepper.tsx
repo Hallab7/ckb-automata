@@ -34,7 +34,10 @@ export interface SetupStepperProperties {
   readonly renderStep?: (context: SetupStepRenderContext) => ReactNode;
   readonly storageId?: string;
   readonly template: SetupTemplateId;
-  readonly validateStep?: (step: SetupStepId, draft: SetupDraft) => SetupErrors;
+  readonly validateStep?: (
+    step: SetupStepId,
+    draft: SetupDraft,
+  ) => SetupErrors | Promise<SetupErrors>;
 }
 
 const EMPTY_DRAFT = Object.freeze({});
@@ -116,6 +119,7 @@ export function SetupStepper({
   const [draft, setDraft] = useState<SetupDraft>(initialDraft);
   const [errors, setErrors] = useState<SetupErrors>({});
   const [hydrated, setHydrated] = useState(false);
+  const [validating, setValidating] = useState(false);
   const [maxReached, setMaxReached] = useState(currentIndex);
   const storageKey = setupStorageKey(template, storageId);
   const dirty = hydrated && JSON.stringify(draft) !== JSON.stringify(initialDraft);
@@ -205,16 +209,22 @@ export function SetupStepper({
     [dirty, router, storageKey],
   );
 
-  const continueForward = useCallback(() => {
-    const validation = validateStep(currentStep, draft);
-    if (Object.keys(validation).length > 0) {
-      setErrors(validation);
-      focusFirstError(validation);
-      return;
+  const continueForward = useCallback(async () => {
+    if (validating) return;
+    setValidating(true);
+    try {
+      const validation = await validateStep(currentStep, draft);
+      if (Object.keys(validation).length > 0) {
+        setErrors(validation);
+        focusFirstError(validation);
+        return;
+      }
+      const next = SETUP_STEPS[currentIndex + 1];
+      if (next !== undefined) goTo(next.id);
+    } finally {
+      setValidating(false);
     }
-    const next = SETUP_STEPS[currentIndex + 1];
-    if (next !== undefined) goTo(next.id);
-  }, [currentIndex, currentStep, draft, goTo, validateStep]);
+  }, [currentIndex, currentStep, draft, goTo, validateStep, validating]);
 
   const previous = SETUP_STEPS[currentIndex - 1];
   const next = SETUP_STEPS[currentIndex + 1];
@@ -312,8 +322,12 @@ export function SetupStepper({
             Return to automations
           </Button>
         ) : (
-          <Button icon={<ArrowRight aria-hidden="true" size={17} />} onClick={continueForward}>
-            Continue
+          <Button
+            disabled={validating}
+            icon={<ArrowRight aria-hidden="true" size={17} />}
+            onClick={() => void continueForward()}
+          >
+            {validating ? "Checking..." : "Continue"}
           </Button>
         )}
       </footer>

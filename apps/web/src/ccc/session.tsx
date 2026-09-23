@@ -17,6 +17,7 @@ export interface WalletSession {
   readonly open: () => void;
   readonly ownerLockHash: string | undefined;
   readonly refreshDetails: () => void;
+  readonly resolveLockHash: (address: string) => Promise<string>;
   readonly signer: Signer | undefined;
   readonly status: WalletReadiness;
   readonly walletName: string | undefined;

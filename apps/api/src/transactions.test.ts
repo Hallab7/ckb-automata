@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import type { LoggerService } from "@nestjs/common";
@@ -26,6 +27,46 @@ function environment() {
     REDIS_URL: "redis://127.0.0.1:56379",
     PUBLIC_APP_ORIGIN: "http://127.0.0.1:3000",
     WEBHOOK_ENCRYPTION_KEY: "A".repeat(43),
+  };
+}
+
+interface DeadlineValidationFixture {
+  readonly valid: Record<string, unknown> & {
+    readonly pledges: readonly Record<string, unknown>[];
+  };
+  readonly invalid: readonly {
+    readonly name: string;
+    readonly patch?: Readonly<Record<string, unknown>>;
+    readonly pledgePatch?: Readonly<Record<string, unknown>>;
+    readonly outPointPatch?: Readonly<Record<string, unknown>>;
+  }[];
+}
+
+async function deadlineValidationFixture(): Promise<DeadlineValidationFixture> {
+  return JSON.parse(
+    await readFile(
+      new URL("../../../contracts/fixtures/deadline_request_validation_v1.json", import.meta.url),
+      "utf8",
+    ),
+  ) as DeadlineValidationFixture;
+}
+
+function invalidDeadlineRequest(
+  valid: DeadlineValidationFixture["valid"],
+  invalid: DeadlineValidationFixture["invalid"][number],
+) {
+  const pledge = valid.pledges[0] ?? {};
+  const outPoint = (pledge["outPoint"] as Record<string, unknown> | undefined) ?? {};
+  return {
+    ...valid,
+    ...invalid.patch,
+    pledges: [
+      {
+        ...pledge,
+        ...invalid.pledgePatch,
+        outPoint: { ...outPoint, ...invalid.outPointPatch },
+      },
+    ],
   };
 }
 
@@ -127,4 +168,31 @@ test("chain read failures remain service outages instead of request errors", asy
       return true;
     },
   );
+});
+
+test("deadline endpoint rejects every shared invalid request fixture", async () => {
+  const fixture = await deadlineValidationFixture();
+  const service = new TransactionBuildService(
+    {} as never,
+    {
+      getTipHeader: async () => {
+        throw new Error("invalid requests must fail before reading the tip");
+      },
+    } as never,
+    environment().CKB_GENESIS_HASH,
+  );
+  for (const invalid of fixture.invalid) {
+    await assert.rejects(
+      service.construct("create_deadline_job", invalidDeadlineRequest(fixture.valid, invalid)),
+      (error: unknown) => {
+        const response = error as {
+          getStatus(): number;
+          getResponse(): { code: string };
+        };
+        assert.equal(response.getStatus(), 400, invalid.name);
+        assert.equal(response.getResponse().code, "INVALID_TRANSACTION_REQUEST", invalid.name);
+        return true;
+      },
+    );
+  }
 });

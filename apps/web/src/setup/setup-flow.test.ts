@@ -45,4 +45,6 @@ test("stepper protects dirty drafts and focuses the first invalid field", async 
   assert.match(source, /querySelector<HTMLElement>/);
   assert.match(source, /\.focus\(\)/);
   assert.match(source, /sessionStorage/);
+  assert.match(source, /await validateStep/);
+  assert.match(source, /disabled=\{validating\}/);
 });
