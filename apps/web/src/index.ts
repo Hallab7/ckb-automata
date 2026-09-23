@@ -21,3 +21,6 @@ export {
 } from "@ckb-automata/api-client";
 
 export const WEB_APP_ID = `${WORKSPACE_NAME}:web` as const;
+
+export { parseWebEnvironment, type WebEnvironment, type WebNetwork } from "./environment.ts";
+export { createServerApiClient } from "./server-api.ts";
