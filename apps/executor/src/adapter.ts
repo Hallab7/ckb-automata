@@ -11,6 +11,7 @@ import {
   type Shannons,
   type UnsignedDeadlineTransaction,
 } from "@ckb-automata/core";
+import type { TelemetryRuntime } from "@ckb-automata/telemetry";
 
 type Hex = `0x${string}`;
 
@@ -241,36 +242,42 @@ export function runExecutorAdapter(
   registry: ExecutorAdapterRegistry,
   snapshot: ExecutorSnapshot,
   identity: ExecutorIdentity,
+  instrumentation: { readonly telemetry?: Pick<TelemetryRuntime, "withSpanSync"> } = {},
 ): ExecutorRunResult {
-  const context = createContext(snapshot, identity);
-  const adapter = registry.resolve(context.jobInspection.policy);
-  const inspection = adapter.inspect(context);
-  const eligibility = adapter.eligibility(context, inspection);
-  if (eligibility.status === "ineligible") {
-    return Object.freeze({
-      status: "ineligible",
-      adapterId: adapter.registration.id,
-      inspection,
-      eligibility,
-    });
-  }
-  const build = adapter.build(context, inspection, eligibility);
-  const verification = adapter.verifyBuilt(context, inspection, eligibility, build);
-  return verification.status === "valid"
-    ? Object.freeze({
-        status: "built",
+  const run = (): ExecutorRunResult => {
+    const context = createContext(snapshot, identity);
+    const adapter = registry.resolve(context.jobInspection.policy);
+    const inspection = adapter.inspect(context);
+    const eligibility = adapter.eligibility(context, inspection);
+    if (eligibility.status === "ineligible") {
+      return Object.freeze({
+        status: "ineligible",
         adapterId: adapter.registration.id,
         inspection,
         eligibility,
-        build,
-        verification,
-      })
-    : Object.freeze({
-        status: "invalid_build",
-        adapterId: adapter.registration.id,
-        inspection,
-        eligibility,
-        build,
-        verification,
       });
+    }
+    const build = adapter.build(context, inspection, eligibility);
+    const verification = adapter.verifyBuilt(context, inspection, eligibility, build);
+    return verification.status === "valid"
+      ? Object.freeze({
+          status: "built",
+          adapterId: adapter.registration.id,
+          inspection,
+          eligibility,
+          build,
+          verification,
+        })
+      : Object.freeze({
+          status: "invalid_build",
+          adapterId: adapter.registration.id,
+          inspection,
+          eligibility,
+          build,
+          verification,
+        });
+  };
+  return instrumentation.telemetry === undefined
+    ? run()
+    : instrumentation.telemetry.withSpanSync("executor.adapter.run", {}, run);
 }

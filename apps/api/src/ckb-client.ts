@@ -15,6 +15,7 @@ import {
 } from "@ckb-ccc/shell";
 
 import { parseBlockNumber, parseHash32, type BlockNumber, type Hash32 } from "@ckb-automata/core";
+import type { AutomataMetrics, TelemetryRuntime } from "@ckb-automata/telemetry";
 
 export type CkbClientErrorCode =
   | "CHAIN_READ_FAILED"
@@ -44,6 +45,8 @@ export interface CkbClientOptions {
   readonly timeoutMs?: number;
   readonly safeReadAttempts?: number;
   readonly retryDelayMs?: number;
+  readonly metrics?: Pick<AutomataMetrics, "rpcErrorsTotal">;
+  readonly telemetry?: Pick<TelemetryRuntime, "withSpan">;
 }
 
 export interface CkbReadClient {
@@ -114,6 +117,8 @@ export class CkbClient implements CkbReadClient {
   readonly #senderOwner: Owner<ClientPublicTestnet>;
   readonly #safeReadAttempts: number;
   readonly #retryDelayMs: number;
+  readonly #metrics: Pick<AutomataMetrics, "rpcErrorsTotal"> | undefined;
+  readonly #telemetry: Pick<TelemetryRuntime, "withSpan"> | undefined;
   #closed = false;
 
   private constructor(
@@ -122,12 +127,15 @@ export class CkbClient implements CkbReadClient {
     senderOwner: Owner<ClientPublicTestnet>,
     safeReadAttempts: number,
     retryDelayMs: number,
+    instrumentation: Pick<CkbClientOptions, "metrics" | "telemetry">,
   ) {
     this.#chainOwner = chainOwner;
     this.#indexerOwner = indexerOwner;
     this.#senderOwner = senderOwner;
     this.#safeReadAttempts = safeReadAttempts;
     this.#retryDelayMs = retryDelayMs;
+    this.#metrics = instrumentation.metrics;
+    this.#telemetry = instrumentation.telemetry;
   }
 
   static open(options: CkbClientOptions): CkbClient {
@@ -147,7 +155,10 @@ export class CkbClient implements CkbReadClient {
     const indexerOwner = ClientPublicTestnet.open({ urls: indexerEndpoints, timeout });
     // Writes deliberately receive no fallback endpoints.
     const senderOwner = ClientPublicTestnet.open({ urls: [rpcEndpoints[0]], timeout });
-    return new CkbClient(chainOwner, indexerOwner, senderOwner, safeReadAttempts, retryDelayMs);
+    return new CkbClient(chainOwner, indexerOwner, senderOwner, safeReadAttempts, retryDelayMs, {
+      ...(options.metrics === undefined ? {} : { metrics: options.metrics }),
+      ...(options.telemetry === undefined ? {} : { telemetry: options.telemetry }),
+    });
   }
 
   #assertOpen(): void {
@@ -156,23 +167,31 @@ export class CkbClient implements CkbReadClient {
 
   async #safeRead<T>(
     code: "CHAIN_READ_FAILED" | "INDEXER_READ_FAILED" | "DRY_RUN_FAILED",
+    endpoint: "rpc" | "indexer",
+    method: string,
     operation: () => Promise<T>,
   ): Promise<T> {
-    this.#assertOpen();
-    let cause: unknown;
-    for (let attempt = 1; attempt <= this.#safeReadAttempts; attempt += 1) {
-      try {
-        return await operation();
-      } catch (error) {
-        cause = error;
-        if (attempt < this.#safeReadAttempts) await delay(this.#retryDelayMs);
+    const run = async (): Promise<T> => {
+      this.#assertOpen();
+      let cause: unknown;
+      for (let attempt = 1; attempt <= this.#safeReadAttempts; attempt += 1) {
+        try {
+          return await operation();
+        } catch (error) {
+          cause = error;
+          if (attempt < this.#safeReadAttempts) await delay(this.#retryDelayMs);
+        }
       }
-    }
-    throw new CkbClientError(code, "CKB client operation failed", { cause });
+      this.#metrics?.rpcErrorsTotal.inc({ endpoint, method });
+      throw new CkbClientError(code, "CKB client operation failed", { cause });
+    };
+    return this.#telemetry === undefined
+      ? run()
+      : this.#telemetry.withSpan(`ckb.${endpoint}.${method}`, { "rpc.system": "ckb" }, run);
   }
 
   async getGenesisHash(): Promise<Hash32> {
-    return this.#safeRead("CHAIN_READ_FAILED", async () => {
+    return this.#safeRead("CHAIN_READ_FAILED", "rpc", "get_block_hash", async () => {
       const result = await this.#chainOwner.value.requestor.request("get_block_hash", ["0x0"]);
       if (typeof result !== "string") throw new TypeError("genesis hash response is invalid");
       return parseHash32(result);
@@ -180,11 +199,13 @@ export class CkbClient implements CkbReadClient {
   }
 
   getTipHeader(): Promise<ClientBlockHeader> {
-    return this.#safeRead("CHAIN_READ_FAILED", () => this.#chainOwner.value.getTipHeader());
+    return this.#safeRead("CHAIN_READ_FAILED", "rpc", "get_tip_header", () =>
+      this.#chainOwner.value.getTipHeader(),
+    );
   }
 
   async getIndexerTip(): Promise<CkbIndexerTip> {
-    return this.#safeRead("INDEXER_READ_FAILED", async () => {
+    return this.#safeRead("INDEXER_READ_FAILED", "indexer", "get_tip", async () => {
       const result = record(
         await this.#indexerOwner.value.requestor.request("get_tip", []),
         "indexer tip",
@@ -200,13 +221,13 @@ export class CkbClient implements CkbReadClient {
   }
 
   getBlockByNumber(blockNumber: NumLike): Promise<ClientBlock | undefined> {
-    return this.#safeRead("CHAIN_READ_FAILED", () =>
+    return this.#safeRead("CHAIN_READ_FAILED", "rpc", "get_block_by_number", () =>
       this.#chainOwner.value.getBlockByNumberNoCache(blockNumber),
     );
   }
 
   getBlockByHash(blockHash: HexLike): Promise<ClientBlock | undefined> {
-    return this.#safeRead("CHAIN_READ_FAILED", () =>
+    return this.#safeRead("CHAIN_READ_FAILED", "rpc", "get_block", () =>
       this.#chainOwner.value.getBlockByHashNoCache(blockHash),
     );
   }
@@ -217,28 +238,36 @@ export class CkbClient implements CkbReadClient {
     limit?: NumLike,
     after?: string,
   ): Promise<ClientFindCellsResponse> {
-    return this.#safeRead("INDEXER_READ_FAILED", () =>
+    return this.#safeRead("INDEXER_READ_FAILED", "indexer", "get_cells", () =>
       this.#indexerOwner.value.findCellsPagedNoCache(key, order, limit, after),
     );
   }
 
   dryRun(transaction: TransactionLike, validator?: OutputsValidator): Promise<Num> {
-    return this.#safeRead("DRY_RUN_FAILED", () =>
+    return this.#safeRead("DRY_RUN_FAILED", "rpc", "dry_run_transaction", () =>
       this.#chainOwner.value.sendTransactionDry(transaction, validator),
     );
   }
 
   async send(transaction: TransactionLike, validator?: OutputsValidator): Promise<Hex> {
-    this.#assertOpen();
-    try {
-      return await this.#senderOwner.value.sendTransactionNoCache(transaction, validator);
-    } catch (cause) {
-      throw new CkbClientError("SUBMISSION_FAILED", "CKB transaction submission failed", { cause });
-    }
+    const run = async (): Promise<Hex> => {
+      this.#assertOpen();
+      try {
+        return await this.#senderOwner.value.sendTransactionNoCache(transaction, validator);
+      } catch (cause) {
+        this.#metrics?.rpcErrorsTotal.inc({ endpoint: "rpc", method: "send_transaction" });
+        throw new CkbClientError("SUBMISSION_FAILED", "CKB transaction submission failed", {
+          cause,
+        });
+      }
+    };
+    return this.#telemetry === undefined
+      ? run()
+      : this.#telemetry.withSpan("ckb.rpc.send_transaction", { "rpc.system": "ckb" }, run);
   }
 
   getTransactionStatus(txHash: HexLike): Promise<ClientTransactionResponse | undefined> {
-    return this.#safeRead("CHAIN_READ_FAILED", () =>
+    return this.#safeRead("CHAIN_READ_FAILED", "rpc", "get_transaction", () =>
       this.#chainOwner.value.getTransactionNoCache(txHash),
     );
   }

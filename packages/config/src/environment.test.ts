@@ -67,6 +67,21 @@ test("unrelated process values do not enter the parsed configuration", () => {
   assert.equal("PATH" in result, false);
 });
 
+test("optional observability metadata is validated and disabled placeholders are ignored", () => {
+  const disabled = parseEnvironment({
+    ...validEnvironment("local"),
+    ERROR_TRACKING_DSN: "local-placeholder-disabled",
+    OTEL_EXPORTER_OTLP_ENDPOINT: "local-placeholder-disabled",
+    OTEL_EXPORTER_OTLP_HEADERS: "local-placeholder-disabled",
+  });
+  assert.equal(disabled.ERROR_TRACKING_DSN, undefined);
+  assert.equal(disabled.OTEL_EXPORTER_OTLP_ENDPOINT, undefined);
+  assert.equal(disabled.OTEL_EXPORTER_OTLP_HEADERS, undefined);
+  assert.throws(() =>
+    parseEnvironment({ ...validEnvironment("local"), RELEASE_REVISION: "not-a-revision" }),
+  );
+});
+
 test("user signing material fails startup validation", () => {
   assert.throws(
     () =>

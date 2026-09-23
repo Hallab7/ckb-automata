@@ -9,6 +9,7 @@ import {
   type Hash32,
   type RegisteredDeployment,
 } from "@ckb-automata/core";
+import type { AutomataMetrics, TelemetryRuntime } from "@ckb-automata/telemetry";
 
 import type { CkbReadClient } from "../ckb-client.ts";
 import type { AutomataDatabase } from "../database/client.ts";
@@ -285,6 +286,10 @@ export class CanonicalBlockProjector {
   readonly #rollback: JobProjectionRollback;
   readonly #discovery: JobCellDiscovery;
   readonly #transitions: JobTransitionIndexer;
+  readonly #instrumentation: {
+    readonly metrics?: Pick<AutomataMetrics, "reorgsTotal">;
+    readonly telemetry?: Pick<TelemetryRuntime, "withSpan">;
+  };
 
   constructor(
     ckbClient: Pick<CkbReadClient, "getBlockByNumber">,
@@ -292,12 +297,17 @@ export class CanonicalBlockProjector {
     rollback: JobProjectionRollback,
     discovery: JobCellDiscovery,
     transitions: JobTransitionIndexer,
+    instrumentation: {
+      readonly metrics?: Pick<AutomataMetrics, "reorgsTotal">;
+      readonly telemetry?: Pick<TelemetryRuntime, "withSpan">;
+    } = {},
   ) {
     this.#ckbClient = ckbClient;
     this.#checkpoints = checkpoints;
     this.#rollback = rollback;
     this.#discovery = discovery;
     this.#transitions = transitions;
+    this.#instrumentation = instrumentation;
   }
 
   async scanBlock(
@@ -314,6 +324,20 @@ export class CanonicalBlockProjector {
   }
 
   async projectBlock(
+    block: ClientBlock,
+    deployment: RegisteredDeployment,
+  ): Promise<CanonicalBlockProjectionResult> {
+    const run = () => this.#projectBlock(block, deployment);
+    return this.#instrumentation.telemetry === undefined
+      ? run()
+      : this.#instrumentation.telemetry.withSpan(
+          "indexer.block.project",
+          { "ckb.block_number": block.header.number.toString() },
+          run,
+        );
+  }
+
+  async #projectBlock(
     block: ClientBlock,
     deployment: RegisteredDeployment,
   ): Promise<CanonicalBlockProjectionResult> {
@@ -337,17 +361,32 @@ export class CanonicalBlockProjector {
         blockNumber - 1n,
         parentHash,
       );
+      this.#instrumentation.metrics?.reorgsTotal.inc();
     }
 
-    const discovery = await this.#discovery.projectBlock(block, deployment);
-    const transitions = await this.#transitions.indexBlock(block, deployment);
-    const checkpoint = await this.#checkpoints.record({
-      networkId: deployment.network,
-      blockNumber,
-      blockHash,
-      parentHash,
-      blockTimestamp: BigInt(block.header.timestamp),
-    });
+    const span = <T>(name: string, operation: () => Promise<T>): Promise<T> =>
+      this.#instrumentation.telemetry === undefined
+        ? operation()
+        : this.#instrumentation.telemetry.withSpan(
+            name,
+            { "ckb.block_number": blockNumber.toString() },
+            operation,
+          );
+    const discovery = await span("indexer.job.discover", () =>
+      this.#discovery.projectBlock(block, deployment),
+    );
+    const transitions = await span("indexer.job.transition", () =>
+      this.#transitions.indexBlock(block, deployment),
+    );
+    const checkpoint = await span("indexer.checkpoint.record", () =>
+      this.#checkpoints.record({
+        networkId: deployment.network,
+        blockNumber,
+        blockHash,
+        parentHash,
+        blockTimestamp: BigInt(block.header.timestamp),
+      }),
+    );
     return Object.freeze({
       ...(rollback ? { rollback } : {}),
       discovery,

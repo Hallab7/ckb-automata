@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 import { AuthService } from "../apps/api/src/auth.ts";
 import { createDatabaseClient } from "../apps/api/src/database/client.ts";
 import { migrateDatabase } from "../apps/api/src/database/migrator.ts";
+import { BackendTelemetry, MetricsController } from "../apps/api/src/telemetry.ts";
 import { WebhookService, verifyWebhookSignature } from "../apps/api/src/webhooks.ts";
 
 const requireFromApi = createRequire(new URL("../apps/api/package.json", import.meta.url));
@@ -26,13 +27,20 @@ testUrl.pathname = `/${databaseName}`;
 const admin = postgres(adminUrl.href, { max: 1, onnotice: () => undefined });
 let databaseClient;
 let inspect;
+let telemetry;
 
+const hash = (byte) => `0x${byte.toString(16).padStart(2, "0").repeat(32)}`;
 const environment = {
+  AUTOMATA_PROFILE: "test",
   CKB_NETWORK: "ckb_dev",
+  CKB_GENESIS_HASH: hash(1),
+  CKB_RPC_URL: "http://127.0.0.1:8114/",
+  CKB_INDEXER_URL: "http://127.0.0.1:8116/",
+  DATABASE_URL: testUrl.href,
+  REDIS_URL: "redis://127.0.0.1:6379/",
   PUBLIC_APP_ORIGIN: "https://automata.example.test",
   WEBHOOK_ENCRYPTION_KEY: "A".repeat(43),
 };
-const hash = (byte) => `0x${byte.toString(16).padStart(2, "0").repeat(32)}`;
 
 async function createSession(auth, privateKey, codeHash) {
   const signer = new SignerCkbPrivateKey({}, privateKey);
@@ -65,7 +73,12 @@ try {
       id, genesis_hash, rpc_profile, confirmation_depth, deployment_manifest_hash
     ) VALUES ('ckb_dev', ${hash(1)}, 'local', 2, ${"a".repeat(64)})
   `;
+  await inspect`
+    INSERT INTO indexer_checkpoints (network_id, block_number, block_hash)
+    VALUES ('ckb_dev', 3, ${hash(2)})
+  `;
   databaseClient = createDatabaseClient(testUrl.href);
+  telemetry = new BackendTelemetry(environment, { writer: () => undefined });
   const auth = new AuthService(databaseClient.database, environment);
   const owner = await createSession(auth, hash(7), hash(17));
   const otherOwner = await createSession(auth, hash(8), hash(18));
@@ -99,6 +112,31 @@ try {
   assert.ok(
     successEvent && timeoutEvent && retryEvent && permanentEvent && duplicateEvent && rotationEvent,
   );
+  await inspect`
+    INSERT INTO job_events (
+      network_id, job_id, event_type, source, payload, occurred_at, created_at
+    ) VALUES (
+      'ckb_dev', ${jobId}, 'execution_ready', 'operational',
+      '{}'::jsonb, '2026-09-23T00:01:00Z', '2026-09-23T00:01:00Z'
+    )
+  `;
+  const metricsController = new MetricsController(telemetry, databaseClient, {
+    getTipHeader: async () => ({ number: 5n }),
+  });
+  const readyMetrics = await metricsController.get();
+  assert.match(readyMetrics, /automata_jobs_live_total 1/);
+  assert.match(readyMetrics, /automata_jobs_ready_total 1/);
+  assert.match(readyMetrics, /automata_indexer_tip_lag_blocks 2/);
+  await inspect`
+    INSERT INTO job_events (
+      network_id, job_id, event_type, source, payload, occurred_at, created_at
+    ) VALUES (
+      'ckb_dev', ${jobId}, 'execution_submitted', 'operational',
+      '{}'::jsonb, '2026-09-23T00:02:00Z', '2026-09-23T00:02:00Z'
+    )
+  `;
+  const submittedMetrics = await metricsController.get();
+  assert.match(submittedMetrics, /automata_jobs_ready_total 0/);
 
   let currentTime = Date.parse("2026-09-23T01:00:00Z");
   let mode = "success";
@@ -133,6 +171,7 @@ try {
     now: () => new Date(currentTime),
     resolveHostname: async () => [{ address: "203.0.113.10" }],
     timeoutMs: 15,
+    metrics: telemetry.metrics,
   });
 
   await assert.rejects(
@@ -300,11 +339,16 @@ try {
     () => webhooks.replay(owner.authorization, registration.id, first.id),
     (error) => error?.getResponse?.().code === "WEBHOOK_UNAVAILABLE",
   );
+  const renderedMetrics = await telemetry.metrics.render();
+  assert.match(renderedMetrics, /automata_webhook_deliveries_total\{outcome="delivered"\} 6/);
+  assert.match(renderedMetrics, /automata_webhook_deliveries_total\{outcome="failed"\} 3/);
+  assert.match(renderedMetrics, /automata_webhook_deliveries_total\{outcome="retry_scheduled"\} 7/);
 
   console.log(
-    "Webhooks verified: signatures, timeout, deduplication, bounded retry, rotation, disablement, history, and replay",
+    "Telemetry verified: live/readiness/index-lag metrics plus signed webhook delivery outcomes",
   );
 } finally {
+  await telemetry?.onModuleDestroy();
   await databaseClient?.close();
   await inspect?.end({ timeout: 2 });
   await admin.unsafe(`DROP DATABASE IF EXISTS "${databaseName}" WITH (FORCE)`);

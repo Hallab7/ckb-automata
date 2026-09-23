@@ -33,6 +33,7 @@ import {
 import { and, asc, desc, eq, lt, lte } from "drizzle-orm";
 
 import type { AutomataEnvironment } from "@ckb-automata/config";
+import type { AutomataMetrics } from "@ckb-automata/telemetry";
 
 import { AuthService } from "./auth.ts";
 import type { AutomataDatabase } from "./database/client.ts";
@@ -86,6 +87,7 @@ export interface WebhookServiceOptions {
   readonly randomUuid?: () => string;
   readonly resolveHostname?: (hostname: string) => Promise<readonly ResolvedAddress[]>;
   readonly timeoutMs?: number;
+  readonly metrics?: Pick<AutomataMetrics, "webhookDeliveriesTotal">;
 }
 
 export interface WebhookSubscriptionResponse {
@@ -431,6 +433,7 @@ export class WebhookService {
   readonly #randomUuid: () => string;
   readonly #resolveHostname: (hostname: string) => Promise<readonly ResolvedAddress[]>;
   readonly #timeoutMs: number;
+  readonly #metrics: Pick<AutomataMetrics, "webhookDeliveriesTotal"> | undefined;
 
   constructor(
     database: AutomataDatabase,
@@ -442,6 +445,7 @@ export class WebhookService {
     this.#database = database;
     this.#encryptionKey = decodeEncryptionKey(environment.WEBHOOK_ENCRYPTION_KEY);
     this.#fetch = options.fetch ?? globalThis.fetch;
+    this.#metrics = options.metrics;
     this.#network = environment.CKB_NETWORK;
     this.#now = options.now ?? (() => new Date());
     this.#randomBytes = options.randomBytes ?? randomBytes;
@@ -904,6 +908,7 @@ export class WebhookService {
       .where(and(eq(webhookDeliveries.id, id), eq(webhookDeliveries.status, "pending")))
       .returning();
     if (completed === undefined) throw new Error("webhook attempt completion lost its claim");
+    this.#metrics?.webhookDeliveriesTotal.inc({ outcome: completed.status });
     return deliveryResponse(completed);
   }
 

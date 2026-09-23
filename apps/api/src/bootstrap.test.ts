@@ -1,12 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {
-  ConsoleLogger,
-  ValidationPipe,
-  type INestApplication,
-  type LoggerService,
-} from "@nestjs/common";
+import { ValidationPipe, type INestApplication, type LoggerService } from "@nestjs/common";
 
 import {
   API_GLOBAL_PREFIX,
@@ -110,7 +105,8 @@ test("bootstrap installs validation, versioning, shutdown hooks, and structured 
     },
   );
   assert.ok(receivedLogger);
-  assert.ok(receivedLogger instanceof ConsoleLogger);
+  assert.ok(receivedLogger);
+  assert.notEqual(receivedLogger.constructor.name, "ConsoleLogger");
   assert.deepEqual(result.config, {
     environment: parseApiBootstrapConfig(environment()).environment,
     corsOrigins: ["http://127.0.0.1:3000"],

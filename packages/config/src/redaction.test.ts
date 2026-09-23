@@ -41,6 +41,19 @@ test("configured values are removed from free-form messages", () => {
   });
 });
 
+test("authorization material is removed from free-form messages", () => {
+  const output = redactLogRecord({
+    message:
+      "request failed authorization: Bearer raw-session-token signature=0xprivate-proof; authorization=Basic dXNlcjpwYXNz",
+  });
+
+  assert.deepEqual(output, {
+    message:
+      "request failed authorization=[REDACTED] signature=[REDACTED]; authorization=[REDACTED]",
+  });
+  assert.doesNotMatch(JSON.stringify(output), /raw-session-token|private-proof|dXNlcjpwYXNz/);
+});
+
 test("circular values do not crash log redaction", () => {
   const input: { self?: unknown } = {};
   input.self = input;

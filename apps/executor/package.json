@@ -10,6 +10,7 @@
   "dependencies": {
     "@ckb-automata/core": "workspace:*",
     "@ckb-automata/molecule": "workspace:*",
+    "@ckb-automata/telemetry": "workspace:*",
     "@nervosnetwork/ckb-sdk-utils": "0.109.5"
   }
 }

@@ -1,4 +1,5 @@
 import { Module, type DynamicModule } from "@nestjs/common";
+import { APP_INTERCEPTOR } from "@nestjs/core";
 
 import type { AutomataEnvironment } from "@ckb-automata/config";
 
@@ -29,6 +30,7 @@ import {
 } from "./preferences.ts";
 import { JobQuoteController, JobQuoteService } from "./quotes.ts";
 import { TransactionBuildService, TransactionController } from "./transactions.ts";
+import { ApiTelemetryInterceptor, BackendTelemetry, MetricsController } from "./telemetry.ts";
 import { WebhookController, WebhookService } from "./webhooks.ts";
 
 // Nest uses the class identity as the root dependency-injection module token.
@@ -41,6 +43,7 @@ Module({
     AuthController,
     NotificationPreferencesController,
     WebhookController,
+    MetricsController,
     NetworkMetadataController,
     JobsController,
     AccountJobsController,
@@ -57,11 +60,23 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
     module: AppModule,
     providers: [
       {
+        provide: BackendTelemetry,
+        useFactory: () => new BackendTelemetry(environment),
+      },
+      {
+        provide: APP_INTERCEPTOR,
+        inject: [BackendTelemetry],
+        useFactory: (telemetry: BackendTelemetry) => new ApiTelemetryInterceptor(telemetry),
+      },
+      {
         provide: CkbClient,
-        useFactory: () =>
+        inject: [BackendTelemetry],
+        useFactory: (telemetry: BackendTelemetry) =>
           createCkbClient({
             rpcEndpoints: [environment.CKB_RPC_URL],
             indexerEndpoints: [environment.CKB_INDEXER_URL],
+            metrics: telemetry.metrics,
+            telemetry: telemetry.runtime,
           }),
       },
       {
@@ -82,9 +97,15 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
       },
       {
         provide: WebhookService,
-        inject: [DatabaseClient, AuthService],
-        useFactory: (databaseClient: DatabaseClient, auth: AuthService) =>
-          new WebhookService(databaseClient.database, auth, environment),
+        inject: [DatabaseClient, AuthService, BackendTelemetry],
+        useFactory: (
+          databaseClient: DatabaseClient,
+          auth: AuthService,
+          telemetry: BackendTelemetry,
+        ) =>
+          new WebhookService(databaseClient.database, auth, environment, {
+            metrics: telemetry.metrics,
+          }),
       },
       {
         provide: CanonicalCheckpointStore,
@@ -118,6 +139,7 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
           JobProjectionRollback,
           JobCellDiscovery,
           JobTransitionIndexer,
+          BackendTelemetry,
         ],
         useFactory: (
           ckbClient: CkbClient,
@@ -125,7 +147,12 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
           rollback: JobProjectionRollback,
           discovery: JobCellDiscovery,
           transitions: JobTransitionIndexer,
-        ) => new CanonicalBlockProjector(ckbClient, checkpoints, rollback, discovery, transitions),
+          telemetry: BackendTelemetry,
+        ) =>
+          new CanonicalBlockProjector(ckbClient, checkpoints, rollback, discovery, transitions, {
+            metrics: telemetry.metrics,
+            telemetry: telemetry.runtime,
+          }),
       },
       {
         provide: HealthService,

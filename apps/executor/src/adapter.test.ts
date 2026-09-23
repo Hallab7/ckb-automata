@@ -137,17 +137,31 @@ test("identical snapshot and executor identity produce identical policy outputs"
     { readonly tip: string; readonly rewardLock: ScriptIdentity }
   >);
   const registry = new ExecutorAdapterRegistry([adapter]);
+  const spans: string[] = [];
   const first = runExecutorAdapter(registry, fixture.snapshot, {
     rewardLock: fixture.rewardLock,
     transactionFee: parseShannons("1000000"),
   });
-  const second = runExecutorAdapter(registry, fixture.snapshot, {
-    rewardLock: fixture.rewardLock,
-    transactionFee: parseShannons("1000000"),
-  });
+  const second = runExecutorAdapter(
+    registry,
+    fixture.snapshot,
+    {
+      rewardLock: fixture.rewardLock,
+      transactionFee: parseShannons("1000000"),
+    },
+    {
+      telemetry: {
+        withSpanSync: (name, _attributes, operation) => {
+          spans.push(name);
+          return operation();
+        },
+      },
+    },
+  );
   assert.deepEqual(first, second);
   assert.equal(first.status, "built");
   assert.equal(first.adapterId, "recurring-v1");
+  assert.deepEqual(spans, ["executor.adapter.run"]);
 });
 
 test("deadline and recurring registrations own their policy matching", () => {

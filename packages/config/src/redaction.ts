@@ -37,9 +37,19 @@ function isSensitiveKey(key: string): boolean {
 }
 
 function redactString(value: string, configuredSecrets: readonly string[]): string {
-  return configuredSecrets
+  const configured = configuredSecrets
     .filter((secret) => secret.length > 0)
     .reduce((redacted, secret) => redacted.replaceAll(secret, REDACTED_VALUE), value);
+  return configured
+    .replace(
+      /\bauthorization\s*[:=]\s*(?:[A-Za-z][A-Za-z0-9_-]*\s+)?[^\s,;]+/gi,
+      `authorization=${REDACTED_VALUE}`,
+    )
+    .replace(
+      /\b(password|private[_-]?key|secret|seed[_-]?phrase|signature|token)\s*[:=]\s*(?:Bearer\s+)?[^\s,;]+/gi,
+      `$1=${REDACTED_VALUE}`,
+    )
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, `Bearer ${REDACTED_VALUE}`);
 }
 
 function redactValue(

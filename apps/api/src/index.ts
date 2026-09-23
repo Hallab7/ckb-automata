@@ -48,6 +48,12 @@ export {
   type WebhookSubscriptionResponse,
 } from "./webhooks.ts";
 export {
+  ApiTelemetryInterceptor,
+  BackendTelemetry,
+  MetricsController,
+  createBackendLogger,
+} from "./telemetry.ts";
+export {
   AUTH_CHALLENGE_TTL_MS,
   AUTH_SESSION_SCOPE,
   AUTH_SESSION_TTL_MS,

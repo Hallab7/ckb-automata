@@ -1,11 +1,6 @@
 import { isIP } from "node:net";
 
-import {
-  ConsoleLogger,
-  ValidationPipe,
-  type INestApplication,
-  type LoggerService,
-} from "@nestjs/common";
+import { ValidationPipe, type INestApplication, type LoggerService } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 
@@ -18,6 +13,7 @@ import {
   ApiTimeoutInterceptor,
   installFastifyAbuseControls,
 } from "./abuse-controls.ts";
+import { createBackendLogger } from "./telemetry.ts";
 
 export const API_GLOBAL_PREFIX = "v1" as const;
 export const DEFAULT_API_HOST = "0.0.0.0" as const;
@@ -117,10 +113,6 @@ export function configureApiApplication(app: INestApplication): void {
   app.enableShutdownHooks();
 }
 
-function structuredLogger(): ConsoleLogger {
-  return new ConsoleLogger("api-bootstrap", { json: true, timestamp: true });
-}
-
 async function createFastifyApplication(
   logger: LoggerService,
   config: ApiBootstrapConfig,
@@ -153,7 +145,7 @@ export async function createApiApplication(
   dependencies: ApiBootstrapDependencies = {},
 ): Promise<ApiBootstrapResult> {
   const config = parseApiBootstrapConfig(input);
-  const logger = dependencies.logger ?? structuredLogger();
+  const logger = dependencies.logger ?? createBackendLogger(config.environment);
   const app = await (dependencies.createApplication ?? createFastifyApplication)(logger, config);
   configureApiApplication(app);
   return Object.freeze({ app, config });

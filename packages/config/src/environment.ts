@@ -14,6 +14,11 @@ export const AUTOMATA_ENV_KEYS = [
   "REDIS_URL",
   "PUBLIC_APP_ORIGIN",
   "WEBHOOK_ENCRYPTION_KEY",
+  "ERROR_TRACKING_DSN",
+  "OTEL_EXPORTER_OTLP_ENDPOINT",
+  "OTEL_EXPORTER_OTLP_HEADERS",
+  "RELEASE_VERSION",
+  "RELEASE_REVISION",
 ] as const;
 
 export const FORBIDDEN_USER_SECRET_KEYS = [
@@ -32,6 +37,32 @@ const commonFields = {
   WEBHOOK_ENCRYPTION_KEY: z
     .string()
     .regex(/^[A-Za-z0-9_-]{43}$/, "must be a base64url-encoded 32-byte key"),
+  ERROR_TRACKING_DSN: z.preprocess(
+    (value) => (value === "" || value === "local-placeholder-disabled" ? undefined : value),
+    z.url().optional(),
+  ),
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.preprocess(
+    (value) => (value === "" || value === "local-placeholder-disabled" ? undefined : value),
+    z.url().optional(),
+  ),
+  OTEL_EXPORTER_OTLP_HEADERS: z.preprocess(
+    (value) => (value === "" || value === "local-placeholder-disabled" ? undefined : value),
+    z.string().max(4096).optional(),
+  ),
+  RELEASE_VERSION: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z
+      .string()
+      .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/)
+      .optional(),
+  ),
+  RELEASE_REVISION: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z
+      .string()
+      .regex(/^[0-9a-f]{7,64}$/)
+      .optional(),
+  ),
   REDIS_URL: z
     .string()
     .refine(

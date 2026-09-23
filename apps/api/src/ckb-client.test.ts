@@ -3,6 +3,8 @@ import { createServer, type ServerResponse } from "node:http";
 import { once } from "node:events";
 import test from "node:test";
 
+import { AutomataMetrics } from "@ckb-automata/telemetry";
+
 import { CkbClientError, createCkbClient } from "./ckb-client.ts";
 
 const GENESIS_HASH = `0x${"11".repeat(32)}`;
@@ -120,11 +122,20 @@ test("client configuration rejects unsafe endpoints and retry bounds", () => {
 test("request timeout fails with a stable non-sensitive error", async (context) => {
   const hanging = await openServer(() => undefined);
   context.after(() => hanging.close());
+  const metrics = new AutomataMetrics();
+  const spans: string[] = [];
   const client = createCkbClient({
     rpcEndpoints: [hanging.url],
     indexerEndpoints: [hanging.url],
     timeoutMs: 25,
     safeReadAttempts: 1,
+    metrics,
+    telemetry: {
+      withSpan: async (name, _attributes, operation) => {
+        spans.push(name);
+        return operation();
+      },
+    },
   });
   context.after(() => client.close());
 
@@ -135,6 +146,10 @@ test("request timeout fails with a stable non-sensitive error", async (context) 
       error.code === "CHAIN_READ_FAILED" &&
       !error.message.includes(hanging.url),
   );
+  assert.deepEqual(spans, ["ckb.rpc.get_block_hash"]);
+  const rendered = await metrics.render();
+  assert.match(rendered, /automata_rpc_errors_total\{endpoint="rpc",method="get_block_hash"\} 1/);
+  assert.doesNotMatch(rendered, new RegExp(hanging.url.replaceAll("/", "\\/")));
 });
 
 test("malformed RPC success envelopes fail closed", async (context) => {

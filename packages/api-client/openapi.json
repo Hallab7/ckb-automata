@@ -1099,6 +1099,20 @@
         "tags": ["job quotes"]
       }
     },
+    "/v1/metrics": {
+      "get": {
+        "operationId": "MetricsController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": { "text/plain": { "schema": { "type": "string" } } },
+            "description": ""
+          }
+        },
+        "summary": "Read Prometheus service metrics",
+        "tags": ["operations"]
+      }
+    },
     "/v1/network": {
       "get": {
         "operationId": "NetworkMetadataController_get",
