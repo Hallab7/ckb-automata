@@ -359,6 +359,66 @@ export const ERROR_CATALOG = {
     domain: "executor",
     copy: "The job requires an owner recovery action.",
   },
+  EXECUTOR_BUILD_FAILED: {
+    code: 3019,
+    domain: "executor",
+    copy: "The executor could not build the transaction.",
+  },
+  EXECUTOR_ADAPTER_MISMATCH: {
+    code: 3020,
+    domain: "executor",
+    copy: "Eligibility and transaction building selected different policy adapters.",
+  },
+  EXECUTOR_BUILD_CLAIM_LOST: {
+    code: 3021,
+    domain: "executor",
+    copy: "The transaction build lease expired before completion.",
+  },
+  EXECUTOR_CHAIN_SNAPSHOT_MOVED: {
+    code: 3022,
+    domain: "executor",
+    copy: "The canonical chain changed while the transaction snapshot was assembled.",
+  },
+  EXECUTOR_STALE_OUTPOINT: {
+    code: 3023,
+    domain: "executor",
+    copy: "The selected job outpoint is no longer live.",
+  },
+  EXECUTOR_BUILD_RECORD_INVALID: {
+    code: 3024,
+    domain: "executor",
+    copy: "The stored transaction build record is invalid.",
+  },
+  EXECUTOR_FEE_MISMATCH: {
+    code: 3025,
+    domain: "executor",
+    copy: "The built transaction fee differs from the configured fee.",
+  },
+  EXECUTOR_REWARD_INVALID: {
+    code: 3026,
+    domain: "executor",
+    copy: "The built transaction does not preserve the committed reward.",
+  },
+  EXECUTOR_CYCLE_LIMIT_EXCEEDED: {
+    code: 3027,
+    domain: "executor",
+    copy: "The transaction exceeds the configured cycle limit.",
+  },
+  EXECUTOR_UNPROFITABLE: {
+    code: 3028,
+    domain: "executor",
+    copy: "The transaction does not meet the configured profit margin.",
+  },
+  EXECUTOR_SUBMISSION_RECORD_INVALID: {
+    code: 3029,
+    domain: "executor",
+    copy: "The approved transaction submission record is invalid.",
+  },
+  EXECUTOR_SUBMISSION_HASH_MISMATCH: {
+    code: 3030,
+    domain: "executor",
+    copy: "The submitted transaction hash differs from the approved intent.",
+  },
 } as const satisfies Record<string, ErrorDefinition>;
 
 export type ErrorKey = keyof typeof ERROR_CATALOG;

@@ -16,6 +16,7 @@ import type {
   EligibilityQueuePayload,
 } from "./eligibility.ts";
 import type { DurableQueueRegistry } from "./queues.ts";
+import { executorFailureCode } from "./retry.ts";
 
 export const BUILD_CLAIM_LEASE_MS = 5 * 60_000;
 
@@ -85,11 +86,7 @@ function sameOutPoint(record: EligibilityJobRecord, snapshot: ExecutorSnapshot):
 }
 
 function errorCode(error: unknown): string {
-  if (typeof error === "object" && error !== null && "code" in error) {
-    const code = String(error.code);
-    if (/^[A-Z][A-Z0-9_]{2,63}$/.test(code)) return code;
-  }
-  return "EXECUTOR_BUILD_FAILED";
+  return executorFailureCode(error) ?? "EXECUTOR_BUILD_FAILED";
 }
 
 export class TransactionBuildService {

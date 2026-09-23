@@ -81,6 +81,16 @@ export {
   type QueuePolicy,
 } from "./queues.ts";
 export {
+  EXECUTOR_RETRY_POLICIES,
+  executeWithRetryPolicy,
+  executorFailureCode,
+  normalizeExecutorFailureCode,
+  retryPolicyFor,
+  type ExecutorFailureCode,
+  type ExecutorRetryPolicy,
+  type RetryCategory,
+} from "./retry.ts";
+export {
   ExecutorRuntime,
   type ExecutorChainClient,
   type ExecutorEventLogger,

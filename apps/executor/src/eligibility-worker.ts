@@ -23,6 +23,7 @@ import {
   parseRedisConnection,
   type QueueJobEnvelope,
 } from "./queues.ts";
+import { executeWithRetryPolicy } from "./retry.ts";
 import type { ExecutorEventLogger, ExecutorRuntime } from "./runtime.ts";
 
 export const DISCOVERY_INTERVAL_MS = 5_000;
@@ -244,12 +245,18 @@ export class EligibilityCoordinator implements OnApplicationBootstrap, OnModuleD
     this.#workers = [
       new Worker<QueueJobEnvelope<DiscoveryPayload>, unknown, string>(
         "discovery",
-        (job) => this.#runtime.run(() => this.#discover(job)),
+        (job) =>
+          this.#runtime.run(() =>
+            executeWithRetryPolicy(() => this.#discover(job), job.attemptsMade),
+          ),
         workerOptions,
       ),
       new Worker<QueueJobEnvelope<EligibilityQueuePayload>, unknown, string>(
         "evaluate",
-        (job) => this.#runtime.run(() => this.#evaluate(job)),
+        (job) =>
+          this.#runtime.run(() =>
+            executeWithRetryPolicy(() => this.#evaluate(job), job.attemptsMade),
+          ),
         workerOptions,
       ),
     ];

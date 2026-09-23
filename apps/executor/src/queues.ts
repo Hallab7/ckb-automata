@@ -17,7 +17,11 @@ export const QUEUE_READINESS_TIMEOUT_MS = 5_000;
 
 export interface QueuePolicy {
   readonly attempts: number;
-  readonly backoff: Readonly<{ readonly type: "exponential"; readonly delay: number }>;
+  readonly backoff: Readonly<{
+    readonly type: "exponential";
+    readonly delay: number;
+    readonly jitter: number;
+  }>;
   readonly removeOnComplete: Readonly<{ readonly age: number; readonly count: number }>;
   readonly removeOnFail: Readonly<{ readonly age: number; readonly count: number }>;
 }
@@ -25,10 +29,10 @@ export interface QueuePolicy {
 const COMPLETE_RETENTION = Object.freeze({ age: 24 * 60 * 60, count: 1_000 });
 const FAILURE_RETENTION = Object.freeze({ age: 7 * 24 * 60 * 60, count: 5_000 });
 
-function policy(attempts: number, delay: number): QueuePolicy {
+function policy(attempts: number, delay: number, jitter = 0.25): QueuePolicy {
   return Object.freeze({
     attempts,
-    backoff: Object.freeze({ type: "exponential" as const, delay }),
+    backoff: Object.freeze({ type: "exponential" as const, delay, jitter }),
     removeOnComplete: COMPLETE_RETENTION,
     removeOnFail: FAILURE_RETENTION,
   });

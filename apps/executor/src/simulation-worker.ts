@@ -9,6 +9,7 @@ import {
   type SimulationStore,
 } from "./simulation.ts";
 import { DEFAULT_QUEUE_PREFIX, parseRedisConnection, type QueueJobEnvelope } from "./queues.ts";
+import { executeWithRetryPolicy } from "./retry.ts";
 import type { ExecutorEventLogger, ExecutorRuntime } from "./runtime.ts";
 import type { SubmissionService, SubmissionStore } from "./submission.ts";
 
@@ -69,12 +70,15 @@ export class SimulationCoordinator implements OnApplicationBootstrap, OnModuleDe
   async onApplicationBootstrap(): Promise<void> {
     this.#worker = new Worker<QueueJobEnvelope<SimulationQueuePayload>, unknown, string>(
       "submit",
-      async (job) => {
-        const canonicalPayload = payload(job);
-        const simulation = await this.#runtime.run(() => this.#service.evaluate(canonicalPayload));
-        if (simulation.status === "rejected") return simulation;
-        return this.#runtime.run(() => this.#submission.submit(canonicalPayload));
-      },
+      (job) =>
+        this.#runtime.run(() =>
+          executeWithRetryPolicy(async () => {
+            const canonicalPayload = payload(job);
+            const simulation = await this.#service.evaluate(canonicalPayload);
+            if (simulation.status === "rejected") return simulation;
+            return this.#submission.submit(canonicalPayload);
+          }, job.attemptsMade),
+        ),
       {
         connection: parseRedisConnection(this.#redisUrl),
         prefix: this.#prefix,

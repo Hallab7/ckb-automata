@@ -15,6 +15,7 @@ import {
   parseRedisConnection,
   type QueueJobEnvelope,
 } from "./queues.ts";
+import { executeWithRetryPolicy } from "./retry.ts";
 import type { ExecutorEventLogger, ExecutorRuntime } from "./runtime.ts";
 
 export const CONFIRMATION_POLL_MS = 5_000;
@@ -103,15 +104,17 @@ export class ConfirmationCoordinator implements OnApplicationBootstrap, OnModule
     >(
       "confirm",
       (job) =>
-        this.#runtime.run(async () => {
-          if (job.name === "scan-confirmations") {
-            const scan = scanPayload(job as Job<QueueJobEnvelope<ScanPayload>>);
-            return this.#scanAndSchedule(Math.max(scan.slot + 1, nextSlot(this.#now())));
-          }
-          return this.#service.track(
-            confirmationPayload(job as Job<QueueJobEnvelope<ConfirmationQueuePayload>>),
-          );
-        }),
+        this.#runtime.run(() =>
+          executeWithRetryPolicy(async () => {
+            if (job.name === "scan-confirmations") {
+              const scan = scanPayload(job as Job<QueueJobEnvelope<ScanPayload>>);
+              return this.#scanAndSchedule(Math.max(scan.slot + 1, nextSlot(this.#now())));
+            }
+            return this.#service.track(
+              confirmationPayload(job as Job<QueueJobEnvelope<ConfirmationQueuePayload>>),
+            );
+          }, job.attemptsMade),
+        ),
       { connection: parseRedisConnection(this.#redisUrl), prefix: this.#prefix },
     );
     await this.#worker.waitUntilReady();

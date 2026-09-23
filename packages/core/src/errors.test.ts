@@ -53,6 +53,18 @@ test("all planned executor failures have stable codes", () => {
     "JOB_EXPIRED",
     "JOB_CANCELLED",
     "RECOVERY_REQUIRED",
+    "BUILD_FAILED",
+    "ADAPTER_MISMATCH",
+    "BUILD_CLAIM_LOST",
+    "CHAIN_SNAPSHOT_MOVED",
+    "STALE_OUTPOINT",
+    "BUILD_RECORD_INVALID",
+    "FEE_MISMATCH",
+    "REWARD_INVALID",
+    "CYCLE_LIMIT_EXCEEDED",
+    "UNPROFITABLE",
+    "SUBMISSION_RECORD_INVALID",
+    "SUBMISSION_HASH_MISMATCH",
   ];
   const actual = Object.keys(ERROR_CATALOG)
     .filter((key) => key.startsWith("EXECUTOR_"))

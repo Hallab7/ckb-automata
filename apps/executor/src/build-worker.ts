@@ -16,6 +16,7 @@ import {
   parseRedisConnection,
   type QueueJobEnvelope,
 } from "./queues.ts";
+import { executeWithRetryPolicy } from "./retry.ts";
 import type { ExecutorEventLogger, ExecutorRuntime } from "./runtime.ts";
 
 function payload(job: Job<QueueJobEnvelope<BuildQueuePayload>>): BuildQueuePayload {
@@ -78,7 +79,10 @@ export class BuildCoordinator implements OnApplicationBootstrap, OnModuleDestroy
     });
     this.#worker = new Worker<QueueJobEnvelope<BuildQueuePayload>, unknown, string>(
       "build",
-      (job) => this.#runtime.run(() => service.build(payload(job))),
+      (job) =>
+        this.#runtime.run(() =>
+          executeWithRetryPolicy(() => service.build(payload(job)), job.attemptsMade),
+        ),
       {
         connection: parseRedisConnection(this.#redisUrl),
         prefix: this.#prefix,

@@ -48,6 +48,11 @@ test("every durable queue has bounded retry and retention policy", () => {
     const policy = QUEUE_POLICIES[queue];
     assert.equal(Number.isSafeInteger(policy.attempts) && policy.attempts >= 1, true);
     assert.equal(policy.backoff.delay > 0, true);
+    assert.equal(policy.backoff.jitter > 0 && policy.backoff.jitter <= 1, true);
+    assert.equal(
+      policy.backoff.delay * 2 ** Math.max(0, policy.attempts - 1) <= MAX_QUEUE_DELAY_MS,
+      true,
+    );
     assert.equal(policy.removeOnComplete.age > 0, true);
     assert.equal(policy.removeOnComplete.count > 0, true);
     assert.equal(policy.removeOnFail.age > policy.removeOnComplete.age, true);
