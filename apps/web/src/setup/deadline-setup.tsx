@@ -13,6 +13,7 @@ import {
 } from "./deadline-form.ts";
 import type { SetupStepRenderContext } from "./setup-stepper.tsx";
 import { SetupStepper } from "./setup-stepper.tsx";
+import { ReadonlyField } from "./readonly-field.tsx";
 
 function error(context: SetupStepRenderContext, name: string) {
   const message = context.errors[name];
@@ -134,13 +135,14 @@ function DeadlineFunding(context: SetupStepRenderContext) {
         required
         value={context.draft["rewardCkb"] ?? ""}
       />
-      <TextField
-        {...error(context, "ownerAddress")}
+      <ReadonlyField
+        code
+        error={context.errors["ownerAddress"]}
         label="Cancellation and recovery wallet"
         name="ownerAddress"
-        readOnly
-        value={ownerAddress}
-      />
+      >
+        {ownerAddress}
+      </ReadonlyField>
       {session.status === "ready" ? (
         <InlineNotice title="Owner path confirmed" tone="success">
           <p>

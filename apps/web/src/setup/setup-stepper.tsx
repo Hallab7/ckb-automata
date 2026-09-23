@@ -75,7 +75,9 @@ function focusFirstError(errors: SetupErrors): void {
   if (first === undefined) return;
   requestAnimationFrame(() => {
     const escaped = typeof CSS === "undefined" ? first : CSS.escape(first);
-    document.querySelector<HTMLElement>(`[name="${escaped}"]`)?.focus();
+    document
+      .querySelector<HTMLElement>(`[name="${escaped}"], [data-field-name="${escaped}"]`)
+      ?.focus();
   });
 }
 

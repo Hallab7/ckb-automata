@@ -4,12 +4,11 @@ import {
   parseBlockNumber,
   parseDeadlineCreationRequest,
   parseHash32,
-  parseShannons,
 } from "@ckb-automata/core";
 
+import { ckbToShannons, shannonsToCkb } from "./ckb-amount.ts";
 import type { SetupDraft, SetupErrors, SetupStepId } from "./setup-flow.ts";
 
-const SHANNONS_PER_CKB = 100_000_000n;
 const SYNTHETIC_PLEDGE_OUT_POINT = `0x${"11".repeat(32)}`;
 
 export const DEADLINE_INITIAL_DRAFT: SetupDraft = Object.freeze({
@@ -25,22 +24,6 @@ export interface DeadlineValidationContext {
   readonly ownerLockHash: string | undefined;
   readonly resolveLockHash: (address: string) => Promise<string>;
   readonly walletReady: boolean;
-}
-
-export function ckbToShannons(value: string): string {
-  const match = /^(0|[1-9][0-9]*)(?:\.([0-9]{1,8}))?$/.exec(value.trim());
-  if (match === null) {
-    throw new TypeError("Enter CKB with no more than 8 decimal places.");
-  }
-  const whole = BigInt(match[1] ?? "0");
-  const fraction = BigInt((match[2] ?? "").padEnd(8, "0") || "0");
-  return parseShannons(whole * SHANNONS_PER_CKB + fraction).toString();
-}
-
-function shannonsToCkb(value: bigint): string {
-  const whole = value / SHANNONS_PER_CKB;
-  const fraction = (value % SHANNONS_PER_CKB).toString().padStart(8, "0").replace(/0+$/, "");
-  return fraction ? `${whole}.${fraction}` : whole.toString();
 }
 
 export function clientAcceptsDeadlineRequest(input: unknown): boolean {
@@ -73,7 +56,7 @@ function amount(
   const value = required(draft, name, `Enter ${label}.`, errors);
   if (!value) return undefined;
   try {
-    const parsed = parseShannons(ckbToShannons(value));
+    const parsed = BigInt(ckbToShannons(value));
     if (parsed < minimum) {
       errors[name] = `${label} must be at least ${shannonsToCkb(minimum)} CKB.`;
       return undefined;

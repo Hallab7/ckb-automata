@@ -98,6 +98,10 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.setup-form-grid--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .setup-address-field {
   align-content: start;
   display: grid;
@@ -106,6 +110,79 @@
 
 .setup-address-field .ui-button {
   justify-self: start;
+}
+
+.setup-funding-preview {
+  border-bottom: 1px solid var(--ui-color-border);
+  border-top: 1px solid var(--ui-color-border);
+  display: grid;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-4) 0;
+}
+
+.setup-funding-preview h3 {
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.setup-funding-preview dl {
+  display: grid;
+  gap: var(--ui-space-2);
+  margin: 0;
+}
+
+.setup-funding-preview dl > div {
+  display: flex;
+  gap: var(--ui-space-4);
+  justify-content: space-between;
+}
+
+.setup-funding-preview dt {
+  color: var(--ui-color-text-muted);
+}
+
+.setup-funding-preview dd {
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  margin: 0;
+  text-align: right;
+}
+
+.setup-funding-preview__total {
+  border-top: 1px solid var(--ui-color-border);
+  font-weight: 750;
+  padding-top: var(--ui-space-2);
+}
+
+.setup-readonly-field {
+  display: grid;
+  gap: var(--ui-space-2);
+  min-width: 0;
+}
+
+.setup-readonly-field__label {
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.setup-readonly-field__value {
+  background: var(--ui-color-surface-subtle);
+  border: 1px solid var(--ui-color-border-strong);
+  border-radius: var(--ui-radius-md);
+  display: block;
+  line-height: 1.45;
+  min-height: var(--ui-control-height);
+  overflow-wrap: anywhere;
+  padding: 0.55rem 0.75rem;
+}
+
+.setup-readonly-field__value--code {
+  font-family: var(--ui-font-mono);
+  font-size: 0.8125rem;
+}
+
+.setup-readonly-field[data-invalid="true"] .setup-readonly-field__value {
+  border-color: var(--ui-color-danger);
 }
 
 .setup-step h2 {

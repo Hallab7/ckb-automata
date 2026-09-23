@@ -43,6 +43,7 @@ import {
   parseDeadlineCreationRequest,
   parseHash32,
   parseOutPoint,
+  parseRecurringCreationRequest,
   type LiveCellResolver,
   type RegisteredDeployment,
   type ScriptIdentity,
@@ -517,31 +518,17 @@ export class TransactionBuildService {
   }
 
   async #recurring(input: unknown, deployment: RegisteredDeployment): Promise<BuiltArtifact> {
-    const request = record(input, "recurring request");
-    exact(
-      request,
-      [
-        "ownerLockHash",
-        "recipientLockHash",
-        "amount",
-        "intervalBlocks",
-        "firstNotBefore",
-        "totalRuns",
-        "reward",
-        "creatorNonce",
-      ],
-      "recurring request",
-    );
+    const request = parseRecurringCreationRequest(input);
     const build = buildRecurringCreation({
       deployment,
-      ownerLockHash: hash(request["ownerLockHash"], "ownerLockHash"),
-      recipientLockHash: hash(request["recipientLockHash"], "recipientLockHash"),
-      amount: decimal(request["amount"], "amount"),
-      intervalBlocks: decimal(request["intervalBlocks"], "intervalBlocks"),
-      firstNotBefore: decimal(request["firstNotBefore"], "firstNotBefore"),
-      totalRuns: decimal(request["totalRuns"], "totalRuns"),
-      reward: decimal(request["reward"], "reward"),
-      creatorNonce: decimal(request["creatorNonce"], "creatorNonce"),
+      ownerLockHash: request.ownerLockHash,
+      recipientLockHash: request.recipientLockHash,
+      amount: request.amount,
+      intervalBlocks: request.intervalBlocks,
+      firstNotBefore: request.firstNotBefore,
+      totalRuns: request.totalRuns,
+      reward: request.reward,
+      creatorNonce: request.creatorNonce,
       creationFee: JOB_QUOTE_ASSUMPTIONS.recurring,
     });
     const tip = await this.#chain.getTipHeader();

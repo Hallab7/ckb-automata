@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "valid": {
+    "ownerLockHash": "0x1111111111111111111111111111111111111111111111111111111111111111",
+    "recipientLockHash": "0x2222222222222222222222222222222222222222222222222222222222222222",
+    "amount": "10000000000",
+    "intervalBlocks": "100",
+    "firstNotBefore": "15000000",
+    "totalRuns": "3",
+    "reward": "6100000000",
+    "creatorNonce": "9"
+  },
+  "invalid": [
+    {
+      "name": "zero interval",
+      "patch": { "intervalBlocks": "0" }
+    },
+    {
+      "name": "excessive runs",
+      "patch": { "totalRuns": "4294967296" }
+    },
+    {
+      "name": "overflowing amount total",
+      "patch": { "amount": "18446744073709551615", "totalRuns": "2" }
+    },
+    {
+      "name": "undersized payout",
+      "patch": { "amount": "6099999999" }
+    },
+    {
+      "name": "noncanonical reward",
+      "patch": { "reward": "06100000000" }
+    },
+    {
+      "name": "zero owner",
+      "patch": {
+        "ownerLockHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "name": "zero recipient",
+      "patch": {
+        "recipientLockHash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    }
+  ]
+}

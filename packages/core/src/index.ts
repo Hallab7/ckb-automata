@@ -186,6 +186,11 @@ export {
 } from "./recurring-creation.ts";
 
 export {
+  parseRecurringCreationRequest,
+  type RecurringCreationRequest,
+} from "./recurring-request.ts";
+
+export {
   CANCELLATION_OPERATION,
   CancellationBuildError,
   assertCancellationCompletion,

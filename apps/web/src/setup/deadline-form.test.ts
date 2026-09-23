@@ -2,11 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import {
-  ckbToShannons,
-  clientAcceptsDeadlineRequest,
-  validateDeadlineStep,
-} from "./deadline-form.ts";
+import { clientAcceptsDeadlineRequest, validateDeadlineStep } from "./deadline-form.ts";
+import { ckbToShannons } from "./ckb-amount.ts";
 
 interface Fixture {
   readonly valid: Record<string, unknown> & {

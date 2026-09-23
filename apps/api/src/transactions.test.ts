@@ -42,6 +42,14 @@ interface DeadlineValidationFixture {
   }[];
 }
 
+interface RecurringValidationFixture {
+  readonly valid: Readonly<Record<string, unknown>>;
+  readonly invalid: readonly {
+    readonly name: string;
+    readonly patch: Readonly<Record<string, unknown>>;
+  }[];
+}
+
 async function deadlineValidationFixture(): Promise<DeadlineValidationFixture> {
   return JSON.parse(
     await readFile(
@@ -184,6 +192,38 @@ test("deadline endpoint rejects every shared invalid request fixture", async () 
   for (const invalid of fixture.invalid) {
     await assert.rejects(
       service.construct("create_deadline_job", invalidDeadlineRequest(fixture.valid, invalid)),
+      (error: unknown) => {
+        const response = error as {
+          getStatus(): number;
+          getResponse(): { code: string };
+        };
+        assert.equal(response.getStatus(), 400, invalid.name);
+        assert.equal(response.getResponse().code, "INVALID_TRANSACTION_REQUEST", invalid.name);
+        return true;
+      },
+    );
+  }
+});
+
+test("recurring endpoint rejects every shared invalid request fixture", async () => {
+  const fixture = JSON.parse(
+    await readFile(
+      new URL("../../../contracts/fixtures/recurring_request_validation_v1.json", import.meta.url),
+      "utf8",
+    ),
+  ) as RecurringValidationFixture;
+  const service = new TransactionBuildService(
+    {} as never,
+    {
+      getTipHeader: async () => {
+        throw new Error("invalid requests must fail before reading the tip");
+      },
+    } as never,
+    environment().CKB_GENESIS_HASH,
+  );
+  for (const invalid of fixture.invalid) {
+    await assert.rejects(
+      service.construct("create_recurring_job", { ...fixture.valid, ...invalid.patch }),
       (error: unknown) => {
         const response = error as {
           getStatus(): number;
