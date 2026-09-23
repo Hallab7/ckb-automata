@@ -4,6 +4,7 @@ import { createContext, useContext, type ReactNode } from "react";
 
 import { Button, InlineNotice } from "@ckb-automata/ui";
 import type { Signer } from "@ckb-ccc/connector-react";
+import type { ScriptIdentity, UnsignedDeadlineTransaction } from "@ckb-automata/core";
 
 import type { WalletReadiness } from "./policy.ts";
 
@@ -11,13 +12,27 @@ export interface WalletSession {
   readonly address: string | undefined;
   readonly balanceShannons: bigint | undefined;
   readonly close: () => void;
+  readonly completeForReview: (transaction: UnsignedDeadlineTransaction) => Promise<{
+    readonly hash: string;
+    readonly transaction: UnsignedDeadlineTransaction;
+  }>;
   readonly detailsStatus: "error" | "idle" | "loading" | "ready";
   readonly disconnect: () => void;
+  readonly getSignerGenesisHash: () => Promise<string>;
+  readonly getSignerLockHashes: () => Promise<ReadonlySet<string>>;
   readonly isConnectorOpen: boolean;
   readonly open: () => void;
   readonly ownerLockHash: string | undefined;
   readonly refreshDetails: () => void;
   readonly resolveLockHash: (address: string) => Promise<string>;
+  readonly resolveReviewInput: (
+    input: UnsignedDeadlineTransaction["inputs"][number],
+  ) => Promise<{ readonly capacity: bigint; readonly lockHash: string }>;
+  readonly reviewLockHash: (script: ScriptIdentity) => string;
+  readonly selectDeadlinePledge: () => Promise<{
+    readonly index: string;
+    readonly txHash: string;
+  }>;
   readonly signer: Signer | undefined;
   readonly status: WalletReadiness;
   readonly walletName: string | undefined;

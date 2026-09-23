@@ -1,6 +1,7 @@
 "use client";
 
 import { WalletCards } from "lucide-react";
+import { useCallback, useState } from "react";
 
 import { Button, InlineNotice, TextField } from "@ckb-automata/ui";
 
@@ -14,6 +15,12 @@ import {
 import type { SetupStepRenderContext } from "./setup-stepper.tsx";
 import { SetupStepper } from "./setup-stepper.tsx";
 import { ReadonlyField } from "./readonly-field.tsx";
+import {
+  CreationReview,
+  creationReviewKey,
+  reviewStateError,
+  type CreationReviewState,
+} from "./creation-review.tsx";
 
 function error(context: SetupStepRenderContext, name: string) {
   const message = context.errors[name];
@@ -167,16 +174,27 @@ function DeadlineFunding(context: SetupStepRenderContext) {
   );
 }
 
-function DeadlineStep(context: SetupStepRenderContext) {
+function DeadlineStep({
+  context,
+  onReviewStateChange,
+}: Readonly<{
+  context: SetupStepRenderContext;
+  onReviewStateChange: (state: CreationReviewState) => void;
+}>) {
   if (context.step === "details") return <DeadlineDetails {...context} />;
   if (context.step === "timing") return <DeadlineTiming {...context} />;
   if (context.step === "funding") return <DeadlineFunding {...context} />;
+  if (context.step === "review") {
+    return (
+      <CreationReview
+        draft={context.draft}
+        onStateChange={onReviewStateChange}
+        template="deadline"
+      />
+    );
+  }
   const title =
-    context.step === "review"
-      ? "Review pending"
-      : context.step === "approval"
-        ? "Wallet approval pending"
-        : "No transaction submitted";
+    context.step === "approval" ? "Wallet approval pending" : "No transaction submitted";
   return (
     <div className="setup-step__empty">
       <h2>{title}</h2>
@@ -187,6 +205,11 @@ function DeadlineStep(context: SetupStepRenderContext) {
 
 export function DeadlineSetup() {
   const session = useWalletSession();
+  const [reviewState, setReviewState] = useState<CreationReviewState>({ key: "", status: "idle" });
+  const onReviewStateChange = useCallback(
+    (state: CreationReviewState) => setReviewState(state),
+    [],
+  );
   const validationContext: DeadlineValidationContext = {
     ownerLockHash: session.ownerLockHash,
     resolveLockHash: session.resolveLockHash,
@@ -196,9 +219,20 @@ export function DeadlineSetup() {
   return (
     <SetupStepper
       initialDraft={DEADLINE_INITIAL_DRAFT}
-      renderStep={(context) => <DeadlineStep {...context} />}
+      renderStep={(context) => (
+        <DeadlineStep context={context} onReviewStateChange={onReviewStateChange} />
+      )}
       template="deadline"
-      validateStep={(step, draft) => validateDeadlineStep(step, draft, validationContext)}
+      validateStep={(step, draft) => {
+        if (step === "review") {
+          const message = reviewStateError(
+            reviewState,
+            creationReviewKey("deadline", draft, session.ownerLockHash),
+          );
+          return message === undefined ? {} : { review: message };
+        }
+        return validateDeadlineStep(step, draft, validationContext);
+      }}
     />
   );
 }

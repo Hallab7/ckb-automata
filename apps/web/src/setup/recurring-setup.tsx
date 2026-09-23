@@ -1,6 +1,7 @@
 "use client";
 
 import { WalletCards } from "lucide-react";
+import { useCallback, useState } from "react";
 
 import { Button, InlineNotice, TextField } from "@ckb-automata/ui";
 
@@ -17,6 +18,12 @@ import {
 import type { SetupStepRenderContext } from "./setup-stepper.tsx";
 import { SetupStepper } from "./setup-stepper.tsx";
 import { ReadonlyField } from "./readonly-field.tsx";
+import {
+  CreationReview,
+  creationReviewKey,
+  reviewStateError,
+  type CreationReviewState,
+} from "./creation-review.tsx";
 
 function error(context: SetupStepRenderContext, name: string) {
   const message = context.errors[name];
@@ -200,16 +207,27 @@ function RecurringFunding(context: SetupStepRenderContext) {
   );
 }
 
-function RecurringStep(context: SetupStepRenderContext) {
+function RecurringStep({
+  context,
+  onReviewStateChange,
+}: Readonly<{
+  context: SetupStepRenderContext;
+  onReviewStateChange: (state: CreationReviewState) => void;
+}>) {
   if (context.step === "details") return <RecurringDetails {...context} />;
   if (context.step === "timing") return <RecurringTiming {...context} />;
   if (context.step === "funding") return <RecurringFunding {...context} />;
+  if (context.step === "review") {
+    return (
+      <CreationReview
+        draft={context.draft}
+        onStateChange={onReviewStateChange}
+        template="recurring"
+      />
+    );
+  }
   const title =
-    context.step === "review"
-      ? "Review pending"
-      : context.step === "approval"
-        ? "Wallet approval pending"
-        : "No transaction submitted";
+    context.step === "approval" ? "Wallet approval pending" : "No transaction submitted";
   return (
     <div className="setup-step__empty">
       <h2>{title}</h2>
@@ -220,6 +238,11 @@ function RecurringStep(context: SetupStepRenderContext) {
 
 export function RecurringSetup() {
   const session = useWalletSession();
+  const [reviewState, setReviewState] = useState<CreationReviewState>({ key: "", status: "idle" });
+  const onReviewStateChange = useCallback(
+    (state: CreationReviewState) => setReviewState(state),
+    [],
+  );
   const validationContext: RecurringValidationContext = {
     balanceShannons: session.balanceShannons,
     ownerLockHash: session.ownerLockHash,
@@ -229,9 +252,20 @@ export function RecurringSetup() {
   return (
     <SetupStepper
       initialDraft={RECURRING_INITIAL_DRAFT}
-      renderStep={(context) => <RecurringStep {...context} />}
+      renderStep={(context) => (
+        <RecurringStep context={context} onReviewStateChange={onReviewStateChange} />
+      )}
       template="recurring"
-      validateStep={(step, draft) => validateRecurringStep(step, draft, validationContext)}
+      validateStep={(step, draft) => {
+        if (step === "review") {
+          const message = reviewStateError(
+            reviewState,
+            creationReviewKey("recurring", draft, session.ownerLockHash),
+          );
+          return message === undefined ? {} : { review: message };
+        }
+        return validateRecurringStep(step, draft, validationContext);
+      }}
     />
   );
 }

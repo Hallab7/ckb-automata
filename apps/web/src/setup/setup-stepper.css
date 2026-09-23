@@ -185,6 +185,179 @@
   border-color: var(--ui-color-danger);
 }
 
+.setup-review,
+.setup-review-loading {
+  display: grid;
+  gap: var(--ui-space-5);
+  max-width: 52rem;
+  min-width: 0;
+}
+
+.setup-review__heading {
+  align-items: start;
+  display: flex;
+  gap: var(--ui-space-4);
+  justify-content: space-between;
+}
+
+.setup-review__heading > div {
+  display: grid;
+  gap: var(--ui-space-2);
+}
+
+.setup-review__verified {
+  align-items: center;
+  color: var(--ui-color-success);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.8125rem;
+  font-weight: 750;
+  gap: var(--ui-space-2);
+}
+
+.setup-review__section {
+  border-top: 1px solid var(--ui-color-border);
+  display: grid;
+  gap: var(--ui-space-3);
+  min-width: 0;
+  padding-top: var(--ui-space-4);
+}
+
+.setup-review__section h3,
+.setup-review__technical summary {
+  font-size: 0.875rem;
+  font-weight: 750;
+  margin: 0;
+}
+
+.setup-review__section ul,
+.setup-review__warnings {
+  display: grid;
+  gap: var(--ui-space-2);
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.setup-review__section li,
+.setup-review__values code {
+  overflow-wrap: anywhere;
+}
+
+.setup-review__values {
+  display: grid;
+  gap: var(--ui-space-2);
+  margin: 0;
+}
+
+.setup-review__values > div {
+  display: grid;
+  gap: var(--ui-space-4);
+  grid-template-columns: minmax(9rem, 1fr) minmax(0, 1.5fr);
+}
+
+.setup-review__values dt {
+  color: var(--ui-color-text-muted);
+}
+
+.setup-review__values dd {
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  margin: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.setup-review__network {
+  align-items: start;
+  border-left: 3px solid var(--ui-color-warning);
+  display: grid;
+  gap: var(--ui-space-3);
+  grid-template-columns: auto minmax(0, 1fr);
+  padding-left: var(--ui-space-3);
+}
+
+.setup-review__network div {
+  display: grid;
+  gap: var(--ui-space-1);
+  min-width: 0;
+}
+
+.setup-review__network span {
+  color: var(--ui-color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.setup-review__network code,
+.setup-review__technical code {
+  font-family: var(--ui-font-mono);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.setup-review__technical {
+  border-top: 1px solid var(--ui-color-border);
+  padding-top: var(--ui-space-4);
+}
+
+.setup-review__technical summary {
+  cursor: pointer;
+}
+
+.setup-review__technical dl {
+  display: grid;
+  gap: var(--ui-space-3);
+  margin: var(--ui-space-4) 0;
+}
+
+.setup-review__technical dl > div {
+  display: grid;
+  gap: var(--ui-space-1);
+}
+
+.setup-review__technical dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.setup-review__technical pre {
+  background: var(--ui-color-surface-subtle);
+  border: 1px solid var(--ui-color-border);
+  border-radius: var(--ui-radius-md);
+  font-family: var(--ui-font-mono);
+  font-size: 0.6875rem;
+  line-height: 1.5;
+  margin: 0;
+  max-height: 24rem;
+  overflow: auto;
+  padding: var(--ui-space-3);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.setup-review-loading {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.setup-review-loading > div {
+  display: grid;
+  gap: var(--ui-space-2);
+}
+
+.setup-review-loading__icon {
+  animation: setup-review-spin 1.2s linear infinite;
+  color: var(--ui-color-accent);
+}
+
+.setup-review-loading__warning {
+  color: var(--ui-color-warning);
+}
+
+@keyframes setup-review-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .setup-step h2 {
   font-size: 1.125rem;
   margin: 0;
@@ -205,7 +378,7 @@
   padding-top: var(--ui-space-4);
 }
 
-@media (max-width: 30rem) {
+@media (max-width: 36rem) {
   .setup-form-grid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -223,5 +396,25 @@
 
   .setup-actions .ui-button {
     width: 100%;
+  }
+
+  .setup-review__heading {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .setup-review__values > div {
+    gap: var(--ui-space-1);
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .setup-review__values dd {
+    text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .setup-review-loading__icon {
+    animation: none;
   }
 }

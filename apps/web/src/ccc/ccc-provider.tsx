@@ -6,6 +6,12 @@ import { usePathname } from "next/navigation";
 import { ccc } from "@ckb-ccc/connector-react";
 
 import {
+  parseHash32,
+  type ScriptIdentity,
+  type UnsignedDeadlineTransaction,
+} from "@ckb-automata/core";
+
+import {
   AUTOMATA_CCC_IDENTITY,
   PREFERRED_CCC_NETWORKS,
   deriveWalletReadiness,
@@ -14,6 +20,67 @@ import {
 import { WalletSessionContext, type WalletSession } from "./session.tsx";
 
 const clientGuardSymbol = Symbol.for("ckb-automata.ccc-client-guard");
+
+function reviewedScript(value: ccc.Script): ScriptIdentity {
+  if (value.hashType === "data2") {
+    throw new Error("CCC returned a data2 script that is outside the reviewed transaction schema");
+  }
+  return {
+    codeHash: parseHash32(value.codeHash),
+    hashType: value.hashType,
+    args: value.args,
+  };
+}
+
+function reviewedTransaction(transaction: ccc.Transaction): UnsignedDeadlineTransaction {
+  return {
+    version: ccc.numToHex(transaction.version) as "0x0",
+    cellDeps: transaction.cellDeps.map((dependency) => ({
+      outPoint: {
+        txHash: parseHash32(dependency.outPoint.txHash),
+        index: ccc.numToHex(dependency.outPoint.index),
+      },
+      depType: dependency.depType,
+    })),
+    headerDeps: transaction.headerDeps.map(parseHash32),
+    inputs: transaction.inputs.map((input) => ({
+      since: ccc.numToHex(input.since),
+      previousOutput: {
+        txHash: parseHash32(input.previousOutput.txHash),
+        index: ccc.numToHex(input.previousOutput.index),
+      },
+    })),
+    outputs: transaction.outputs.map((output) => ({
+      capacity: ccc.numToHex(output.capacity),
+      lock: reviewedScript(output.lock),
+      type: output.type === undefined ? null : reviewedScript(output.type),
+    })),
+    outputsData: [...transaction.outputsData],
+    witnesses: [...transaction.witnesses],
+  };
+}
+
+function cccTransaction(transaction: UnsignedDeadlineTransaction): ccc.Transaction {
+  return ccc.Transaction.from({
+    version: transaction.version,
+    cellDeps: transaction.cellDeps.map((dependency) => ({
+      outPoint: { ...dependency.outPoint },
+      depType: dependency.depType,
+    })),
+    headerDeps: [...transaction.headerDeps],
+    inputs: transaction.inputs.map((input) => ({
+      since: input.since,
+      previousOutput: { ...input.previousOutput },
+    })),
+    outputs: transaction.outputs.map((output) => ({
+      capacity: output.capacity,
+      lock: { ...output.lock },
+      type: output.type === null ? null : { ...output.type },
+    })),
+    outputsData: [...transaction.outputsData],
+    witnesses: [...transaction.witnesses],
+  });
+}
 
 function installConnectorClientGuard(): void {
   const prototype = ccc.SignersController.prototype as ccc.SignersController &
@@ -209,12 +276,38 @@ function WalletSessionBridge({ children }: Readonly<{ children: ReactNode }>) {
 
   const currentDetails = details.signer === signer ? details : { status: "loading" as const };
   const value = useMemo<WalletSession>(() => {
+    const requireSigner = (): ccc.Signer => {
+      if (signer === undefined || status !== "ready") {
+        throw new Error("Connect a supported CKB testnet wallet before reviewing a transaction.");
+      }
+      return signer;
+    };
     return {
       address: status === "ready" ? currentDetails.address : undefined,
       balanceShannons: status === "ready" ? currentDetails.balanceShannons : undefined,
       close: () => connector.close(),
+      completeForReview: async (transaction) => {
+        const currentSigner = requireSigner();
+        const completed = cccTransaction(transaction);
+        await completed.completeFeeBy(currentSigner);
+        return Object.freeze({
+          hash: completed.hash(),
+          transaction: reviewedTransaction(completed),
+        });
+      },
       detailsStatus: status === "ready" ? currentDetails.status : "idle",
       disconnect: () => connector.disconnect(),
+      getSignerGenesisHash: async () => {
+        const genesis = await requireSigner().client.getHeaderByNumber(0);
+        if (genesis === undefined) throw new Error("The wallet client could not resolve genesis.");
+        return genesis.hash;
+      },
+      getSignerLockHashes: async () =>
+        new Set(
+          (await requireSigner().getAddressObjs()).map((address) =>
+            ccc.hashCkb(address.script.toBytes()),
+          ),
+        ),
       isConnectorOpen: connector.isOpen,
       open: () => connector.open(),
       ownerLockHash: status === "ready" ? currentDetails.ownerLockHash : undefined,
@@ -225,6 +318,30 @@ function WalletSessionBridge({ children }: Readonly<{ children: ReactNode }>) {
           signer?.client ?? connector.client,
         );
         return ccc.hashCkb(address.script.toBytes());
+      },
+      resolveReviewInput: async (input) => {
+        const currentSigner = requireSigner();
+        const cell = await ccc.CellInput.from(input).getCell(currentSigner.client);
+        return Object.freeze({
+          capacity: cell.cellOutput.capacity,
+          lockHash: ccc.hashCkb(cell.cellOutput.lock.toBytes()),
+        });
+      },
+      reviewLockHash: (scriptValue) => ccc.hashCkb(ccc.Script.from(scriptValue).toBytes()),
+      selectDeadlinePledge: async () => {
+        const currentSigner = requireSigner();
+        for await (const cell of currentSigner.findCells(
+          { scriptLenRange: [0, 1], outputDataLenRange: [0, 1] },
+          true,
+        )) {
+          return Object.freeze({
+            txHash: cell.outPoint.txHash,
+            index: cell.outPoint.index.toString(),
+          });
+        }
+        throw new Error(
+          "The connected wallet has no plain CKB cell available for this automation.",
+        );
       },
       signer,
       status,
