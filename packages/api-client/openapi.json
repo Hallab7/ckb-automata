@@ -2943,6 +2943,503 @@
         "summary": "Validate and dry-run a wallet-completed transaction",
         "tags": ["transactions"]
       }
+    },
+    "/v1/webhooks": {
+      "get": {
+        "operationId": "WebhookController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "properties": {
+                          "createdAt": { "format": "date-time", "type": "string" },
+                          "enabled": { "type": "boolean" },
+                          "endpoint": { "format": "uri", "type": "string" },
+                          "eventTypes": {
+                            "items": {
+                              "enum": [
+                                "ready",
+                                "submitted",
+                                "confirmed",
+                                "failed",
+                                "budget_low",
+                                "cancelled",
+                                "recovery_required"
+                              ],
+                              "type": "string"
+                            },
+                            "maxItems": 7,
+                            "minItems": 1,
+                            "type": "array",
+                            "uniqueItems": true
+                          },
+                          "id": { "format": "uuid", "type": "string" },
+                          "secretVersion": { "minimum": 1, "type": "integer" },
+                          "updatedAt": { "format": "date-time", "type": "string" }
+                        },
+                        "required": [
+                          "createdAt",
+                          "enabled",
+                          "endpoint",
+                          "eventTypes",
+                          "id",
+                          "secretVersion",
+                          "updatedAt"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["items"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": { "description": "A valid off-chain settings session is required" }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List owner-scoped webhook registrations",
+        "tags": ["webhooks"]
+      },
+      "post": {
+        "operationId": "WebhookController_register",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "endpoint": { "format": "uri", "type": "string" },
+                  "eventTypes": {
+                    "items": {
+                      "enum": [
+                        "ready",
+                        "submitted",
+                        "confirmed",
+                        "failed",
+                        "budget_low",
+                        "cancelled",
+                        "recovery_required"
+                      ],
+                      "type": "string"
+                    },
+                    "maxItems": 7,
+                    "minItems": 1,
+                    "type": "array",
+                    "uniqueItems": true
+                  }
+                },
+                "required": ["endpoint", "eventTypes"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "createdAt": { "format": "date-time", "type": "string" },
+                    "enabled": { "type": "boolean" },
+                    "endpoint": { "format": "uri", "type": "string" },
+                    "eventTypes": {
+                      "items": {
+                        "enum": [
+                          "ready",
+                          "submitted",
+                          "confirmed",
+                          "failed",
+                          "budget_low",
+                          "cancelled",
+                          "recovery_required"
+                        ],
+                        "type": "string"
+                      },
+                      "maxItems": 7,
+                      "minItems": 1,
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "id": { "format": "uuid", "type": "string" },
+                    "secret": {
+                      "description": "Returned once",
+                      "pattern": "^[A-Za-z0-9_-]{43}$",
+                      "type": "string"
+                    },
+                    "secretVersion": { "minimum": 1, "type": "integer" },
+                    "updatedAt": { "format": "date-time", "type": "string" }
+                  },
+                  "required": [
+                    "createdAt",
+                    "enabled",
+                    "endpoint",
+                    "eventTypes",
+                    "id",
+                    "secretVersion",
+                    "updatedAt",
+                    "secret"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": { "description": "Malformed or unsafe webhook registration" },
+          "401": { "description": "A valid off-chain settings session is required" }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Register an owner-scoped signed webhook",
+        "tags": ["webhooks"]
+      }
+    },
+    "/v1/webhooks/{subscriptionId}": {
+      "patch": {
+        "operationId": "WebhookController_update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "subscriptionId",
+            "required": true,
+            "schema": { "format": "uuid", "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "minProperties": 1,
+                "properties": {
+                  "enabled": { "type": "boolean" },
+                  "eventTypes": {
+                    "items": {
+                      "enum": [
+                        "ready",
+                        "submitted",
+                        "confirmed",
+                        "failed",
+                        "budget_low",
+                        "cancelled",
+                        "recovery_required"
+                      ],
+                      "type": "string"
+                    },
+                    "maxItems": 7,
+                    "minItems": 1,
+                    "type": "array",
+                    "uniqueItems": true
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "createdAt": { "format": "date-time", "type": "string" },
+                    "enabled": { "type": "boolean" },
+                    "endpoint": { "format": "uri", "type": "string" },
+                    "eventTypes": {
+                      "items": {
+                        "enum": [
+                          "ready",
+                          "submitted",
+                          "confirmed",
+                          "failed",
+                          "budget_low",
+                          "cancelled",
+                          "recovery_required"
+                        ],
+                        "type": "string"
+                      },
+                      "maxItems": 7,
+                      "minItems": 1,
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "id": { "format": "uuid", "type": "string" },
+                    "secretVersion": { "minimum": 1, "type": "integer" },
+                    "updatedAt": { "format": "date-time", "type": "string" }
+                  },
+                  "required": [
+                    "createdAt",
+                    "enabled",
+                    "endpoint",
+                    "eventTypes",
+                    "id",
+                    "secretVersion",
+                    "updatedAt"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": { "description": "A valid off-chain settings session is required" },
+          "404": { "description": "The owner-scoped webhook resource was not found" }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Update webhook event selection or enablement",
+        "tags": ["webhooks"]
+      }
+    },
+    "/v1/webhooks/{subscriptionId}/deliveries": {
+      "get": {
+        "operationId": "WebhookController_history",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "subscriptionId",
+            "required": true,
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": { "maximum": 100, "minimum": 1, "type": "number" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "properties": {
+                          "attemptNumber": { "maximum": 4, "minimum": 1, "type": "integer" },
+                          "createdAt": { "format": "date-time", "type": "string" },
+                          "deliveredAt": {
+                            "format": "date-time",
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "errorCode": { "nullable": true, "type": "string" },
+                          "eventId": { "pattern": "^[1-9][0-9]*$", "type": "string" },
+                          "finishedAt": {
+                            "format": "date-time",
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "id": { "format": "uuid", "type": "string" },
+                          "idempotencyKey": { "pattern": "^[0-9a-f]{64}$", "type": "string" },
+                          "nextAttemptAt": {
+                            "format": "date-time",
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "notificationType": {
+                            "enum": [
+                              "ready",
+                              "submitted",
+                              "confirmed",
+                              "failed",
+                              "budget_low",
+                              "cancelled",
+                              "recovery_required"
+                            ],
+                            "type": "string"
+                          },
+                          "replayNumber": { "minimum": 0, "type": "integer" },
+                          "responseCode": {
+                            "maximum": 599,
+                            "minimum": 100,
+                            "nullable": true,
+                            "type": "integer"
+                          },
+                          "responseExcerpt": { "nullable": true, "type": "string" },
+                          "status": {
+                            "enum": ["pending", "retry_scheduled", "delivered", "failed"],
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "attemptNumber",
+                          "createdAt",
+                          "deliveredAt",
+                          "errorCode",
+                          "eventId",
+                          "finishedAt",
+                          "id",
+                          "idempotencyKey",
+                          "nextAttemptAt",
+                          "notificationType",
+                          "replayNumber",
+                          "responseCode",
+                          "responseExcerpt",
+                          "status"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "subscriptionId": { "format": "uuid", "type": "string" }
+                  },
+                  "required": ["items", "subscriptionId"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": { "description": "A valid off-chain settings session is required" },
+          "404": { "description": "The owner-scoped webhook resource was not found" }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Read owner-scoped webhook delivery history",
+        "tags": ["webhooks"]
+      }
+    },
+    "/v1/webhooks/{subscriptionId}/deliveries/{deliveryId}/replay": {
+      "post": {
+        "operationId": "WebhookController_replay",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "subscriptionId",
+            "required": true,
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "in": "path",
+            "name": "deliveryId",
+            "required": true,
+            "schema": { "format": "uuid", "type": "string" }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "attemptNumber": { "maximum": 4, "minimum": 1, "type": "integer" },
+                    "createdAt": { "format": "date-time", "type": "string" },
+                    "deliveredAt": { "format": "date-time", "nullable": true, "type": "string" },
+                    "errorCode": { "nullable": true, "type": "string" },
+                    "eventId": { "pattern": "^[1-9][0-9]*$", "type": "string" },
+                    "finishedAt": { "format": "date-time", "nullable": true, "type": "string" },
+                    "id": { "format": "uuid", "type": "string" },
+                    "idempotencyKey": { "pattern": "^[0-9a-f]{64}$", "type": "string" },
+                    "nextAttemptAt": { "format": "date-time", "nullable": true, "type": "string" },
+                    "notificationType": {
+                      "enum": [
+                        "ready",
+                        "submitted",
+                        "confirmed",
+                        "failed",
+                        "budget_low",
+                        "cancelled",
+                        "recovery_required"
+                      ],
+                      "type": "string"
+                    },
+                    "replayNumber": { "minimum": 0, "type": "integer" },
+                    "responseCode": {
+                      "maximum": 599,
+                      "minimum": 100,
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "responseExcerpt": { "nullable": true, "type": "string" },
+                    "status": {
+                      "enum": ["pending", "retry_scheduled", "delivered", "failed"],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "attemptNumber",
+                    "createdAt",
+                    "deliveredAt",
+                    "errorCode",
+                    "eventId",
+                    "finishedAt",
+                    "id",
+                    "idempotencyKey",
+                    "nextAttemptAt",
+                    "notificationType",
+                    "replayNumber",
+                    "responseCode",
+                    "responseExcerpt",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": { "description": "A valid off-chain settings session is required" },
+          "404": { "description": "The owner-scoped webhook resource was not found" },
+          "409": { "description": "The webhook is disabled or does not select the event" }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Replay a webhook event as a new idempotent delivery run",
+        "tags": ["webhooks"]
+      }
+    },
+    "/v1/webhooks/{subscriptionId}/rotate-secret": {
+      "post": {
+        "operationId": "WebhookController_rotate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "subscriptionId",
+            "required": true,
+            "schema": { "format": "uuid", "type": "string" }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "id": { "format": "uuid", "type": "string" },
+                    "rotatedAt": { "format": "date-time", "type": "string" },
+                    "secret": {
+                      "description": "Returned once",
+                      "pattern": "^[A-Za-z0-9_-]{43}$",
+                      "type": "string"
+                    },
+                    "secretVersion": { "minimum": 2, "type": "integer" }
+                  },
+                  "required": ["id", "rotatedAt", "secret", "secretVersion"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": { "description": "A valid off-chain settings session is required" },
+          "404": { "description": "The owner-scoped webhook resource was not found" }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Rotate a webhook signing secret",
+        "tags": ["webhooks"]
+      }
     }
   },
   "servers": [],

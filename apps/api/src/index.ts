@@ -14,6 +14,21 @@ export {
   type NotificationPreferencesResponse,
 } from "./preferences.ts";
 export {
+  WEBHOOK_MAX_ATTEMPTS,
+  WEBHOOK_CLAIM_LEASE_MS,
+  WEBHOOK_RETRY_DELAYS_MS,
+  WEBHOOK_TIMEOUT_MS,
+  WebhookController,
+  WebhookService,
+  signWebhookRequest,
+  verifyWebhookSignature,
+  type WebhookDeliveryResponse,
+  type WebhookDeliveryRun,
+  type WebhookRegistrationResponse,
+  type WebhookServiceOptions,
+  type WebhookSubscriptionResponse,
+} from "./webhooks.ts";
+export {
   AUTH_CHALLENGE_TTL_MS,
   AUTH_SESSION_SCOPE,
   AUTH_SESSION_TTL_MS,

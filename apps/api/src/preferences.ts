@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, randomBytes, randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 
 import { BadRequestException, Body, Controller, Get, Headers, Inject, Put } from "@nestjs/common";
 import {
@@ -17,6 +17,7 @@ import type { AutomataEnvironment } from "@ckb-automata/config";
 import { AuthService } from "./auth.ts";
 import type { AutomataDatabase } from "./database/client.ts";
 import { notificationPreferences } from "./database/schema.ts";
+import { decodeEncryptionKey, decryptSecret, encryptSecret } from "./secret-box.ts";
 
 export const NOTIFICATION_EVENT_TYPES = [
   "ready",
@@ -140,58 +141,8 @@ function parseInput(value: unknown): PreferencesInput {
   };
 }
 
-function encryptionKey(value: string): Buffer {
-  const key = Buffer.from(value, "base64url");
-  if (key.length !== 32) throw new Error("WEBHOOK_ENCRYPTION_KEY must decode to 32 bytes");
-  return key;
-}
-
 function aad(network: string, ownerLockHash: string): Buffer {
   return Buffer.from(`notification-email:v1:${network}:${ownerLockHash}`, "utf8");
-}
-
-function encryptEmail(
-  address: string,
-  key: Buffer,
-  associatedData: Buffer,
-  randomIv: () => Buffer,
-): string {
-  const iv = randomIv();
-  if (iv.length !== 12) throw new Error("notification IV provider must return 12 bytes");
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
-  cipher.setAAD(associatedData);
-  const ciphertext = Buffer.concat([cipher.update(address, "utf8"), cipher.final()]);
-  return [
-    "v1",
-    iv.toString("base64url"),
-    ciphertext.toString("base64url"),
-    cipher.getAuthTag().toString("base64url"),
-  ].join(".");
-}
-
-function decryptEmail(value: string, key: Buffer, associatedData: Buffer): string {
-  const [version, ivValue, ciphertextValue, tagValue, extra] = value.split(".");
-  if (
-    version !== "v1" ||
-    ivValue === undefined ||
-    ciphertextValue === undefined ||
-    tagValue === undefined ||
-    extra !== undefined
-  ) {
-    throw new Error("stored notification destination is malformed");
-  }
-  const iv = Buffer.from(ivValue, "base64url");
-  const tag = Buffer.from(tagValue, "base64url");
-  if (iv.length !== 12 || tag.length !== 16 || ciphertextValue.length === 0) {
-    throw new Error("stored notification destination is malformed");
-  }
-  const decipher = createDecipheriv("aes-256-gcm", key, iv);
-  decipher.setAAD(associatedData);
-  decipher.setAuthTag(tag);
-  return Buffer.concat([
-    decipher.update(Buffer.from(ciphertextValue, "base64url")),
-    decipher.final(),
-  ]).toString("utf8");
 }
 
 function maskEmail(address: string): string {
@@ -238,7 +189,7 @@ export class NotificationPreferencesService {
   ) {
     this.#auth = auth;
     this.#database = database;
-    this.#encryptionKey = encryptionKey(environment.WEBHOOK_ENCRYPTION_KEY);
+    this.#encryptionKey = decodeEncryptionKey(environment.WEBHOOK_ENCRYPTION_KEY);
     this.#network = environment.CKB_NETWORK;
     this.#now = options.now ?? (() => new Date());
     this.#randomIv = options.randomIv ?? (() => randomBytes(12));
@@ -281,7 +232,7 @@ export class NotificationPreferencesService {
       let destinationCiphertext = existingEmail?.destinationCiphertext ?? null;
       if (input.email.address === null) destinationCiphertext = null;
       if (typeof input.email.address === "string") {
-        destinationCiphertext = encryptEmail(
+        destinationCiphertext = encryptSecret(
           input.email.address,
           this.#encryptionKey,
           aad(this.#network, session.ownerLockHash),
@@ -346,7 +297,7 @@ export class NotificationPreferencesService {
       email?.destinationCiphertext === null || email?.destinationCiphertext === undefined
         ? null
         : maskEmail(
-            decryptEmail(
+            decryptSecret(
               email.destinationCiphertext,
               this.#encryptionKey,
               aad(this.#network, ownerLockHash),

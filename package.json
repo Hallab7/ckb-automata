@@ -33,6 +33,7 @@
     "jobs:verify:quotes:local": "node scripts/verify-job-quotes-local.mjs",
     "auth:verify:local": "node scripts/verify-auth-local.mjs",
     "preferences:verify:local": "node scripts/verify-preferences-local.mjs",
+    "webhooks:verify:local": "node scripts/verify-webhooks-local.mjs",
     "transactions:verify:local": "node scripts/verify-transaction-api-local.mjs",
     "transactions:verify:endpoints:local": "node scripts/verify-transaction-endpoints-local.mjs",
     "format": "prettier --write . && cargo fmt --all",

@@ -129,3 +129,34 @@ test("updates preferences with generated request types and session scope", async
   assert.equal(request?.headers.get("authorization"), `Bearer ${"B".repeat(43)}`);
   assert.deepEqual(await request?.json(), body);
 });
+
+test("registers, updates, and replays webhooks with owner sessions", async () => {
+  const requests: Request[] = [];
+  const client = createApiClient({
+    baseUrl: "https://api.example.test/",
+    fetch: async (input, init) => {
+      requests.push(new Request(input, init));
+      return new Response(JSON.stringify({ id: "delivery" }), { headers: jsonHeaders });
+    },
+  });
+  const session = "C".repeat(43);
+  await client.registerWebhook(session, {
+    endpoint: "https://hooks.example.test/automata",
+    eventTypes: ["confirmed"],
+  });
+  await client.updateWebhook(session, "subscription/value", { enabled: false });
+  await client.replayWebhookDelivery(session, "subscription/value", "delivery/value");
+
+  assert.equal(requests[0]?.method, "POST");
+  assert.equal(requests[0]?.headers.get("authorization"), `Bearer ${session}`);
+  assert.deepEqual(await requests[0]?.json(), {
+    endpoint: "https://hooks.example.test/automata",
+    eventTypes: ["confirmed"],
+  });
+  assert.equal(requests[1]?.method, "PATCH");
+  assert.equal(requests[1]?.url, "https://api.example.test/v1/webhooks/subscription%2Fvalue");
+  assert.equal(
+    requests[2]?.url,
+    "https://api.example.test/v1/webhooks/subscription%2Fvalue/deliveries/delivery%2Fvalue/replay",
+  );
+});

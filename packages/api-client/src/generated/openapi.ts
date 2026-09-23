@@ -342,6 +342,92 @@ export type paths = {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/v1/webhooks": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /** List owner-scoped webhook registrations */
+        readonly get: operations["WebhookController_list"];
+        readonly put?: never;
+        /** Register an owner-scoped signed webhook */
+        readonly post: operations["WebhookController_register"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/v1/webhooks/{subscriptionId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        /** Update webhook event selection or enablement */
+        readonly patch: operations["WebhookController_update"];
+        readonly trace?: never;
+    };
+    readonly "/v1/webhooks/{subscriptionId}/deliveries": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /** Read owner-scoped webhook delivery history */
+        readonly get: operations["WebhookController_history"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/v1/webhooks/{subscriptionId}/deliveries/{deliveryId}/replay": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /** Replay a webhook event as a new idempotent delivery run */
+        readonly post: operations["WebhookController_replay"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/v1/webhooks/{subscriptionId}/rotate-secret": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /** Rotate a webhook signing secret */
+        readonly post: operations["WebhookController_rotate"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
 };
 export type webhooks = Record<string, never>;
 export type components = {
@@ -1939,6 +2025,326 @@ export interface operations {
             };
             /** @description Chain or deployment evidence is unavailable */
             readonly 503: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly WebhookController_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        readonly items: readonly {
+                            /** Format: date-time */
+                            readonly createdAt: string;
+                            readonly enabled: boolean;
+                            /** Format: uri */
+                            readonly endpoint: string;
+                            readonly eventTypes: readonly ("ready" | "submitted" | "confirmed" | "failed" | "budget_low" | "cancelled" | "recovery_required")[];
+                            /** Format: uuid */
+                            readonly id: string;
+                            readonly secretVersion: number;
+                            /** Format: date-time */
+                            readonly updatedAt: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description A valid off-chain settings session is required */
+            readonly 401: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly WebhookController_register: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": {
+                    /** Format: uri */
+                    readonly endpoint: string;
+                    readonly eventTypes: readonly ("ready" | "submitted" | "confirmed" | "failed" | "budget_low" | "cancelled" | "recovery_required")[];
+                };
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        /** Format: date-time */
+                        readonly createdAt: string;
+                        readonly enabled: boolean;
+                        /** Format: uri */
+                        readonly endpoint: string;
+                        readonly eventTypes: readonly ("ready" | "submitted" | "confirmed" | "failed" | "budget_low" | "cancelled" | "recovery_required")[];
+                        /** Format: uuid */
+                        readonly id: string;
+                        /** @description Returned once */
+                        readonly secret: string;
+                        readonly secretVersion: number;
+                        /** Format: date-time */
+                        readonly updatedAt: string;
+                    };
+                };
+            };
+            /** @description Malformed or unsafe webhook registration */
+            readonly 400: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description A valid off-chain settings session is required */
+            readonly 401: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly WebhookController_update: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly subscriptionId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": {
+                    readonly enabled?: boolean;
+                    readonly eventTypes?: readonly ("ready" | "submitted" | "confirmed" | "failed" | "budget_low" | "cancelled" | "recovery_required")[];
+                };
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        /** Format: date-time */
+                        readonly createdAt: string;
+                        readonly enabled: boolean;
+                        /** Format: uri */
+                        readonly endpoint: string;
+                        readonly eventTypes: readonly ("ready" | "submitted" | "confirmed" | "failed" | "budget_low" | "cancelled" | "recovery_required")[];
+                        /** Format: uuid */
+                        readonly id: string;
+                        readonly secretVersion: number;
+                        /** Format: date-time */
+                        readonly updatedAt: string;
+                    };
+                };
+            };
+            /** @description A valid off-chain settings session is required */
+            readonly 401: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The owner-scoped webhook resource was not found */
+            readonly 404: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly WebhookController_history: {
+        readonly parameters: {
+            readonly query?: {
+                readonly limit?: number;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly subscriptionId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        readonly items: readonly {
+                            readonly attemptNumber: number;
+                            /** Format: date-time */
+                            readonly createdAt: string;
+                            /** Format: date-time */
+                            readonly deliveredAt: string | null;
+                            readonly errorCode: string | null;
+                            readonly eventId: string;
+                            /** Format: date-time */
+                            readonly finishedAt: string | null;
+                            /** Format: uuid */
+                            readonly id: string;
+                            readonly idempotencyKey: string;
+                            /** Format: date-time */
+                            readonly nextAttemptAt: string | null;
+                            /** @enum {string} */
+                            readonly notificationType: "ready" | "submitted" | "confirmed" | "failed" | "budget_low" | "cancelled" | "recovery_required";
+                            readonly replayNumber: number;
+                            readonly responseCode: number | null;
+                            readonly responseExcerpt: string | null;
+                            /** @enum {string} */
+                            readonly status: "pending" | "retry_scheduled" | "delivered" | "failed";
+                        }[];
+                        /** Format: uuid */
+                        readonly subscriptionId: string;
+                    };
+                };
+            };
+            /** @description A valid off-chain settings session is required */
+            readonly 401: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The owner-scoped webhook resource was not found */
+            readonly 404: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly WebhookController_replay: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly deliveryId: string;
+                readonly subscriptionId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        readonly attemptNumber: number;
+                        /** Format: date-time */
+                        readonly createdAt: string;
+                        /** Format: date-time */
+                        readonly deliveredAt: string | null;
+                        readonly errorCode: string | null;
+                        readonly eventId: string;
+                        /** Format: date-time */
+                        readonly finishedAt: string | null;
+                        /** Format: uuid */
+                        readonly id: string;
+                        readonly idempotencyKey: string;
+                        /** Format: date-time */
+                        readonly nextAttemptAt: string | null;
+                        /** @enum {string} */
+                        readonly notificationType: "ready" | "submitted" | "confirmed" | "failed" | "budget_low" | "cancelled" | "recovery_required";
+                        readonly replayNumber: number;
+                        readonly responseCode: number | null;
+                        readonly responseExcerpt: string | null;
+                        /** @enum {string} */
+                        readonly status: "pending" | "retry_scheduled" | "delivered" | "failed";
+                    };
+                };
+            };
+            /** @description A valid off-chain settings session is required */
+            readonly 401: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The owner-scoped webhook resource was not found */
+            readonly 404: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The webhook is disabled or does not select the event */
+            readonly 409: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly WebhookController_rotate: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly subscriptionId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        /** Format: uuid */
+                        readonly id: string;
+                        /** Format: date-time */
+                        readonly rotatedAt: string;
+                        /** @description Returned once */
+                        readonly secret: string;
+                        readonly secretVersion: number;
+                    };
+                };
+            };
+            /** @description A valid off-chain settings session is required */
+            readonly 401: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The owner-scoped webhook resource was not found */
+            readonly 404: {
                 headers: {
                     readonly [name: string]: unknown;
                 };

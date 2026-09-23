@@ -29,6 +29,7 @@ import {
 } from "./preferences.ts";
 import { JobQuoteController, JobQuoteService } from "./quotes.ts";
 import { TransactionBuildService, TransactionController } from "./transactions.ts";
+import { WebhookController, WebhookService } from "./webhooks.ts";
 
 // Nest uses the class identity as the root dependency-injection module token.
 // oxlint-disable-next-line typescript/no-extraneous-class
@@ -39,6 +40,7 @@ Module({
     HealthController,
     AuthController,
     NotificationPreferencesController,
+    WebhookController,
     NetworkMetadataController,
     JobsController,
     AccountJobsController,
@@ -77,6 +79,12 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
         inject: [DatabaseClient, AuthService],
         useFactory: (databaseClient: DatabaseClient, auth: AuthService) =>
           new NotificationPreferencesService(databaseClient.database, auth, environment),
+      },
+      {
+        provide: WebhookService,
+        inject: [DatabaseClient, AuthService],
+        useFactory: (databaseClient: DatabaseClient, auth: AuthService) =>
+          new WebhookService(databaseClient.database, auth, environment),
       },
       {
         provide: CanonicalCheckpointStore,

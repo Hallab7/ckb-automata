@@ -41,6 +41,9 @@ export type ApiTransactionValidation = ApiSuccess<"TransactionController_validat
 export type ApiAuthChallenge = ApiSuccess<"AuthController_issue">;
 export type ApiAuthSession = ApiSuccess<"AuthController_verify">;
 export type ApiNotificationPreferences = ApiSuccess<"NotificationPreferencesController_get">;
+export type ApiWebhookList = ApiSuccess<"WebhookController_list">;
+export type ApiWebhookRegistration = ApiSuccess<"WebhookController_register">;
+export type ApiWebhookDelivery = ApiSuccess<"WebhookController_replay">;
 
 export interface ApiClientOptions {
   readonly baseUrl: string;
@@ -122,6 +125,70 @@ export class AutomataApiClient {
     });
   }
 
+  listWebhooks(sessionToken: string): Promise<ApiWebhookList> {
+    return this.#request("v1/webhooks", {
+      headers: { authorization: `Bearer ${sessionToken}` },
+    });
+  }
+
+  registerWebhook(
+    sessionToken: string,
+    body: ApiRequestBody<"WebhookController_register">,
+  ): Promise<ApiWebhookRegistration> {
+    return this.#request("v1/webhooks", {
+      body,
+      headers: { authorization: `Bearer ${sessionToken}` },
+      method: "POST",
+    });
+  }
+
+  updateWebhook(
+    sessionToken: string,
+    subscriptionId: string,
+    body: ApiRequestBody<"WebhookController_update">,
+  ): Promise<ApiSuccess<"WebhookController_update">> {
+    return this.#request(`v1/webhooks/${encodeURIComponent(subscriptionId)}`, {
+      body,
+      headers: { authorization: `Bearer ${sessionToken}` },
+      method: "PATCH",
+    });
+  }
+
+  rotateWebhookSecret(
+    sessionToken: string,
+    subscriptionId: string,
+  ): Promise<ApiSuccess<"WebhookController_rotate">> {
+    return this.#request(`v1/webhooks/${encodeURIComponent(subscriptionId)}/rotate-secret`, {
+      headers: { authorization: `Bearer ${sessionToken}` },
+      method: "POST",
+    });
+  }
+
+  webhookDeliveries(
+    sessionToken: string,
+    subscriptionId: string,
+    query?: ApiQuery<"WebhookController_history">,
+  ): Promise<ApiSuccess<"WebhookController_history">> {
+    return this.#request(`v1/webhooks/${encodeURIComponent(subscriptionId)}/deliveries`, {
+      headers: { authorization: `Bearer ${sessionToken}` },
+      query,
+    });
+  }
+
+  replayWebhookDelivery(
+    sessionToken: string,
+    subscriptionId: string,
+    deliveryId: string,
+  ): Promise<ApiWebhookDelivery> {
+    return this.#request(
+      `v1/webhooks/${encodeURIComponent(subscriptionId)}/deliveries/${encodeURIComponent(deliveryId)}/replay`,
+      {
+        headers: { authorization: `Bearer ${sessionToken}` },
+        method: "POST",
+      },
+    );
+  }
+
   listJobs(query?: ApiQuery<"JobsController_list">): Promise<ApiJobList> {
     return this.#request("v1/jobs", { query });
   }
@@ -193,7 +260,7 @@ export class AutomataApiClient {
     options: {
       readonly body?: unknown;
       readonly headers?: Readonly<Record<string, string>>;
-      readonly method?: "POST" | "PUT";
+      readonly method?: "PATCH" | "POST" | "PUT";
       readonly query?: unknown;
     } = {},
   ): Promise<Result> {

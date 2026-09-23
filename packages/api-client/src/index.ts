@@ -18,6 +18,9 @@ export {
   type ApiTemplates,
   type ApiTransactionBuild,
   type ApiTransactionValidation,
+  type ApiWebhookDelivery,
+  type ApiWebhookList,
+  type ApiWebhookRegistration,
 } from "./client.ts";
 export type { components, operations, paths, webhooks } from "./generated/openapi.ts";
 

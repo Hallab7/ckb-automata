@@ -15,6 +15,9 @@ export {
   type ApiTemplates,
   type ApiTransactionBuild,
   type ApiTransactionValidation,
+  type ApiWebhookDelivery,
+  type ApiWebhookList,
+  type ApiWebhookRegistration,
 } from "@ckb-automata/api-client";
 
 export const WEB_APP_ID = `${WORKSPACE_NAME}:web` as const;

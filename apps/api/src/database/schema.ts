@@ -306,6 +306,9 @@ export const notificationSubscriptions = pgTable(
     destinationCiphertext: text("destination_ciphertext").notNull(),
     eventTypes: jsonb("event_types").notNull(),
     enabled: boolean("enabled").default(true).notNull(),
+    secretVersion: integer("secret_version").default(1).notNull(),
+    nextReplayNumber: integer("next_replay_number").default(1).notNull(),
+    disabledAt: timestamp("disabled_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -314,7 +317,13 @@ export const notificationSubscriptions = pgTable(
     check("notification_subscriptions_channel_ck", sql`${table.channel} IN ('email', 'webhook')`),
     check(
       "notification_subscriptions_event_types_ck",
-      sql`jsonb_typeof(${table.eventTypes}) = 'array'`,
+      sql`jsonb_typeof(${table.eventTypes}) = 'array' AND jsonb_array_length(${table.eventTypes}) BETWEEN 1 AND 7 AND ${table.eventTypes} <@ '["ready", "submitted", "confirmed", "failed", "budget_low", "cancelled", "recovery_required"]'::jsonb`,
+    ),
+    check("notification_subscriptions_secret_version_ck", sql`${table.secretVersion} > 0`),
+    check("notification_subscriptions_next_replay_number_ck", sql`${table.nextReplayNumber} > 0`),
+    check(
+      "notification_subscriptions_disabled_ck",
+      sql`(${table.enabled} AND ${table.disabledAt} IS NULL) OR (NOT ${table.enabled} AND ${table.disabledAt} IS NOT NULL)`,
     ),
   ],
 );
@@ -376,26 +385,52 @@ export const webhookDeliveries = pgTable(
       .notNull()
       .references(() => jobEvents.id, { onDelete: "cascade" }),
     attemptNumber: integer("attempt_number").notNull(),
+    replayNumber: integer("replay_number").default(0).notNull(),
+    notificationType: varchar("notification_type", { length: 32 }).notNull(),
+    idempotencyKey: varchar("idempotency_key", { length: 64 }).notNull(),
     requestSignature: text("request_signature").notNull(),
+    status: varchar("status", { length: 24 }).default("pending").notNull(),
     responseCode: integer("response_code"),
     responseExcerpt: text("response_excerpt"),
+    errorCode: varchar("error_code", { length: 64 }),
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
     deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
   (table) => [
     uniqueIndex("webhook_deliveries_attempt_uq").on(
       table.subscriptionId,
       table.eventId,
+      table.replayNumber,
       table.attemptNumber,
     ),
+    index("webhook_deliveries_history_idx").on(table.subscriptionId, table.createdAt, table.id),
     index("webhook_deliveries_retry_idx")
       .on(table.nextAttemptAt)
       .where(sql`${table.deliveredAt} IS NULL AND ${table.nextAttemptAt} IS NOT NULL`),
     check("webhook_deliveries_attempt_number_ck", sql`${table.attemptNumber} > 0`),
+    check("webhook_deliveries_replay_number_ck", sql`${table.replayNumber} >= 0`),
+    check("webhook_deliveries_idempotency_key_ck", sql`${table.idempotencyKey} ~ '^[0-9a-f]{64}$'`),
+    check(
+      "webhook_deliveries_notification_type_ck",
+      sql`${table.notificationType} IN ('ready', 'submitted', 'confirmed', 'failed', 'budget_low', 'cancelled', 'recovery_required')`,
+    ),
+    check(
+      "webhook_deliveries_status_ck",
+      sql`${table.status} IN ('pending', 'retry_scheduled', 'delivered', 'failed')`,
+    ),
     check(
       "webhook_deliveries_response_code_ck",
       sql`${table.responseCode} IS NULL OR ${table.responseCode} BETWEEN 100 AND 599`,
+    ),
+    check(
+      "webhook_deliveries_terminal_ck",
+      sql`(${table.status} = 'pending' AND ${table.finishedAt} IS NULL AND ${table.nextAttemptAt} IS NULL) OR (${table.status} = 'retry_scheduled' AND ${table.finishedAt} IS NOT NULL AND ${table.nextAttemptAt} IS NOT NULL) OR (${table.status} IN ('delivered', 'failed') AND ${table.finishedAt} IS NOT NULL AND ${table.nextAttemptAt} IS NULL)`,
+    ),
+    check(
+      "webhook_deliveries_delivered_ck",
+      sql`(${table.status} = 'delivered' AND ${table.deliveredAt} IS NOT NULL) OR (${table.status} <> 'delivered' AND ${table.deliveredAt} IS NULL)`,
     ),
   ],
 );
