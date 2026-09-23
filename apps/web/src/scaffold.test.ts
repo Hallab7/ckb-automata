@@ -26,7 +26,8 @@ test("App Router exposes every planned product route", async () => {
     .filter((entry) => entry.endsWith("/page.tsx") || entry === "page.tsx")
     .map(routeFromPage)
     .toSorted();
-  assert.deepEqual(routes, [
+  const productRoutes = routes.filter((route) => !route.startsWith("/fixtures/"));
+  assert.deepEqual(productRoutes, [
     "/",
     "/activity",
     "/automations",
@@ -38,6 +39,7 @@ test("App Router exposes every planned product route", async () => {
     "/research/nervdao",
     "/settings",
   ]);
+  assert.ok(routes.includes("/fixtures/visual-system"));
   for (const boundary of [
     "error.tsx",
     "global-error.tsx",

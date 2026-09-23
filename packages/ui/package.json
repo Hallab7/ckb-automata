@@ -5,13 +5,31 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./styles.css": "./src/styles.css",
+    "./visual-system-fixture": "./src/visual-system.fixture.tsx",
     "./package.json": "./package.json"
   },
+  "sideEffects": [
+    "./src/styles.css"
+  ],
   "scripts": {
     "test": "node --test src/**/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@ckb-automata/core": "workspace:*"
+    "@ckb-automata/core": "workspace:*",
+    "@radix-ui/react-dialog": "1.1.23",
+    "@radix-ui/react-tooltip": "1.2.16",
+    "lucide-react": "1.47.0"
+  },
+  "peerDependencies": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
   }
 }
