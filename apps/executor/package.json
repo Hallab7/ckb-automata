@@ -7,6 +7,7 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
     "test": "node --test src/**/*.test.ts",
+    "test:integration": "node --test --test-concurrency=1 integration/*.test.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -16,8 +17,10 @@
     "@ckb-automata/molecule": "workspace:*",
     "@ckb-automata/telemetry": "workspace:*",
     "@nervosnetwork/ckb-sdk-utils": "0.109.5",
+    "@nestjs/bullmq": "12.0.0",
     "@nestjs/common": "12.0.4",
     "@nestjs/core": "12.0.4",
+    "bullmq": "6.3.8",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2"
   }

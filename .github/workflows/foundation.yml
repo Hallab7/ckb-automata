@@ -111,7 +111,9 @@ jobs:
         env:
           AUTOMATA_INTEGRATION_DATABASE_URL: postgresql://automata:automata@127.0.0.1:5432/postgres
           AUTOMATA_INTEGRATION_REDIS_URL: redis://127.0.0.1:6379
-        run: npm exec --yes --package=pnpm@12.5.1 -- pnpm --filter @ckb-automata/api test:integration
+        run: |
+          npm exec --yes --package=pnpm@12.5.1 -- pnpm --filter @ckb-automata/api test:integration
+          npm exec --yes --package=pnpm@12.5.1 -- pnpm --filter @ckb-automata/executor test:integration
 
   contract-build:
     name: contract-build

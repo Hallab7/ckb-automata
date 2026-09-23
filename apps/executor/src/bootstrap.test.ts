@@ -37,6 +37,10 @@ function chainFixture(genesisHash = GENESIS_HASH) {
   };
 }
 
+const readyQueues = Object.freeze({
+  async ready() {},
+});
+
 async function until(predicate: () => boolean): Promise<void> {
   for (let attempt = 0; attempt < 100; attempt += 1) {
     if (predicate()) return;
@@ -50,6 +54,7 @@ test("standalone context reports readiness without creating an HTTP listener", a
   const lines: string[] = [];
   const result = await createExecutorApplication(environment(), {
     createChainClient: () => chain.client,
+    queues: readyQueues,
     writer: (line) => lines.push(line),
   });
   try {
@@ -60,6 +65,7 @@ test("standalone context reports readiness without creating an HTTP listener", a
       activeWork: 0,
       adapters: ["deadline-v1", "recurring-v1"],
       chain: { status: "up", genesisHash: GENESIS_HASH },
+      redis: { status: "up" },
     });
     assert.equal(
       lines.some((line) => line.includes('"event":"executor.ready"')),
@@ -75,6 +81,7 @@ test("shutdown rejects new work and waits for active work before closing the cha
   const chain = chainFixture();
   const result = await createExecutorApplication(environment(), {
     createChainClient: () => chain.client,
+    queues: readyQueues,
     writer: () => undefined,
   });
   let release: (() => void) | undefined;
@@ -118,9 +125,27 @@ test("wrong-network readiness fails closed and disposes the chain", async () => 
   await assert.rejects(
     createExecutorApplication(environment(), {
       createChainClient: () => chain.client,
+      queues: readyQueues,
       writer: () => undefined,
     }),
     /wrong network/,
+  );
+  assert.equal(chain.closes(), 1);
+});
+
+test("Redis readiness failure prevents work and disposes the chain", async () => {
+  const chain = chainFixture();
+  await assert.rejects(
+    createExecutorApplication(environment(), {
+      createChainClient: () => chain.client,
+      queues: {
+        async ready() {
+          throw new Error("Redis unavailable");
+        },
+      },
+      writer: () => undefined,
+    }),
+    /Redis unavailable/,
   );
   assert.equal(chain.closes(), 1);
 });

@@ -99,6 +99,8 @@ export interface ExecutorBootstrapDependencies {
   ) => Promise<INestApplicationContext>;
   readonly createChainClient?: ExecutorModuleDependencies["createChainClient"];
   readonly logger?: ExecutorLogger;
+  readonly queuePrefix?: string;
+  readonly queues?: ExecutorModuleDependencies["queues"];
   readonly writer?: LogWriter;
 }
 
@@ -124,6 +126,8 @@ export async function createExecutorApplication(
     ...(dependencies.createChainClient === undefined
       ? {}
       : { createChainClient: dependencies.createChainClient }),
+    ...(dependencies.queuePrefix === undefined ? {} : { queuePrefix: dependencies.queuePrefix }),
+    ...(dependencies.queues === undefined ? {} : { queues: dependencies.queues }),
   });
   const app = await (dependencies.createApplicationContext ?? createNestApplicationContext)(
     module,

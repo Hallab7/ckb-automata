@@ -6,6 +6,7 @@ export {
   EXECUTOR_ADAPTERS,
   EXECUTOR_ENVIRONMENT,
   EXECUTOR_LOGGER,
+  EXECUTOR_QUEUES,
   ExecutorModule,
   createExecutorModule,
   type ExecutorModuleDependencies,
@@ -18,9 +19,24 @@ export {
   type ExecutorBootstrapResult,
 } from "./bootstrap.ts";
 export {
+  DEFAULT_QUEUE_PREFIX,
+  MAX_QUEUE_DELAY_MS,
+  QUEUE_READINESS_TIMEOUT_MS,
+  QUEUE_POLICIES,
+  DurableQueueRegistry,
+  parseRedisConnection,
+  queueRegistrationOptions,
+  queueRootOptions,
+  stableQueueJobId,
+  type DeadLetterPayload,
+  type QueueJobEnvelope,
+  type QueuePolicy,
+} from "./queues.ts";
+export {
   ExecutorRuntime,
   type ExecutorChainClient,
   type ExecutorEventLogger,
+  type ExecutorQueueReadiness,
   type ExecutorReadinessReport,
   type ExecutorRuntimeState,
 } from "./runtime.ts";

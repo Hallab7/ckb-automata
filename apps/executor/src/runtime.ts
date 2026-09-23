@@ -18,9 +18,16 @@ export interface ExecutorReadinessReport {
     readonly status: "pending" | "up" | "down" | "closed";
     readonly genesisHash?: string;
   };
+  readonly redis: {
+    readonly status: "pending" | "up" | "down";
+  };
 }
 
 export type ExecutorChainClient = Pick<CkbClient, "close" | "getGenesisHash">;
+
+export interface ExecutorQueueReadiness {
+  ready(): Promise<void>;
+}
 
 export interface ExecutorEventLogger {
   info(event: string, message: string, fields?: Readonly<Record<string, unknown>>): void;
@@ -31,6 +38,7 @@ export class ExecutorRuntime implements OnApplicationBootstrap, OnModuleDestroy 
   readonly #environment: AutomataEnvironment;
   readonly #chain: ExecutorChainClient;
   readonly #registry: ExecutorAdapterRegistry;
+  readonly #queues: ExecutorQueueReadiness;
   readonly #adapterIds: readonly string[];
   readonly #logger: ExecutorEventLogger;
   readonly #idleWaiters = new Set<() => void>();
@@ -38,18 +46,21 @@ export class ExecutorRuntime implements OnApplicationBootstrap, OnModuleDestroy 
   #chainStatus: ExecutorReadinessReport["chain"]["status"] = "pending";
   #genesisHash: string | undefined;
   #lifetimeHandle: ReturnType<typeof setInterval> | undefined;
+  #redisStatus: ExecutorReadinessReport["redis"]["status"] = "pending";
   #state: ExecutorRuntimeState = "starting";
 
   constructor(options: {
     readonly environment: AutomataEnvironment;
     readonly chain: ExecutorChainClient;
     readonly registry: ExecutorAdapterRegistry;
+    readonly queues: ExecutorQueueReadiness;
     readonly adapterIds: readonly string[];
     readonly logger: ExecutorEventLogger;
   }) {
     this.#environment = options.environment;
     this.#chain = options.chain;
     this.#registry = options.registry;
+    this.#queues = options.queues;
     this.#adapterIds = Object.freeze([...options.adapterIds]);
     this.#logger = options.logger;
   }
@@ -68,6 +79,7 @@ export class ExecutorRuntime implements OnApplicationBootstrap, OnModuleDestroy 
         status: this.#chainStatus,
         ...(this.#genesisHash === undefined ? {} : { genesisHash: this.#genesisHash }),
       }),
+      redis: Object.freeze({ status: this.#redisStatus }),
     });
   }
 
@@ -79,6 +91,8 @@ export class ExecutorRuntime implements OnApplicationBootstrap, OnModuleDestroy 
       }
       this.#genesisHash = genesisHash;
       this.#chainStatus = "up";
+      await this.#queues.ready();
+      this.#redisStatus = "up";
       this.#state = "ready";
       this.#lifetimeHandle = setInterval(() => undefined, 60_000);
       this.#logger.info("executor.ready", "Executor is ready", {
@@ -86,7 +100,8 @@ export class ExecutorRuntime implements OnApplicationBootstrap, OnModuleDestroy 
         network: this.#environment.CKB_NETWORK,
       });
     } catch (error) {
-      this.#chainStatus = "down";
+      if (this.#chainStatus === "pending") this.#chainStatus = "down";
+      else this.#redisStatus = "down";
       this.#state = "not_ready";
       this.#logger.error("executor.readiness.failed", "Executor readiness check failed");
       await this.#chain.close();

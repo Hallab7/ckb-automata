@@ -47,7 +47,8 @@ variable to verify the successful path.
 
 The `backend-integration` job runs the same composed NestJS suite against a fresh database and an
 upgrade from migration 3. It uses isolated PostgreSQL and Redis services plus in-process CKB RPC and
-webhook receivers; no live chain or external webhook is contacted.
+webhook receivers; no live chain or external webhook is contacted. The executor suite closes and
+reopens every Redis queue client around pending work to prove the job is recovered from Redis.
 
 The fuzz smoke job exercises the contract parsers and arithmetic helpers with
 fixed seeds on every foundation run. The separate `Contract Fuzz` workflow runs
