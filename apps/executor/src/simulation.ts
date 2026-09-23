@@ -109,7 +109,9 @@ function script(value: unknown, name: string): ScriptIdentity {
   });
 }
 
-function transaction(value: Readonly<Record<string, unknown>>): UnsignedDeadlineTransaction {
+export function parseStoredTransaction(
+  value: Readonly<Record<string, unknown>>,
+): UnsignedDeadlineTransaction {
   const inputs = array(value["inputs"], "transaction.inputs").map((item, index) => {
     const input = record(item, `transaction.inputs[${index}]`);
     const previous = record(input["previousOutput"], `transaction.inputs[${index}].previousOutput`);
@@ -301,7 +303,7 @@ export class SimulationGateService {
     const attempt = await this.#store.load(payload.attemptId, intentHash);
     if (!attempt) return Object.freeze({ status: "stale" });
     try {
-      const built = transaction(attempt.transaction);
+      const built = parseStoredTransaction(attempt.transaction);
       const actualIntentHash = parseHash32(
         rawTransactionToHash(built as unknown as Parameters<typeof rawTransactionToHash>[0]),
       );

@@ -24,6 +24,8 @@ import { SimulationGateService } from "./simulation.ts";
 import { PostgresSimulationStore } from "./simulation-store.ts";
 import { SimulationCoordinator } from "./simulation-worker.ts";
 import { operatorLockArgs } from "./signing.ts";
+import { PostgresSubmissionStore } from "./submission-store.ts";
+import { SubmissionService } from "./submission.ts";
 
 export const EXECUTOR_ADAPTERS = Symbol("EXECUTOR_ADAPTERS");
 export const EXECUTOR_ENVIRONMENT = Symbol("EXECUTOR_ENVIRONMENT");
@@ -237,6 +239,7 @@ export function createExecutorModule(
                 throw new Error("operator private key does not match the configured reward lock");
               }
               const store = new PostgresSimulationStore(configured.DATABASE_URL);
+              const submissionStore = new PostgresSubmissionStore(configured.DATABASE_URL);
               return new SimulationCoordinator({
                 runtime,
                 store,
@@ -251,6 +254,16 @@ export function createExecutorModule(
                   maxCycles: BigInt(maxCycles),
                   minimumMargin: parseShannons(minimumMargin),
                 }),
+                submission: new SubmissionService({
+                  store: submissionStore,
+                  chain: {
+                    send: (transaction) => runtime.send(transaction as never),
+                    getTransactionStatus: (transactionHash) =>
+                      runtime.getTransactionStatus(transactionHash),
+                  },
+                  privateKey,
+                }),
+                submissionStore,
                 redisUrl: configured.REDIS_URL,
                 logger,
                 ...(dependencies.queuePrefix === undefined

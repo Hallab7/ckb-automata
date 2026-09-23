@@ -32,6 +32,7 @@ export type ExecutorChainClient = Pick<
   | "getGenesisHash"
   | "getTipHeader"
   | "getTransactionStatus"
+  | "send"
 >;
 
 export interface ExecutorQueueReadiness {
@@ -101,6 +102,11 @@ export class ExecutorRuntime implements OnApplicationBootstrap, OnModuleDestroy 
   getTransactionStatus(...args: Parameters<ExecutorChainClient["getTransactionStatus"]>) {
     if (this.#state !== "ready") throw new Error("executor chain reads require ready state");
     return this.#chain.getTransactionStatus(...args);
+  }
+
+  send(...args: Parameters<ExecutorChainClient["send"]>) {
+    if (this.#state !== "ready") throw new Error("executor submission requires ready state");
+    return this.#chain.send(...args);
   }
 
   readiness(): ExecutorReadinessReport {

@@ -74,6 +74,7 @@ export {
 export { operatorLockArgs, signOperatorFeeInput } from "./signing.ts";
 export {
   SimulationGateService,
+  parseStoredTransaction,
   type SimulationAttempt,
   type SimulationChain,
   type SimulationQueuePayload,
@@ -83,6 +84,16 @@ export {
 } from "./simulation.ts";
 export { PostgresSimulationStore } from "./simulation-store.ts";
 export { SimulationCoordinator } from "./simulation-worker.ts";
+export { PostgresSubmissionStore } from "./submission-store.ts";
+export {
+  SubmissionError,
+  SubmissionService,
+  type SubmissionAcceptance,
+  type SubmissionAttempt,
+  type SubmissionChain,
+  type SubmissionResult,
+  type SubmissionStore,
+} from "./submission.ts";
 
 export {
   ExecutorAdapterError,

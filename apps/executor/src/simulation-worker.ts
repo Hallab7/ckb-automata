@@ -10,6 +10,7 @@ import {
 } from "./simulation.ts";
 import { DEFAULT_QUEUE_PREFIX, parseRedisConnection, type QueueJobEnvelope } from "./queues.ts";
 import type { ExecutorEventLogger, ExecutorRuntime } from "./runtime.ts";
+import type { SubmissionService, SubmissionStore } from "./submission.ts";
 
 function payload(job: Job<QueueJobEnvelope<SimulationQueuePayload>>): SimulationQueuePayload {
   const value = job.data.payload;
@@ -38,6 +39,8 @@ export class SimulationCoordinator implements OnApplicationBootstrap, OnModuleDe
   readonly #runtime: ExecutorRuntime;
   readonly #store: SimulationStore & { close(): Promise<void> };
   readonly #service: SimulationGateService;
+  readonly #submission: SubmissionService;
+  readonly #submissionStore: SubmissionStore & { close(): Promise<void> };
   readonly #redisUrl: string;
   readonly #prefix: string;
   readonly #logger: ExecutorEventLogger;
@@ -47,6 +50,8 @@ export class SimulationCoordinator implements OnApplicationBootstrap, OnModuleDe
     readonly runtime: ExecutorRuntime;
     readonly store: SimulationStore & { close(): Promise<void> };
     readonly service: SimulationGateService;
+    readonly submission: SubmissionService;
+    readonly submissionStore: SubmissionStore & { close(): Promise<void> };
     readonly redisUrl: string;
     readonly prefix?: string;
     readonly logger: ExecutorEventLogger;
@@ -54,6 +59,8 @@ export class SimulationCoordinator implements OnApplicationBootstrap, OnModuleDe
     this.#runtime = options.runtime;
     this.#store = options.store;
     this.#service = options.service;
+    this.#submission = options.submission;
+    this.#submissionStore = options.submissionStore;
     this.#redisUrl = options.redisUrl;
     this.#prefix = options.prefix ?? DEFAULT_QUEUE_PREFIX;
     this.#logger = options.logger;
@@ -62,7 +69,12 @@ export class SimulationCoordinator implements OnApplicationBootstrap, OnModuleDe
   async onApplicationBootstrap(): Promise<void> {
     this.#worker = new Worker<QueueJobEnvelope<SimulationQueuePayload>, unknown, string>(
       "submit",
-      (job) => this.#runtime.run(() => this.#service.evaluate(payload(job))),
+      async (job) => {
+        const canonicalPayload = payload(job);
+        const simulation = await this.#runtime.run(() => this.#service.evaluate(canonicalPayload));
+        if (simulation.status === "rejected") return simulation;
+        return this.#runtime.run(() => this.#submission.submit(canonicalPayload));
+      },
       {
         connection: parseRedisConnection(this.#redisUrl),
         prefix: this.#prefix,
@@ -75,7 +87,7 @@ export class SimulationCoordinator implements OnApplicationBootstrap, OnModuleDe
   async onModuleDestroy(): Promise<void> {
     await this.#worker?.close();
     this.#worker = undefined;
-    await this.#store.close();
+    await Promise.all([this.#store.close(), this.#submissionStore.close()]);
     this.#logger.info("executor.simulation.stopped", "Dry-run and profitability worker stopped");
   }
 }

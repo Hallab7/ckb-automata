@@ -18,6 +18,7 @@ import { AUTOMATA_QUEUES } from "@ckb-automata/telemetry";
 import { migrateDatabase } from "../../api/src/database/migrator.ts";
 import { PostgresBuildAttemptStore } from "../src/build-store.ts";
 import { PostgresSimulationStore } from "../src/simulation-store.ts";
+import { PostgresSubmissionStore } from "../src/submission-store.ts";
 import { createExecutorApplication } from "../src/bootstrap.ts";
 import { DurableQueueRegistry, parseRedisConnection } from "../src/queues.ts";
 
@@ -132,6 +133,9 @@ function chainFixture(state) {
     async dryRun() {
       throw new Error("simulation worker is not configured by this test");
     },
+    async send() {
+      throw new Error("submission is not configured by this test");
+    },
     async getTipHeader() {
       return {
         hash: hash(Number(state.tip)),
@@ -217,6 +221,7 @@ test("concurrent build deliveries share one durable operational attempt", async 
   const database = await createDatabase();
   let store;
   let simulationStore;
+  let submissionStore;
   try {
     const job = await seedJob(database.url);
     store = new PostgresBuildAttemptStore(database.url, deployment.network);
@@ -254,6 +259,21 @@ test("concurrent build deliveries share one durable operational attempt", async 
       }),
       true,
     );
+    submissionStore = new PostgresSubmissionStore(
+      database.url,
+      () => new Date("2026-09-23T10:00:00.000Z"),
+    );
+    const submissionAttempt = await submissionStore.load(claimed.claim.attemptId, hash(72));
+    assert.ok(submissionAttempt);
+    assert.equal(submissionAttempt.state, "awaiting_signature");
+    assert.equal(
+      await submissionStore.markSubmitted(submissionAttempt, hash(72), "broadcast"),
+      true,
+    );
+    assert.equal(
+      await submissionStore.markSubmitted(submissionAttempt, hash(72), "broadcast"),
+      false,
+    );
     const afterApproval = await store.claim(payload);
     assert.equal(afterApproval.status, "duplicate");
     assert.equal(afterApproval.attemptId, claimed.claim.attemptId);
@@ -261,16 +281,28 @@ test("concurrent build deliveries share one durable operational attempt", async 
     const sql = postgres(database.url, { max: 1, onnotice: () => undefined });
     try {
       const [attempt] = await sql`
-        SELECT count(*)::integer AS value, min(state)::text AS state,
-               min(simulation->>'cycles') AS cycles
-        FROM transaction_attempts
-        WHERE job_id = ${job.jobId} AND sequence = ${job.sequence}
+        SELECT count(*)::integer AS value, min(attempt.state)::text AS state,
+               min(attempt.simulation->>'cycles') AS cycles,
+               count(event.id)::integer AS events,
+               min(event.payload->>'acceptance') AS acceptance
+        FROM transaction_attempts AS attempt
+        LEFT JOIN job_events AS event
+          ON event.payload->>'attemptId' = attempt.id::text
+         AND event.event_type = 'transaction_submitted'
+        WHERE attempt.job_id = ${job.jobId} AND attempt.sequence = ${job.sequence}
       `;
-      assert.deepEqual(attempt, { value: 1, state: "awaiting_signature", cycles: "1000" });
+      assert.deepEqual(attempt, {
+        value: 1,
+        state: "submitted",
+        cycles: "1000",
+        events: 1,
+        acceptance: "broadcast",
+      });
     } finally {
       await sql.end({ timeout: 2 });
     }
   } finally {
+    if (submissionStore) await submissionStore.close();
     if (simulationStore) await simulationStore.close();
     if (store) await store.close();
     await database.admin.unsafe(`DROP DATABASE IF EXISTS "${database.name}" WITH (FORCE)`);

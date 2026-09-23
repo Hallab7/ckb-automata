@@ -33,6 +33,9 @@ function chainFixture(genesisHash = GENESIS_HASH) {
       async dryRun() {
         throw new Error("dry run is not used by bootstrap tests");
       },
+      async send() {
+        throw new Error("submission is not used by bootstrap tests");
+      },
       async getTipHeader() {
         throw new Error("tip header is not used by bootstrap tests");
       },
