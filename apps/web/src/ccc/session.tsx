@@ -1,0 +1,83 @@
+"use client";
+
+import { createContext, useContext, type ReactNode } from "react";
+
+import { Button, InlineNotice } from "@ckb-automata/ui";
+import type { Signer } from "@ckb-ccc/connector-react";
+
+import type { WalletReadiness } from "./policy.ts";
+
+export interface WalletSession {
+  readonly close: () => void;
+  readonly disconnect: () => void;
+  readonly isConnectorOpen: boolean;
+  readonly open: () => void;
+  readonly signer: Signer | undefined;
+  readonly status: WalletReadiness;
+  readonly walletName: string | undefined;
+}
+
+export const WalletSessionContext = createContext<WalletSession | undefined>(undefined);
+
+export function useWalletSession(): WalletSession {
+  const session = useContext(WalletSessionContext);
+  if (session === undefined) throw new Error("useWalletSession requires CccProvider");
+  return session;
+}
+
+export function useAutomataSigner(): Signer | undefined {
+  const session = useWalletSession();
+  return session.status === "ready" ? session.signer : undefined;
+}
+
+function WrongNetworkNotice() {
+  const session = useWalletSession();
+  return (
+    <InlineNotice title="Wrong wallet network" tone="danger">
+      <p>Switch the wallet to CKB testnet before reviewing or signing a transaction.</p>
+      <Button onClick={session.open} tone="secondary">
+        Review wallet
+      </Button>
+    </InlineNotice>
+  );
+}
+
+function UnsupportedWalletNotice() {
+  const session = useWalletSession();
+  return (
+    <InlineNotice title="Unsupported wallet" tone="danger">
+      <p>Disconnect this wallet and select a supported CKB or BTC testnet wallet.</p>
+      <Button onClick={session.disconnect} tone="secondary">
+        Disconnect wallet
+      </Button>
+    </InlineNotice>
+  );
+}
+
+export function WalletNetworkNotice() {
+  const session = useWalletSession();
+  const notice =
+    session.status === "wrong_network" ? (
+      <WrongNetworkNotice />
+    ) : session.status === "unsupported_wallet" ? (
+      <UnsupportedWalletNotice />
+    ) : null;
+  return notice === null ? null : <div className="app-network-alert">{notice}</div>;
+}
+
+export function TestnetSignerGate({ children }: Readonly<{ children: ReactNode }>) {
+  const session = useWalletSession();
+  if (session.status === "wrong_network") return <WrongNetworkNotice />;
+  if (session.status === "unsupported_wallet") return <UnsupportedWalletNotice />;
+  if (session.status === "disconnected") {
+    return (
+      <InlineNotice title="Wallet connection required" tone="warning">
+        <p>Connect a supported testnet wallet before continuing to transaction review.</p>
+        <Button onClick={session.open} tone="secondary">
+          Connect wallet
+        </Button>
+      </InlineNotice>
+    );
+  }
+  return children;
+}

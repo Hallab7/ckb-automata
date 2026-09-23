@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import { CccProvider } from "../src/ccc/ccc-provider.tsx";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -10,12 +12,15 @@ export const metadata: Metadata = {
   },
   description: "Non-custodial automation for CKB testnet.",
   applicationName: "CKB Automata",
+  icons: { icon: "/automata-mark.svg" },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <CccProvider>{children}</CccProvider>
+      </body>
     </html>
   );
 }

@@ -4,6 +4,7 @@ packages:
   - tools/*
 allowBuilds:
   "@scarf/scarf": false
+  core-js: false
   msgpackr-extract: false
 minimumReleaseAgeExclude:
   - "@oxlint/binding-android-arm-eabi@1.85.0"

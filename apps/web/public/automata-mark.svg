@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="CKB Automata">
+  <rect width="64" height="64" rx="10" fill="#17212b"/>
+  <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="4">
+    <circle cx="32" cy="15" r="5"/>
+    <circle cx="17" cy="43" r="5"/>
+    <circle cx="47" cy="43" r="5"/>
+    <path d="M32 20v12M21 40l11-8 11 8M17 38V26h30v12"/>
+  </g>
+</svg>

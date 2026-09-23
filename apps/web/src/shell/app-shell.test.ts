@@ -17,7 +17,9 @@ test("application shell exposes keyboard and landmark navigation", () => {
 test("network, wallet, and notification state remain explicit in text", () => {
   assert.match(shellSource, /app-network-badge__prefix/);
   assert.match(shellSource, /Testnet/);
-  assert.match(shellSource, /Not connected/);
+  assert.match(shellSource, /Connect wallet/);
+  assert.match(shellSource, /Wrong network/);
+  assert.match(shellSource, /Disconnect wallet/);
   assert.match(shellSource, /<NotificationCenter \/>/);
 });
 

@@ -146,6 +146,26 @@
   overflow-wrap: anywhere;
 }
 
+.app-wallet-summary > .ui-icon-button {
+  margin-left: auto;
+}
+
+.app-wallet-summary--action {
+  display: block;
+}
+
+.app-wallet-summary--action .ui-button {
+  width: 100%;
+}
+
+.app-wallet-summary--warning {
+  color: var(--ui-color-warning);
+}
+
+.app-network-alert {
+  margin-bottom: var(--ui-space-6);
+}
+
 .app-shell__workspace {
   min-width: 0;
 }
