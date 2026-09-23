@@ -57,6 +57,8 @@ export interface ExecutorContext {
   readonly jobInspection: Extract<JobInspectionResult, { readonly status: "ok" }>;
 }
 
+export type ExecutorEligibilityContext = Omit<ExecutorContext, "identity">;
+
 export type EligibilityDecision<Evidence = unknown> =
   | {
       readonly status: "eligible";
@@ -86,6 +88,7 @@ export interface ExecutorAdapterRegistration {
   readonly id: string;
   readonly policy: "deadline" | "recurring";
   readonly supports: (policy: PolicyMetadata) => boolean;
+  readonly evaluateEligibility: (context: ExecutorEligibilityContext) => EligibilityDecision;
 }
 
 export interface ExecutorPolicyAdapter<Inspection = unknown, Evidence = unknown> {
@@ -148,6 +151,11 @@ export type ExecutorRunResult =
       readonly build: ExecutorBuild;
       readonly verification: Extract<BuiltVerification, { readonly status: "invalid" }>;
     };
+
+export interface ExecutorEligibilityResult {
+  readonly adapterId: string;
+  readonly eligibility: EligibilityDecision;
+}
 
 export class ExecutorAdapterError extends Error {
   override readonly name = "ExecutorAdapterError";
@@ -223,7 +231,7 @@ export class ExecutorAdapterRegistry {
   }
 }
 
-function createContext(snapshot: ExecutorSnapshot, identity: ExecutorIdentity): ExecutorContext {
+function createEligibilityContext(snapshot: ExecutorSnapshot): ExecutorEligibilityContext {
   const jobInspection = inspectJobData(snapshot.job.data, {
     manifest: snapshot.deployment.manifest,
     expectedGenesisHash: snapshot.deployment.genesisHash,
@@ -235,7 +243,23 @@ function createContext(snapshot: ExecutorSnapshot, identity: ExecutorIdentity): 
       `executor snapshot contains a job that failed inspection (${jobInspection.status})`,
     );
   }
-  return Object.freeze({ snapshot, identity, jobInspection });
+  return Object.freeze({ snapshot, jobInspection });
+}
+
+function createContext(snapshot: ExecutorSnapshot, identity: ExecutorIdentity): ExecutorContext {
+  return Object.freeze({ ...createEligibilityContext(snapshot), identity });
+}
+
+export function evaluateExecutorEligibility(
+  registry: ExecutorAdapterRegistry,
+  snapshot: ExecutorSnapshot,
+): ExecutorEligibilityResult {
+  const context = createEligibilityContext(snapshot);
+  const adapter = registry.resolve(context.jobInspection.policy);
+  return Object.freeze({
+    adapterId: adapter.registration.id,
+    eligibility: adapter.registration.evaluateEligibility(context),
+  });
 }
 
 export function runExecutorAdapter(

@@ -31,6 +31,8 @@ import {
   type ExecutorBuild,
   type ExecutorCellSnapshot,
   type ExecutorContext,
+  type ExecutorEligibilityContext,
+  type EligibilityDecision,
 } from "../adapter.ts";
 
 type Hex = `0x${string}`;
@@ -38,10 +40,27 @@ type Hex = `0x${string}`;
 const PLEDGE_RECORD_BYTES = 76;
 const EXECUTION_MODE = 0;
 
+function evaluateDeadlineEligibility(
+  context: ExecutorEligibilityContext,
+): EligibilityDecision<DeadlineEvidence> {
+  const deadline = context.jobInspection.job.notBefore;
+  const observedTip = context.snapshot.tip.number;
+  const evidence = Object.freeze({ deadline, observedTip });
+  return observedTip >= deadline
+    ? Object.freeze({ status: "eligible", evidence })
+    : Object.freeze({
+        status: "ineligible",
+        reason: "EXECUTOR_NOT_YET_ELIGIBLE",
+        terminal: false,
+        evidence,
+      });
+}
+
 export const DEADLINE_EXECUTOR_REGISTRATION = Object.freeze({
   id: "deadline-v1",
   policy: "deadline",
   supports: (policy) => policy.kind === "deadline",
+  evaluateEligibility: evaluateDeadlineEligibility,
 } satisfies ExecutorAdapterRegistration);
 
 export type DeadlineAdapterErrorCode =
@@ -472,19 +491,7 @@ export const DEADLINE_EXECUTOR_ADAPTER = defineExecutorAdapter<
 >({
   registration: DEADLINE_EXECUTOR_REGISTRATION,
   inspect: inspectDeadline,
-  eligibility: (context) => {
-    const deadline = context.jobInspection.job.notBefore;
-    const observedTip = context.snapshot.tip.number;
-    const evidence = Object.freeze({ deadline, observedTip });
-    return observedTip >= deadline
-      ? Object.freeze({ status: "eligible", evidence })
-      : Object.freeze({
-          status: "ineligible",
-          reason: "EXECUTOR_NOT_YET_ELIGIBLE",
-          terminal: false,
-          evidence,
-        });
-  },
+  eligibility: evaluateDeadlineEligibility,
   build: (context, inspection) => buildDeadline(context, inspection),
   verifyBuilt: (context, inspection, _eligibility, build) => {
     const expected = buildDeadline(context, inspection);

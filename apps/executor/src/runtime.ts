@@ -23,7 +23,7 @@ export interface ExecutorReadinessReport {
   };
 }
 
-export type ExecutorChainClient = Pick<CkbClient, "close" | "getGenesisHash">;
+export type ExecutorChainClient = Pick<CkbClient, "close" | "getGenesisHash" | "getTipHeader">;
 
 export interface ExecutorQueueReadiness {
   ready(): Promise<void>;
@@ -67,6 +67,11 @@ export class ExecutorRuntime implements OnApplicationBootstrap, OnModuleDestroy 
 
   get registry(): ExecutorAdapterRegistry {
     return this.#registry;
+  }
+
+  getTipHeader(): ReturnType<ExecutorChainClient["getTipHeader"]> {
+    if (this.#state !== "ready") throw new Error("executor chain reads require ready state");
+    return this.#chain.getTipHeader();
   }
 
   readiness(): ExecutorReadinessReport {

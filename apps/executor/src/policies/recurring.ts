@@ -35,15 +35,38 @@ import {
   type ExecutorBuild,
   type ExecutorCellSnapshot,
   type ExecutorContext,
+  type ExecutorEligibilityContext,
+  type EligibilityDecision,
 } from "../adapter.ts";
 
 type Hex = `0x${string}`;
 const EXECUTION_MODE = 0;
 
+function evaluateRecurringEligibility(
+  context: ExecutorEligibilityContext,
+): EligibilityDecision<RecurringEvidence> {
+  const scheduledBlock = context.jobInspection.job.notBefore;
+  const observedTip = context.snapshot.tip.number;
+  const evidence = Object.freeze({
+    scheduledBlock,
+    observedTip,
+    sequence: context.jobInspection.job.sequence,
+  });
+  return observedTip >= scheduledBlock
+    ? Object.freeze({ status: "eligible", evidence })
+    : Object.freeze({
+        status: "ineligible",
+        reason: "EXECUTOR_NOT_YET_ELIGIBLE",
+        terminal: false,
+        evidence,
+      });
+}
+
 export const RECURRING_EXECUTOR_REGISTRATION = Object.freeze({
   id: "recurring-v1",
   policy: "recurring",
   supports: (policy) => policy.kind === "recurring",
+  evaluateEligibility: evaluateRecurringEligibility,
 } satisfies ExecutorAdapterRegistration);
 
 export type RecurringAdapterErrorCode =
@@ -370,23 +393,7 @@ export const RECURRING_EXECUTOR_ADAPTER = defineExecutorAdapter<
 >({
   registration: RECURRING_EXECUTOR_REGISTRATION,
   inspect: inspectRecurring,
-  eligibility: (context) => {
-    const scheduledBlock = context.jobInspection.job.notBefore;
-    const observedTip = context.snapshot.tip.number;
-    const evidence = Object.freeze({
-      scheduledBlock,
-      observedTip,
-      sequence: context.jobInspection.job.sequence,
-    });
-    return observedTip >= scheduledBlock
-      ? Object.freeze({ status: "eligible", evidence })
-      : Object.freeze({
-          status: "ineligible",
-          reason: "EXECUTOR_NOT_YET_ELIGIBLE",
-          terminal: false,
-          evidence,
-        });
-  },
+  eligibility: evaluateRecurringEligibility,
   build: (context, inspection) => buildRecurring(context, inspection),
   verifyBuilt: (context, inspection, _eligibility, build) => {
     const expected = buildRecurring(context, inspection);

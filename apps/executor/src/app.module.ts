@@ -6,6 +6,7 @@ import { createCkbClient, type CkbClient } from "@ckb-automata/ccc";
 import type { AutomataEnvironment } from "@ckb-automata/config";
 
 import { ExecutorAdapterRegistry, type RegisteredExecutorAdapter } from "./adapter.ts";
+import { EligibilityCoordinator, PostgresEligibilityJobSource } from "./eligibility-worker.ts";
 import { DEADLINE_EXECUTOR_ADAPTER } from "./policies/deadline.ts";
 import { RECURRING_EXECUTOR_ADAPTER } from "./policies/recurring.ts";
 import { DurableQueueRegistry, queueRegistrationOptions, queueRootOptions } from "./queues.ts";
@@ -35,6 +36,7 @@ Module({})(ExecutorModule);
 export interface ExecutorModuleDependencies {
   readonly adapters?: readonly RegisteredExecutorAdapter[];
   readonly createChainClient?: (environment: AutomataEnvironment) => ExecutorChainClient;
+  readonly enableEligibilityWorkers?: boolean;
   readonly logger: ExecutorEventLogger;
   readonly queuePrefix?: string;
   readonly queues?: ExecutorQueueReadiness;
@@ -64,6 +66,42 @@ export function createExecutorModule(
           { provide: EXECUTOR_QUEUES, useExisting: DurableQueueRegistry },
         ]
       : [{ provide: EXECUTOR_QUEUES, useValue: dependencies.queues }];
+  const eligibilityProviders: Provider[] =
+    dependencies.enableEligibilityWorkers === false
+      ? []
+      : [
+          {
+            provide: EligibilityCoordinator,
+            inject: [
+              EXECUTOR_ENVIRONMENT,
+              ExecutorRuntime,
+              ExecutorAdapterRegistry,
+              DurableQueueRegistry,
+              EXECUTOR_LOGGER,
+            ],
+            useFactory: (
+              configured: AutomataEnvironment,
+              runtime: ExecutorRuntime,
+              registry: ExecutorAdapterRegistry,
+              queues: DurableQueueRegistry,
+              logger: ExecutorEventLogger,
+            ) =>
+              new EligibilityCoordinator({
+                environment: configured,
+                runtime,
+                registry,
+                queues,
+                source: new PostgresEligibilityJobSource(
+                  configured.DATABASE_URL,
+                  configured.CKB_NETWORK,
+                ),
+                logger,
+                ...(dependencies.queuePrefix === undefined
+                  ? {}
+                  : { prefix: dependencies.queuePrefix }),
+              }),
+          },
+        ];
   return {
     module: ExecutorModule,
     imports,
@@ -110,6 +148,7 @@ export function createExecutorModule(
           });
         },
       },
+      ...eligibilityProviders,
     ],
     exports: [ExecutorAdapterRegistry, ExecutorRuntime, EXECUTOR_QUEUES],
   };

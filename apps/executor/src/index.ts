@@ -3,6 +3,13 @@ import { WORKSPACE_NAME } from "@ckb-automata/core";
 export const EXECUTOR_APP_ID = `${WORKSPACE_NAME}:executor` as const;
 
 export {
+  DISCOVERY_INTERVAL_MS,
+  MAX_DISCOVERY_JOBS,
+  EligibilityCoordinator,
+  PostgresEligibilityJobSource,
+  type EligibilityJobSource,
+} from "./eligibility-worker.ts";
+export {
   EXECUTOR_ADAPTERS,
   EXECUTOR_ENVIRONMENT,
   EXECUTOR_LOGGER,
@@ -18,6 +25,17 @@ export {
   type ExecutorBootstrapDependencies,
   type ExecutorBootstrapResult,
 } from "./bootstrap.ts";
+export {
+  MAX_EVALUATION_DELAY_MS,
+  MIN_EVALUATION_DELAY_MS,
+  TARGET_BLOCK_INTERVAL_MS,
+  EligibilityEvaluator,
+  nextEvaluationDelay,
+  type BuildQueuePayload,
+  type EligibilityEvaluationResult,
+  type EligibilityJobRecord,
+  type EligibilityQueuePayload,
+} from "./eligibility.ts";
 export {
   DEFAULT_QUEUE_PREFIX,
   MAX_QUEUE_DELAY_MS,
@@ -45,6 +63,7 @@ export {
   ExecutorAdapterError,
   ExecutorAdapterRegistry,
   defineExecutorAdapter,
+  evaluateExecutorEligibility,
   runExecutorAdapter,
   type BuiltVerification,
   type EligibilityDecision,
@@ -52,6 +71,8 @@ export {
   type ExecutorBuild,
   type ExecutorCellSnapshot,
   type ExecutorContext,
+  type ExecutorEligibilityContext,
+  type ExecutorEligibilityResult,
   type ExecutorHeaderSnapshot,
   type ExecutorIdentity,
   type ExecutorPolicyAdapter,
