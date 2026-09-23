@@ -32,6 +32,10 @@ export function scriptHash(script) {
   return scriptToHash(script);
 }
 
+export function transactionHash(transaction) {
+  return rawTransactionToHash(transaction);
+}
+
 export function littleEndian(value, byteLength) {
   let remaining = BigInt(value);
   const result = new Uint8Array(byteLength);

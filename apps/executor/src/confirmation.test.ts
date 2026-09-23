@@ -132,6 +132,11 @@ test("a canonical competing spend conflicts the attempt before RPC status", () =
     blockHash: BLOCK_HASH,
     source: "indexed_event" as const,
     transactionHash: parseHash32(`0x${"76".repeat(32)}`),
+    executorLockHash: parseHash32(`0x${"77".repeat(32)}`),
+    successorOutPoint: Object.freeze({
+      txHash: parseHash32(`0x${"78".repeat(32)}`),
+      index: "2",
+    }),
   });
   assert.deepEqual(
     deriveConfirmationTransition(
@@ -147,6 +152,8 @@ test("a canonical competing spend conflicts the attempt before RPC status", () =
       errorCode: "EXECUTOR_ALREADY_CONSUMED",
       block: conflict,
       relatedTransactionHash: conflict.transactionHash,
+      winningExecutorLockHash: conflict.executorLockHash,
+      successorOutPoint: conflict.successorOutPoint,
     },
   );
 });

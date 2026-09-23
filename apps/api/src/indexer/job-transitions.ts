@@ -2,7 +2,12 @@ import { and, eq, sql } from "drizzle-orm";
 
 import { WitnessArgs, type ClientBlock } from "@ckb-ccc/shell";
 
-import { parseBlockNumber, parseHash32, type RegisteredDeployment } from "@ckb-automata/core";
+import {
+  parseBlockNumber,
+  parseHash32,
+  type Hash32,
+  type RegisteredDeployment,
+} from "@ckb-automata/core";
 
 import type { CkbReadClient } from "../ckb-client.ts";
 import type { AutomataDatabase } from "../database/client.ts";
@@ -19,7 +24,9 @@ export interface JobTransitionResult {
   readonly consumedByOther: number;
 }
 
-type WitnessOperation = "execute" | "cancel" | "recover" | "top_up" | "unknown";
+type WitnessOperation =
+  | { readonly kind: "execute"; readonly executorLockHash: Hash32 }
+  | { readonly kind: "cancel" | "recover" | "top_up" | "unknown" };
 
 function hexBytes(value: string): Uint8Array {
   if (!/^0x(?:[0-9a-f]{2})*$/.test(value)) throw new TypeError("witness bytes are not canonical");
@@ -29,11 +36,11 @@ function hexBytes(value: string): Uint8Array {
 function witnessOperation(witness: string | undefined): WitnessOperation {
   try {
     const inputType = WitnessArgs.fromBytes(witness ?? "0x").inputType;
-    if (!inputType) return "unknown";
+    if (!inputType) return Object.freeze({ kind: "unknown" });
     const bytes = hexBytes(inputType);
-    if (bytes.length === 1 && bytes[0] === 1) return "cancel";
-    if (bytes.length === 1 && bytes[0] === 2) return "recover";
-    if (bytes.length === 5 && bytes[0] === 3) return "top_up";
+    if (bytes.length === 1 && bytes[0] === 1) return Object.freeze({ kind: "cancel" });
+    if (bytes.length === 1 && bytes[0] === 2) return Object.freeze({ kind: "recover" });
+    if (bytes.length === 5 && bytes[0] === 3) return Object.freeze({ kind: "top_up" });
     if (bytes[0] === 0 && bytes.length >= 42) {
       const controlledCount = bytes[37] ?? 0;
       if (
@@ -41,20 +48,34 @@ function witnessOperation(witness: string | undefined): WitnessOperation {
         controlledCount <= 16 &&
         bytes.length === 38 + controlledCount * 4
       ) {
-        return "execute";
+        const controlled = Array.from({ length: controlledCount }, (_value, index) =>
+          new DataView(bytes.buffer, bytes.byteOffset).getUint32(38 + index * 4, true),
+        );
+        if (new Set(controlled).size !== controlled.length) {
+          return Object.freeze({ kind: "unknown" });
+        }
+        return Object.freeze({
+          kind: "execute",
+          executorLockHash: parseHash32(`0x${Buffer.from(bytes.slice(5, 37)).toString("hex")}`),
+        });
       }
     }
   } catch {
-    return "unknown";
+    return Object.freeze({ kind: "unknown" });
   }
-  return "unknown";
+  return Object.freeze({ kind: "unknown" });
+}
+
+export function executorLockHashFromWitness(witness: string | undefined): Hash32 | undefined {
+  const operation = witnessOperation(witness);
+  return operation.kind === "execute" ? operation.executorLockHash : undefined;
 }
 
 export function classifyJobTransition(
   witness: string | undefined,
   hasSuccessor: boolean,
 ): JobTransitionKind {
-  switch (witnessOperation(witness)) {
+  switch (witnessOperation(witness).kind) {
     case "execute":
       return hasSuccessor ? "recurring" : "one_shot";
     case "cancel":
@@ -158,7 +179,9 @@ export class JobTransitionIndexer {
           if (!consumed) continue;
 
           const successor = successorFor(successors, txHash, consumed.jobId);
-          const kind = classifyJobTransition(chainTransaction.witnesses[inputIndex], !!successor);
+          const witness = chainTransaction.witnesses[inputIndex];
+          const kind = classifyJobTransition(witness, !!successor);
+          const executorLockHash = executorLockHashFromWitness(witness);
           await databaseTransaction
             .update(jobVersions)
             .set({ status: "spent", spentTxHash: txHash })
@@ -229,6 +252,7 @@ export class JobTransitionIndexer {
               successorOutpoint: successor
                 ? { txHash: successor.outPoint.txHash, index: successor.outPoint.index.toString() }
                 : null,
+              ...(executorLockHash === undefined ? {} : { executorLockHash }),
             },
             occurredAt: eventDate(timestamp),
           });

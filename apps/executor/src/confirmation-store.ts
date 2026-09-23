@@ -1,6 +1,6 @@
 import postgres from "postgres";
 
-import { parseBlockNumber, parseHash32, type Hash32 } from "@ckb-automata/core";
+import { parseBlockNumber, parseHash32, parseOutputIndex, type Hash32 } from "@ckb-automata/core";
 
 import type {
   ConfirmationAttempt,
@@ -26,6 +26,9 @@ interface EvidenceRow {
   readonly block_number: string;
   readonly block_hash: string;
   readonly tx_hash: string;
+  readonly executor_lock_hash?: string | null;
+  readonly successor_tx_hash?: string | null;
+  readonly successor_index?: string | null;
 }
 
 function inclusion(
@@ -36,6 +39,28 @@ function inclusion(
     blockNumber: parseBlockNumber(row.block_number).toString(),
     blockHash: parseHash32(row.block_hash),
     source,
+  });
+}
+
+function contentionEvidence(row: EvidenceRow) {
+  const successorFields = [row.successor_tx_hash, row.successor_index];
+  if (successorFields.filter((value) => value != null).length === 1) {
+    throw new Error("canonical contention evidence has an incomplete successor outpoint");
+  }
+  return Object.freeze({
+    ...inclusion(row, "indexed_event"),
+    transactionHash: parseHash32(row.tx_hash),
+    ...(row.executor_lock_hash == null
+      ? {}
+      : { executorLockHash: parseHash32(row.executor_lock_hash) }),
+    ...(row.successor_tx_hash == null || row.successor_index == null
+      ? {}
+      : {
+          successorOutPoint: Object.freeze({
+            txHash: parseHash32(row.successor_tx_hash),
+            index: parseOutputIndex(row.successor_index).toString(),
+          }),
+        }),
   });
 }
 
@@ -163,7 +188,10 @@ export class PostgresConfirmationStore implements ConfirmationStore {
       if (canonical[0]) exactInclusion = inclusion(canonical[0], "rpc_canonical_block");
     }
     const conflicts = await this.#sql<EvidenceRow[]>`
-      SELECT event.block_number::text, event.block_hash, event.tx_hash
+      SELECT event.block_number::text, event.block_hash, event.tx_hash,
+             event.payload->>'executorLockHash' AS executor_lock_hash,
+             event.payload->'successorOutpoint'->>'txHash' AS successor_tx_hash,
+             event.payload->'successorOutpoint'->>'index' AS successor_index
       FROM job_events AS event
       JOIN transaction_attempts AS attempt
         ON attempt.network_id = event.network_id AND attempt.job_id = event.job_id
@@ -189,10 +217,7 @@ export class PostgresConfirmationStore implements ConfirmationStore {
       ...(conflict === undefined
         ? {}
         : {
-            conflict: Object.freeze({
-              ...inclusion(conflict, "indexed_event"),
-              transactionHash: parseHash32(conflict.tx_hash),
-            }),
+            conflict: contentionEvidence(conflict),
           }),
     });
   }
@@ -206,7 +231,19 @@ export class PostgresConfirmationStore implements ConfirmationStore {
             committed_block_number = ${transition.state === "committed" || transition.state === "confirmed" ? (transition.block?.blockNumber ?? null) : null},
             confirmed_at = ${transition.state === "confirmed" ? now : null},
             error_code = ${transition.errorCode ?? null},
-            error_detail = NULL,
+            error_detail = ${
+              transition.state === "conflicted"
+                ? sql.json({
+                    winningTransactionHash: transition.relatedTransactionHash,
+                    ...(transition.winningExecutorLockHash === undefined
+                      ? {}
+                      : { winningExecutorLockHash: transition.winningExecutorLockHash }),
+                    ...(transition.successorOutPoint === undefined
+                      ? {}
+                      : { successorOutPoint: transition.successorOutPoint }),
+                  })
+                : null
+            },
             updated_at = ${now}
         WHERE network_id = ${this.#network}
           AND id = ${attempt.attemptId}
@@ -233,6 +270,12 @@ export class PostgresConfirmationStore implements ConfirmationStore {
             ...(transition.relatedTransactionHash === undefined
               ? {}
               : { relatedTransactionHash: transition.relatedTransactionHash }),
+            ...(transition.winningExecutorLockHash === undefined
+              ? {}
+              : { winningExecutorLockHash: transition.winningExecutorLockHash }),
+            ...(transition.successorOutPoint === undefined
+              ? {}
+              : { successorOutPoint: transition.successorOutPoint }),
             ...(transition.confirmations === undefined
               ? {}
               : {

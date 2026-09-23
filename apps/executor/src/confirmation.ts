@@ -28,7 +28,14 @@ export interface ConfirmationEvidence {
   readonly requiredDepth: number;
   readonly checkpointBlockNumber?: string;
   readonly inclusion?: ConfirmationInclusion;
-  readonly conflict?: ConfirmationInclusion & { readonly transactionHash: Hash32 };
+  readonly conflict?: ConfirmationInclusion & {
+    readonly transactionHash: Hash32;
+    readonly executorLockHash?: Hash32;
+    readonly successorOutPoint?: {
+      readonly txHash: Hash32;
+      readonly index: string;
+    };
+  };
 }
 
 export interface RpcTransactionObservation {
@@ -48,6 +55,11 @@ export interface ConfirmationTransition {
   readonly confirmations?: string;
   readonly requiredDepth?: number;
   readonly relatedTransactionHash?: Hash32;
+  readonly winningExecutorLockHash?: Hash32;
+  readonly successorOutPoint?: {
+    readonly txHash: Hash32;
+    readonly index: string;
+  };
 }
 
 export interface ConfirmationStore {
@@ -130,6 +142,12 @@ export function deriveConfirmationTransition(
       errorCode: "EXECUTOR_ALREADY_CONSUMED",
       block: evidence.conflict,
       relatedTransactionHash: evidence.conflict.transactionHash,
+      ...(evidence.conflict.executorLockHash === undefined
+        ? {}
+        : { winningExecutorLockHash: evidence.conflict.executorLockHash }),
+      ...(evidence.conflict.successorOutPoint === undefined
+        ? {}
+        : { successorOutPoint: evidence.conflict.successorOutPoint }),
     });
   }
   if (rpc?.status === "proposed" && attempt.state === "submitted") {
