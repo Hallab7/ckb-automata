@@ -23,6 +23,10 @@ import {
   TemplatesController,
 } from "./jobs.ts";
 import { NetworkMetadataController, NetworkMetadataService } from "./network-metadata.ts";
+import {
+  NotificationPreferencesController,
+  NotificationPreferencesService,
+} from "./preferences.ts";
 import { JobQuoteController, JobQuoteService } from "./quotes.ts";
 import { TransactionBuildService, TransactionController } from "./transactions.ts";
 
@@ -34,6 +38,7 @@ Module({
   controllers: [
     HealthController,
     AuthController,
+    NotificationPreferencesController,
     NetworkMetadataController,
     JobsController,
     AccountJobsController,
@@ -66,6 +71,12 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
         inject: [DatabaseClient],
         useFactory: (databaseClient: DatabaseClient) =>
           new AuthService(databaseClient.database, environment),
+      },
+      {
+        provide: NotificationPreferencesService,
+        inject: [DatabaseClient, AuthService],
+        useFactory: (databaseClient: DatabaseClient, auth: AuthService) =>
+          new NotificationPreferencesService(databaseClient.database, auth, environment),
       },
       {
         provide: CanonicalCheckpointStore,

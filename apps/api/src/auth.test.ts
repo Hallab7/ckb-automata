@@ -24,6 +24,7 @@ function environment() {
     DATABASE_URL: "postgresql://automata:test@127.0.0.1:55432/automata",
     REDIS_URL: "redis://127.0.0.1:56379",
     PUBLIC_APP_ORIGIN: "https://automata.example.test/path",
+    WEBHOOK_ENCRYPTION_KEY: "A".repeat(43),
   } as const;
 }
 

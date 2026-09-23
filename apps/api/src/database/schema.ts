@@ -319,6 +319,52 @@ export const notificationSubscriptions = pgTable(
   ],
 );
 
+export const notificationPreferences = pgTable(
+  "notification_preferences",
+  {
+    id: uuid("id").primaryKey(),
+    networkId: varchar("network_id", { length: 64 })
+      .notNull()
+      .references(() => networks.id, { onDelete: "cascade" }),
+    ownerLockHash: hash("owner_lock_hash").notNull(),
+    channel: varchar("channel", { length: 16 }).notNull(),
+    eventTypes: jsonb("event_types").notNull(),
+    destinationCiphertext: text("destination_ciphertext"),
+    enabled: boolean("enabled").default(false).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("notification_preferences_owner_channel_uq").on(
+      table.networkId,
+      table.ownerLockHash,
+      table.channel,
+    ),
+    index("notification_preferences_owner_idx").on(table.networkId, table.ownerLockHash),
+    check(
+      "notification_preferences_owner_hash_ck",
+      sql`${table.ownerLockHash} ~ '^0x[0-9a-f]{64}$'`,
+    ),
+    check("notification_preferences_channel_ck", sql`${table.channel} IN ('browser', 'email')`),
+    check(
+      "notification_preferences_event_types_ck",
+      sql`jsonb_typeof(${table.eventTypes}) = 'array' AND jsonb_array_length(${table.eventTypes}) <= 7 AND ${table.eventTypes} <@ '["ready", "submitted", "confirmed", "failed", "budget_low", "cancelled", "recovery_required"]'::jsonb`,
+    ),
+    check(
+      "notification_preferences_destination_ck",
+      sql`(${table.channel} = 'browser' AND ${table.destinationCiphertext} IS NULL) OR ${table.channel} = 'email'`,
+    ),
+    check(
+      "notification_preferences_enabled_ck",
+      sql`NOT ${table.enabled} OR jsonb_array_length(${table.eventTypes}) > 0`,
+    ),
+    check(
+      "notification_preferences_email_enabled_ck",
+      sql`${table.channel} <> 'email' OR NOT ${table.enabled} OR ${table.destinationCiphertext} IS NOT NULL`,
+    ),
+  ],
+);
+
 export const webhookDeliveries = pgTable(
   "webhook_deliveries",
   {
@@ -464,6 +510,7 @@ export const schema = {
   jobVersions,
   jobs,
   networks,
+  notificationPreferences,
   notificationSubscriptions,
   scriptDeployments,
   transactionAttempts,

@@ -40,6 +40,7 @@ export type ApiTransactionBuild = ApiSuccess<"TransactionController_createDeadli
 export type ApiTransactionValidation = ApiSuccess<"TransactionController_validateSigned">;
 export type ApiAuthChallenge = ApiSuccess<"AuthController_issue">;
 export type ApiAuthSession = ApiSuccess<"AuthController_verify">;
+export type ApiNotificationPreferences = ApiSuccess<"NotificationPreferencesController_get">;
 
 export interface ApiClientOptions {
   readonly baseUrl: string;
@@ -101,6 +102,23 @@ export class AutomataApiClient {
   getAuthSession(sessionToken: string): Promise<ApiSuccess<"AuthController_current">> {
     return this.#request("v1/auth/session", {
       headers: { authorization: `Bearer ${sessionToken}` },
+    });
+  }
+
+  getNotificationPreferences(sessionToken: string): Promise<ApiNotificationPreferences> {
+    return this.#request("v1/preferences", {
+      headers: { authorization: `Bearer ${sessionToken}` },
+    });
+  }
+
+  updateNotificationPreferences(
+    sessionToken: string,
+    body: ApiRequestBody<"NotificationPreferencesController_update">,
+  ): Promise<ApiSuccess<"NotificationPreferencesController_update">> {
+    return this.#request("v1/preferences", {
+      body,
+      headers: { authorization: `Bearer ${sessionToken}` },
+      method: "PUT",
     });
   }
 
@@ -175,7 +193,7 @@ export class AutomataApiClient {
     options: {
       readonly body?: unknown;
       readonly headers?: Readonly<Record<string, string>>;
-      readonly method?: "POST";
+      readonly method?: "POST" | "PUT";
       readonly query?: unknown;
     } = {},
   ): Promise<Result> {

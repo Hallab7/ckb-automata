@@ -13,6 +13,7 @@ export const AUTOMATA_ENV_KEYS = [
   "DATABASE_URL",
   "REDIS_URL",
   "PUBLIC_APP_ORIGIN",
+  "WEBHOOK_ENCRYPTION_KEY",
 ] as const;
 
 export const FORBIDDEN_USER_SECRET_KEYS = [
@@ -28,6 +29,9 @@ const commonFields = {
   CKB_RPC_URL: z.url(),
   DATABASE_URL: z.string().startsWith("postgresql://"),
   PUBLIC_APP_ORIGIN: z.url(),
+  WEBHOOK_ENCRYPTION_KEY: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{43}$/, "must be a base64url-encoded 32-byte key"),
   REDIS_URL: z
     .string()
     .refine(

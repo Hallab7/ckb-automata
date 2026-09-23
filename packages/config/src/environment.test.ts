@@ -18,6 +18,7 @@ function validEnvironment(profile: EnvironmentProfile) {
     DATABASE_URL: "postgresql://automata:local@127.0.0.1:55432/automata",
     REDIS_URL: "redis://127.0.0.1:56379",
     PUBLIC_APP_ORIGIN: isTestnet ? "https://automata.example.invalid" : "http://127.0.0.1:3000",
+    WEBHOOK_ENCRYPTION_KEY: "A".repeat(43),
   };
 }
 

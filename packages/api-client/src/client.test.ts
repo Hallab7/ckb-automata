@@ -98,3 +98,34 @@ test("sends opaque sessions only in the authorization header", async () => {
   assert.equal(request?.headers.get("authorization"), `Bearer ${"A".repeat(43)}`);
   assert.equal(new URL(request?.url ?? "https://invalid.test").search, "");
 });
+
+test("updates preferences with generated request types and session scope", async () => {
+  let request: Request | undefined;
+  const client = createApiClient({
+    baseUrl: "https://api.example.test/",
+    fetch: async (input, init) => {
+      request = new Request(input, init);
+      return new Response(
+        JSON.stringify({
+          channels: {
+            browser: { enabled: true, eventTypes: ["ready"] },
+            email: { address: null, enabled: false, eventTypes: [] },
+          },
+          network: "ckb_dev",
+          ownerLockHash: `0x${"01".repeat(32)}`,
+        }),
+        { headers: jsonHeaders },
+      );
+    },
+  });
+  const body = {
+    browser: { enabled: true, eventTypes: ["ready"] },
+    email: { enabled: false, eventTypes: [] },
+  } as const;
+
+  await client.updateNotificationPreferences("B".repeat(43), body);
+
+  assert.equal(request?.method, "PUT");
+  assert.equal(request?.headers.get("authorization"), `Bearer ${"B".repeat(43)}`);
+  assert.deepEqual(await request?.json(), body);
+});

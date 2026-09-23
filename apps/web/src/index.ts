@@ -11,6 +11,7 @@ export {
   type ApiJobEvents,
   type ApiJobList,
   type ApiJobQuote,
+  type ApiNotificationPreferences,
   type ApiTemplates,
   type ApiTransactionBuild,
   type ApiTransactionValidation,

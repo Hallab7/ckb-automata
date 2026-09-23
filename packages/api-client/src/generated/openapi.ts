@@ -205,6 +205,24 @@ export type paths = {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/v1/preferences": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /** Read owner-scoped browser and email notification preferences */
+        readonly get: operations["NotificationPreferencesController_get"];
+        /** Replace owner-scoped browser and email notification preferences */
+        readonly put: operations["NotificationPreferencesController_update"];
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/v1/templates": {
         readonly parameters: {
             readonly query?: never;
@@ -1059,6 +1077,112 @@ export interface operations {
         readonly requestBody?: never;
         readonly responses: {
             readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly NotificationPreferencesController_get: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        readonly channels: {
+                            readonly browser: {
+                                readonly enabled: boolean;
+                                readonly eventTypes: readonly ("ready" | "submitted" | "confirmed" | "failed" | "budget_low" | "cancelled" | "recovery_required")[];
+                            };
+                            readonly email: {
+                                /** @description Masked email address */
+                                readonly address: string | null;
+                                readonly enabled: boolean;
+                                readonly eventTypes: readonly ("ready" | "submitted" | "confirmed" | "failed" | "budget_low" | "cancelled" | "recovery_required")[];
+                            };
+                        };
+                        /** @enum {string} */
+                        readonly network: "ckb_dev" | "ckb_testnet";
+                        readonly ownerLockHash: string;
+                    };
+                };
+            };
+            /** @description A valid off-chain settings session is required */
+            readonly 401: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly NotificationPreferencesController_update: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": {
+                    readonly browser: {
+                        readonly enabled: boolean;
+                        readonly eventTypes: readonly ("ready" | "submitted" | "confirmed" | "failed" | "budget_low" | "cancelled" | "recovery_required")[];
+                    };
+                    readonly email: {
+                        /** Format: email */
+                        readonly address?: string | null;
+                        readonly enabled: boolean;
+                        readonly eventTypes: readonly ("ready" | "submitted" | "confirmed" | "failed" | "budget_low" | "cancelled" | "recovery_required")[];
+                    };
+                };
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        readonly channels: {
+                            readonly browser: {
+                                readonly enabled: boolean;
+                                readonly eventTypes: readonly ("ready" | "submitted" | "confirmed" | "failed" | "budget_low" | "cancelled" | "recovery_required")[];
+                            };
+                            readonly email: {
+                                /** @description Masked email address */
+                                readonly address: string | null;
+                                readonly enabled: boolean;
+                                readonly eventTypes: readonly ("ready" | "submitted" | "confirmed" | "failed" | "budget_low" | "cancelled" | "recovery_required")[];
+                            };
+                        };
+                        /** @enum {string} */
+                        readonly network: "ckb_dev" | "ckb_testnet";
+                        readonly ownerLockHash: string;
+                    };
+                };
+            };
+            /** @description Malformed notification preferences */
+            readonly 400: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description A valid off-chain settings session is required */
+            readonly 401: {
                 headers: {
                     readonly [name: string]: unknown;
                 };

@@ -4,6 +4,16 @@ export const API_APP_ID = `${WORKSPACE_NAME}:api` as const;
 
 export { AppModule, createAppModule } from "./app.module.ts";
 export {
+  NOTIFICATION_CHANNELS,
+  NOTIFICATION_EVENT_TYPES,
+  NotificationPreferencesController,
+  NotificationPreferencesService,
+  type NotificationChannel,
+  type NotificationEventType,
+  type NotificationPreferencesOptions,
+  type NotificationPreferencesResponse,
+} from "./preferences.ts";
+export {
   AUTH_CHALLENGE_TTL_MS,
   AUTH_SESSION_SCOPE,
   AUTH_SESSION_TTL_MS,
