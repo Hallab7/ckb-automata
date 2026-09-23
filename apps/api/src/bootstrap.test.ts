@@ -36,17 +36,23 @@ function fakeApplication() {
   const calls: {
     pipes: unknown[];
     prefixes: string[];
+    interceptors: unknown[];
     shutdownHooks: number;
     listens: [number, string][];
   } = {
     pipes: [],
     prefixes: [],
+    interceptors: [],
     shutdownHooks: 0,
     listens: [],
   };
   const app = {
     useGlobalPipes(...pipes: unknown[]) {
       calls.pipes.push(...pipes);
+      return this;
+    },
+    useGlobalInterceptors(...interceptors: unknown[]) {
+      calls.interceptors.push(...interceptors);
       return this;
     },
     setGlobalPrefix(prefix: string) {
@@ -107,12 +113,15 @@ test("bootstrap installs validation, versioning, shutdown hooks, and structured 
   assert.ok(receivedLogger instanceof ConsoleLogger);
   assert.deepEqual(result.config, {
     environment: parseApiBootstrapConfig(environment()).environment,
+    corsOrigins: ["http://127.0.0.1:3000"],
     host: "127.0.0.1",
     port: 4301,
+    trustedProxies: [],
   });
   assert.deepEqual(fixture.calls.prefixes, [API_GLOBAL_PREFIX]);
   assert.equal(fixture.calls.shutdownHooks, 1);
   assert.equal(fixture.calls.pipes.length, 1);
+  assert.equal(fixture.calls.interceptors.length, 1);
   assert.ok(fixture.calls.pipes[0] instanceof ValidationPipe);
   const validation = fixture.calls.pipes[0] as unknown as {
     readonly isTransformEnabled: boolean;
@@ -124,6 +133,13 @@ test("bootstrap installs validation, versioning, shutdown hooks, and structured 
     forbidNonWhitelisted: true,
     whitelist: true,
   });
+});
+
+test("bootstrap rejects wildcard origins and malformed trusted proxies", () => {
+  assert.throws(() => parseApiBootstrapConfig({ ...environment(), API_CORS_ORIGINS: "*" }));
+  assert.throws(() =>
+    parseApiBootstrapConfig({ ...environment(), API_TRUSTED_PROXIES: "proxy.internal" }),
+  );
 });
 
 test("start listens only after successful configuration", async () => {
@@ -142,13 +158,16 @@ test("default application factory uses the pinned Fastify adapter", async () => 
     assert.equal(result.app.getHttpAdapter().constructor.name, "FastifyAdapter");
     await result.app.init();
     const fastify = result.app.getHttpAdapter().getInstance() as {
-      inject(input: {
-        method: string;
-        url: string;
-      }): Promise<{ statusCode: number; json(): unknown }>;
+      inject(input: { method: string; url: string }): Promise<{
+        headers: Readonly<Record<string, string | string[] | undefined>>;
+        statusCode: number;
+        json(): unknown;
+      }>;
     };
     const liveness = await fastify.inject({ method: "GET", url: "/v1/health/live" });
     assert.equal(liveness.statusCode, 200);
+    assert.equal(liveness.headers["cache-control"], "no-store");
+    assert.equal(liveness.headers["x-content-type-options"], "nosniff");
     assert.deepEqual(liveness.json(), {
       status: "ok",
       service: "ckb-automata:api",

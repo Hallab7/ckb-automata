@@ -2,6 +2,25 @@ import { WORKSPACE_NAME } from "@ckb-automata/core";
 
 export const API_APP_ID = `${WORKSPACE_NAME}:api` as const;
 
+export {
+  API_AUTH_HANDLER_TIMEOUT_MS,
+  API_BODY_LIMIT_BYTES,
+  API_DEFAULT_HANDLER_TIMEOUT_MS,
+  API_RATE_BUCKET_CAPACITY,
+  API_RATE_LIMITS,
+  API_RATE_WINDOW_MS,
+  API_REQUEST_RECEIVE_TIMEOUT_MS,
+  API_TRANSACTION_HANDLER_TIMEOUT_MS,
+  ApiTimeoutInterceptor,
+  FixedWindowRateLimiter,
+  endpointTimeoutMs,
+  installFastifyAbuseControls,
+  resolveClientAddress,
+  type AbuseControlOptions,
+  type ApiTimeoutInterceptorOptions,
+  type RateLimitResult,
+} from "./abuse-controls.ts";
+
 export { AppModule, createAppModule } from "./app.module.ts";
 export {
   NOTIFICATION_CHANNELS,

@@ -1,3 +1,5 @@
+import { isIP } from "node:net";
+
 import {
   ConsoleLogger,
   ValidationPipe,
@@ -10,6 +12,12 @@ import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fa
 import { parseEnvironment, type AutomataEnvironment } from "@ckb-automata/config";
 
 import { createAppModule } from "./app.module.ts";
+import {
+  API_BODY_LIMIT_BYTES,
+  API_REQUEST_RECEIVE_TIMEOUT_MS,
+  ApiTimeoutInterceptor,
+  installFastifyAbuseControls,
+} from "./abuse-controls.ts";
 
 export const API_GLOBAL_PREFIX = "v1" as const;
 export const DEFAULT_API_HOST = "0.0.0.0" as const;
@@ -17,8 +25,10 @@ export const DEFAULT_API_PORT = 3001;
 
 export interface ApiBootstrapConfig {
   readonly environment: AutomataEnvironment;
+  readonly corsOrigins: readonly string[];
   readonly host: string;
   readonly port: number;
+  readonly trustedProxies: readonly string[];
 }
 
 export interface ApiBootstrapResult {
@@ -50,13 +60,47 @@ function parseHost(value: string | undefined): string {
   return host;
 }
 
+function parseOrigins(publicOrigin: string, value: string | undefined): readonly string[] {
+  const entries = [new URL(publicOrigin).origin, ...(value?.split(",") ?? [])]
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const url = new URL(entry);
+      if (
+        !["http:", "https:"].includes(url.protocol) ||
+        url.username !== "" ||
+        url.password !== "" ||
+        url.pathname !== "/" ||
+        url.search !== "" ||
+        url.hash !== ""
+      ) {
+        throw new TypeError("API_CORS_ORIGINS must contain HTTP(S) origins");
+      }
+      return url.origin;
+    });
+  if (value?.includes("*") ?? false) throw new TypeError("API_CORS_ORIGINS cannot use wildcards");
+  return Object.freeze([...new Set(entries)]);
+}
+
+function parseTrustedProxies(value: string | undefined): readonly string[] {
+  if (value === undefined || value.trim() === "") return Object.freeze([]);
+  const entries = value.split(",").map((entry) => entry.trim().toLowerCase());
+  if (entries.some((entry) => isIP(entry) === 0)) {
+    throw new TypeError("API_TRUSTED_PROXIES must contain IP addresses");
+  }
+  return Object.freeze([...new Set(entries)]);
+}
+
 export function parseApiBootstrapConfig(
   input: Readonly<Record<string, string | undefined>>,
 ): ApiBootstrapConfig {
+  const environment = parseEnvironment(input);
   return Object.freeze({
-    environment: parseEnvironment(input),
+    environment,
+    corsOrigins: parseOrigins(environment.PUBLIC_APP_ORIGIN, input["API_CORS_ORIGINS"]),
     host: parseHost(input["API_HOST"]),
     port: parsePort(input["API_PORT"]),
+    trustedProxies: parseTrustedProxies(input["API_TRUSTED_PROXIES"]),
   });
 }
 
@@ -68,6 +112,7 @@ export function configureApiApplication(app: INestApplication): void {
       whitelist: true,
     }),
   );
+  app.useGlobalInterceptors(new ApiTimeoutInterceptor());
   app.setGlobalPrefix(API_GLOBAL_PREFIX);
   app.enableShutdownHooks();
 }
@@ -82,7 +127,19 @@ async function createFastifyApplication(
 ): Promise<INestApplication> {
   return NestFactory.create<NestFastifyApplication>(
     createAppModule(config.environment),
-    new FastifyAdapter(),
+    (() => {
+      const adapter = new FastifyAdapter({
+        bodyLimit: API_BODY_LIMIT_BYTES,
+        requestTimeout: API_REQUEST_RECEIVE_TIMEOUT_MS,
+        routerOptions: { maxParamLength: 256 },
+      });
+      installFastifyAbuseControls(adapter.getInstance(), {
+        allowedOrigins: config.corsOrigins,
+        strictTransport: config.environment.AUTOMATA_PROFILE.startsWith("testnet-"),
+        trustedProxies: config.trustedProxies,
+      });
+      return adapter;
+    })(),
     {
       abortOnError: true,
       bufferLogs: true,
