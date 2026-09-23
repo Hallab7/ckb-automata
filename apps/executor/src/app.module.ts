@@ -10,6 +10,9 @@ import { ExecutorAdapterRegistry, type RegisteredExecutorAdapter } from "./adapt
 import { ChainBuildSnapshotSource } from "./build-snapshot.ts";
 import { PostgresBuildAttemptStore } from "./build-store.ts";
 import { BuildCoordinator } from "./build-worker.ts";
+import { PostgresConfirmationStore } from "./confirmation-store.ts";
+import { ConfirmationCoordinator } from "./confirmation-worker.ts";
+import { ConfirmationService } from "./confirmation.ts";
 import { EligibilityCoordinator, PostgresEligibilityJobSource } from "./eligibility-worker.ts";
 import { DEADLINE_EXECUTOR_ADAPTER } from "./policies/deadline.ts";
 import { RECURRING_EXECUTOR_ADAPTER } from "./policies/recurring.ts";
@@ -47,6 +50,7 @@ export interface ExecutorModuleDependencies {
   readonly adapters?: readonly RegisteredExecutorAdapter[];
   readonly createChainClient?: (environment: AutomataEnvironment) => ExecutorChainClient;
   readonly enableBuildWorkers?: boolean;
+  readonly enableConfirmationWorkers?: boolean;
   readonly enableEligibilityWorkers?: boolean;
   readonly enableSimulationWorkers?: boolean;
   readonly logger: ExecutorEventLogger;
@@ -273,6 +277,42 @@ export function createExecutorModule(
             },
           },
         ];
+  const confirmationProviders: Provider[] =
+    dependencies.enableConfirmationWorkers !== true
+      ? []
+      : [
+          {
+            provide: ConfirmationCoordinator,
+            inject: [ExecutorRuntime, DurableQueueRegistry, EXECUTOR_LOGGER],
+            useFactory: (
+              runtime: ExecutorRuntime,
+              queues: DurableQueueRegistry,
+              logger: ExecutorEventLogger,
+            ) => {
+              const store = new PostgresConfirmationStore(
+                environment.DATABASE_URL,
+                environment.CKB_NETWORK,
+              );
+              return new ConfirmationCoordinator({
+                runtime,
+                queues,
+                store,
+                service: new ConfirmationService({
+                  store,
+                  chain: {
+                    getTransactionStatus: (transactionHash) =>
+                      runtime.getTransactionStatus(transactionHash),
+                  },
+                }),
+                redisUrl: environment.REDIS_URL,
+                logger,
+                ...(dependencies.queuePrefix === undefined
+                  ? {}
+                  : { prefix: dependencies.queuePrefix }),
+              });
+            },
+          },
+        ];
   return {
     module: ExecutorModule,
     imports,
@@ -322,6 +362,7 @@ export function createExecutorModule(
       ...eligibilityProviders,
       ...buildProviders,
       ...simulationProviders,
+      ...confirmationProviders,
     ],
     exports: [ExecutorAdapterRegistry, ExecutorRuntime, EXECUTOR_QUEUES],
   };

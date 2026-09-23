@@ -5,6 +5,23 @@ export const EXECUTOR_APP_ID = `${WORKSPACE_NAME}:executor` as const;
 export { ChainBuildSnapshotSource } from "./build-snapshot.ts";
 export { PostgresBuildAttemptStore } from "./build-store.ts";
 export { BuildCoordinator } from "./build-worker.ts";
+export { PostgresConfirmationStore, MAX_CONFIRMATION_ATTEMPTS } from "./confirmation-store.ts";
+export { CONFIRMATION_POLL_MS, ConfirmationCoordinator } from "./confirmation-worker.ts";
+export {
+  CONFIRMATION_DROP_AFTER_MS,
+  ConfirmationService,
+  deriveConfirmationTransition,
+  type ConfirmationAttempt,
+  type ConfirmationChain,
+  type ConfirmationEvidence,
+  type ConfirmationInclusion,
+  type ConfirmationQueuePayload,
+  type ConfirmationResult,
+  type ConfirmationState,
+  type ConfirmationStore,
+  type ConfirmationTransition,
+  type RpcTransactionObservation,
+} from "./confirmation.ts";
 export {
   BUILD_CLAIM_LEASE_MS,
   TransactionBuildService,

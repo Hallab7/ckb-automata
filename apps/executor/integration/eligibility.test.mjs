@@ -17,6 +17,8 @@ import { AUTOMATA_QUEUES } from "@ckb-automata/telemetry";
 
 import { migrateDatabase } from "../../api/src/database/migrator.ts";
 import { PostgresBuildAttemptStore } from "../src/build-store.ts";
+import { PostgresConfirmationStore } from "../src/confirmation-store.ts";
+import { ConfirmationService } from "../src/confirmation.ts";
 import { PostgresSimulationStore } from "../src/simulation-store.ts";
 import { PostgresSubmissionStore } from "../src/submission-store.ts";
 import { createExecutorApplication } from "../src/bootstrap.ts";
@@ -191,6 +193,7 @@ test(
       const job = await seedJob(database.url);
       app = await createExecutorApplication(environment(database.url), {
         createChainClient: () => chainFixture(state),
+        enableConfirmationWorkers: false,
         queuePrefix: prefix,
         writer: () => undefined,
       });
@@ -222,6 +225,7 @@ test("concurrent build deliveries share one durable operational attempt", async 
   let store;
   let simulationStore;
   let submissionStore;
+  let confirmationStore;
   try {
     const job = await seedJob(database.url);
     store = new PostgresBuildAttemptStore(database.url, deployment.network);
@@ -274,6 +278,78 @@ test("concurrent build deliveries share one durable operational attempt", async 
       await submissionStore.markSubmitted(submissionAttempt, hash(72), "broadcast"),
       false,
     );
+    const evidenceSql = postgres(database.url, { max: 1, onnotice: () => undefined });
+    try {
+      await evidenceSql`
+        UPDATE networks SET confirmation_depth = 2 WHERE id = ${deployment.network}
+      `;
+      await evidenceSql`
+        INSERT INTO canonical_blocks (
+          network_id, block_number, block_hash, parent_hash, block_timestamp
+        ) VALUES (${deployment.network}, '100', ${hash(100)}, ${hash(99)}, '1')
+      `;
+      await evidenceSql`
+        INSERT INTO indexer_checkpoints (network_id, block_number, block_hash)
+        VALUES (${deployment.network}, '100', ${hash(100)})
+      `;
+      await evidenceSql`
+        INSERT INTO job_events (
+          network_id, job_id, event_type, source, block_number, block_hash,
+          tx_hash, payload, occurred_at
+        ) VALUES (
+          ${deployment.network}, ${job.jobId}, 'job_one_shot', 'indexed', '100', ${hash(100)},
+          ${hash(72)},
+          ${evidenceSql.json({ previousOutpoint: { txHash: hash(71), index: "0" } })},
+          ${new Date("2026-09-23T10:00:00.000Z")}
+        )
+      `;
+    } finally {
+      await evidenceSql.end({ timeout: 2 });
+    }
+
+    confirmationStore = new PostgresConfirmationStore(
+      database.url,
+      deployment.network,
+      () => new Date("2026-09-23T10:01:00.000Z"),
+    );
+    const confirmation = new ConfirmationService({
+      store: confirmationStore,
+      chain: {
+        async getTransactionStatus() {
+          return { status: "pending", transaction: { hash: () => hash(72) } };
+        },
+      },
+    });
+    assert.deepEqual(
+      await confirmation.track({
+        attemptId: claimed.claim.attemptId,
+        transactionHash: hash(72),
+      }),
+      { status: "transitioned", state: "committed" },
+    );
+    const depthSql = postgres(database.url, { max: 1, onnotice: () => undefined });
+    try {
+      await depthSql`
+        INSERT INTO canonical_blocks (
+          network_id, block_number, block_hash, parent_hash, block_timestamp
+        ) VALUES (${deployment.network}, '101', ${hash(101)}, ${hash(100)}, '2')
+      `;
+      await depthSql`
+        UPDATE indexer_checkpoints
+        SET block_number = '101', block_hash = ${hash(101)}, updated_at = now()
+        WHERE network_id = ${deployment.network}
+      `;
+    } finally {
+      await depthSql.end({ timeout: 2 });
+    }
+    assert.deepEqual(
+      await confirmation.track({
+        attemptId: claimed.claim.attemptId,
+        transactionHash: hash(72),
+      }),
+      { status: "transitioned", state: "confirmed" },
+    );
+    assert.deepEqual(await confirmationStore.listPending(), []);
     const afterApproval = await store.claim(payload);
     assert.equal(afterApproval.status, "duplicate");
     assert.equal(afterApproval.attemptId, claimed.claim.attemptId);
@@ -284,24 +360,37 @@ test("concurrent build deliveries share one durable operational attempt", async 
         SELECT count(*)::integer AS value, min(attempt.state)::text AS state,
                min(attempt.simulation->>'cycles') AS cycles,
                count(event.id)::integer AS events,
-               min(event.payload->>'acceptance') AS acceptance
+               min(event.payload->>'acceptance') AS acceptance,
+               (
+                 SELECT count(*)::integer FROM job_events AS tracked
+                 WHERE tracked.payload->>'attemptId' = attempt.id::text
+               ) AS tracked_events,
+               (
+                 SELECT count(*)::integer FROM job_events AS confirmed
+                 WHERE confirmed.payload->>'attemptId' = attempt.id::text
+                   AND confirmed.event_type = 'transaction_confirmed'
+               ) AS confirmed_events
         FROM transaction_attempts AS attempt
         LEFT JOIN job_events AS event
           ON event.payload->>'attemptId' = attempt.id::text
          AND event.event_type = 'transaction_submitted'
         WHERE attempt.job_id = ${job.jobId} AND attempt.sequence = ${job.sequence}
+        GROUP BY attempt.id
       `;
       assert.deepEqual(attempt, {
         value: 1,
-        state: "submitted",
+        state: "confirmed",
         cycles: "1000",
         events: 1,
         acceptance: "broadcast",
+        tracked_events: 3,
+        confirmed_events: 1,
       });
     } finally {
       await sql.end({ timeout: 2 });
     }
   } finally {
+    if (confirmationStore) await confirmationStore.close();
     if (submissionStore) await submissionStore.close();
     if (simulationStore) await simulationStore.close();
     if (store) await store.close();

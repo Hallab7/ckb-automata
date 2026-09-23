@@ -73,6 +73,7 @@ test("standalone context reports readiness without creating an HTTP listener", a
   const lines: string[] = [];
   const result = await createExecutorApplication(environment(), {
     createChainClient: () => chain.client,
+    enableConfirmationWorkers: false,
     enableEligibilityWorkers: false,
     queues: readyQueues,
     writer: (line) => lines.push(line),
@@ -101,6 +102,7 @@ test("shutdown rejects new work and waits for active work before closing the cha
   const chain = chainFixture();
   const result = await createExecutorApplication(environment(), {
     createChainClient: () => chain.client,
+    enableConfirmationWorkers: false,
     enableEligibilityWorkers: false,
     queues: readyQueues,
     writer: () => undefined,
@@ -173,6 +175,7 @@ test("wrong-network readiness fails closed and disposes the chain", async () => 
   await assert.rejects(
     createExecutorApplication(environment(), {
       createChainClient: () => chain.client,
+      enableConfirmationWorkers: false,
       enableEligibilityWorkers: false,
       queues: readyQueues,
       writer: () => undefined,
@@ -187,6 +190,7 @@ test("Redis readiness failure prevents work and disposes the chain", async () =>
   await assert.rejects(
     createExecutorApplication(environment(), {
       createChainClient: () => chain.client,
+      enableConfirmationWorkers: false,
       enableEligibilityWorkers: false,
       queues: {
         async ready() {

@@ -100,6 +100,7 @@ export interface ExecutorBootstrapDependencies {
   ) => Promise<INestApplicationContext>;
   readonly createChainClient?: ExecutorModuleDependencies["createChainClient"];
   readonly enableBuildWorkers?: boolean;
+  readonly enableConfirmationWorkers?: boolean;
   readonly enableEligibilityWorkers?: boolean;
   readonly enableSimulationWorkers?: boolean;
   readonly logger?: ExecutorLogger;
@@ -133,6 +134,9 @@ export async function createExecutorApplication(
     ...(dependencies.enableBuildWorkers === undefined
       ? {}
       : { enableBuildWorkers: dependencies.enableBuildWorkers }),
+    ...(dependencies.enableConfirmationWorkers === undefined
+      ? {}
+      : { enableConfirmationWorkers: dependencies.enableConfirmationWorkers }),
     ...(dependencies.enableEligibilityWorkers === undefined
       ? {}
       : { enableEligibilityWorkers: dependencies.enableEligibilityWorkers }),
@@ -161,6 +165,7 @@ export async function startExecutor(
   return createExecutorApplication(input, {
     ...dependencies,
     enableBuildWorkers: dependencies.enableBuildWorkers ?? true,
+    enableConfirmationWorkers: dependencies.enableConfirmationWorkers ?? true,
     enableSimulationWorkers: dependencies.enableSimulationWorkers ?? true,
   });
 }

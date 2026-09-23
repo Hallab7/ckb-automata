@@ -60,6 +60,7 @@ function chainFixture() {
 async function openExecutor(prefix) {
   return createExecutorApplication(environment(), {
     createChainClient: chainFixture,
+    enableConfirmationWorkers: false,
     enableEligibilityWorkers: false,
     queuePrefix: prefix,
     writer: () => undefined,
