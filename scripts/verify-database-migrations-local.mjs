@@ -65,7 +65,7 @@ try {
 
   const emptyUrl = databaseUrl(names[0]);
   const installed = await migrateDatabase({ connectionString: emptyUrl });
-  assert.deepEqual(installed.changed, [1, 2, 3, 4, 5, 6, 7]);
+  assert.deepEqual(installed.changed, [1, 2, 3, 4, 5, 6, 7, 8]);
   const repeated = await migrateDatabase({ connectionString: emptyUrl });
   assert.deepEqual(repeated.changed, []);
   await withClient(names[0], async (sql) => {
@@ -83,7 +83,9 @@ try {
   });
 
   const rolledBack = await rollbackDatabase({ connectionString: emptyUrl });
-  assert.deepEqual(rolledBack.changed, [7]);
+  assert.deepEqual(rolledBack.changed, [8]);
+  const rolledBackWebhooks = await rollbackDatabase({ connectionString: emptyUrl });
+  assert.deepEqual(rolledBackWebhooks.changed, [7]);
   const rolledBackPreferences = await rollbackDatabase({ connectionString: emptyUrl });
   assert.deepEqual(rolledBackPreferences.changed, [6]);
   await withClient(names[0], async (sql) => {
@@ -111,7 +113,7 @@ try {
     assert.equal(column, undefined);
   });
   const reapplied = await migrateDatabase({ connectionString: emptyUrl });
-  assert.deepEqual(reapplied.changed, [4, 5, 6, 7]);
+  assert.deepEqual(reapplied.changed, [4, 5, 6, 7, 8]);
 
   const previousUrl = databaseUrl(names[1]);
   const previous = await migrateDatabase({ connectionString: previousUrl, targetVersion: 3 });
@@ -124,7 +126,7 @@ try {
     )`;
   });
   const upgraded = await migrateDatabase({ connectionString: previousUrl });
-  assert.deepEqual(upgraded.changed, [4, 5, 6, 7]);
+  assert.deepEqual(upgraded.changed, [4, 5, 6, 7, 8]);
   await withClient(names[1], async (sql) => {
     const [{ count }] =
       await sql`SELECT count(*)::integer AS count FROM networks WHERE id = 'fixture'`;
@@ -140,11 +142,11 @@ try {
   try {
     await copyMigrations(temporaryMigrations);
     await writeFile(
-      join(temporaryMigrations, "0008_forced_failure.up.sql"),
+      join(temporaryMigrations, "0009_forced_failure.up.sql"),
       "CREATE TABLE must_rollback (id integer); SELECT 1 / 0;",
     );
     await writeFile(
-      join(temporaryMigrations, "0008_forced_failure.down.sql"),
+      join(temporaryMigrations, "0009_forced_failure.down.sql"),
       "DROP TABLE must_rollback;",
     );
     const migrationsDirectory = new URL(`file:///${temporaryMigrations.replaceAll("\\", "/")}/`);
@@ -161,7 +163,7 @@ try {
     assert.equal(tableName, null);
     const [{ maximum }] =
       await sql`SELECT max(version)::integer AS maximum FROM automata_schema_migrations`;
-    assert.equal(maximum, 7);
+    assert.equal(maximum, 8);
   });
 
   console.log(

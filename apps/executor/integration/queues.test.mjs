@@ -35,6 +35,18 @@ function chainFixture() {
     async getGenesisHash() {
       return genesisHash;
     },
+    async getTipHeader() {
+      throw new Error("chain reads are disabled in the queue integration test");
+    },
+    async getCellLive() {
+      throw new Error("chain reads are disabled in the queue integration test");
+    },
+    async findCellsPaged() {
+      throw new Error("chain reads are disabled in the queue integration test");
+    },
+    async getTransactionStatus() {
+      throw new Error("chain reads are disabled in the queue integration test");
+    },
     async close() {},
   };
 }

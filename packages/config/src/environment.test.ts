@@ -82,6 +82,28 @@ test("optional observability metadata is validated and disabled placeholders are
   );
 });
 
+test("executor fee-cell configuration is public, canonical, and lossless", () => {
+  const configured = parseEnvironment({
+    ...validEnvironment("local"),
+    EXECUTOR_LOCK_ARGS: `0x${"12".repeat(20)}`,
+    EXECUTOR_TRANSACTION_FEE: "1000000",
+  });
+  assert.equal(configured.EXECUTOR_LOCK_ARGS, `0x${"12".repeat(20)}`);
+  assert.equal(configured.EXECUTOR_TRANSACTION_FEE, "1000000");
+  assert.throws(() =>
+    parseEnvironment({
+      ...validEnvironment("local"),
+      EXECUTOR_LOCK_ARGS: `0x${"AB".repeat(20)}`,
+    }),
+  );
+  assert.throws(() =>
+    parseEnvironment({
+      ...validEnvironment("local"),
+      EXECUTOR_TRANSACTION_FEE: "01",
+    }),
+  );
+});
+
 test("user signing material fails startup validation", () => {
   assert.throws(
     () =>

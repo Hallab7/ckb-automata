@@ -2,6 +2,7 @@ import {
   ClientPublicTestnet,
   type ClientBlock,
   type ClientBlockHeader,
+  type Cell,
   type ClientFindCellsResponse,
   type ClientIndexerSearchKeyLike,
   type ClientTransactionResponse,
@@ -9,6 +10,7 @@ import {
   type HexLike,
   type Num,
   type NumLike,
+  type OutPointLike,
   type OutputsValidator,
   type Owner,
   type TransactionLike,
@@ -55,6 +57,7 @@ export interface CkbReadClient {
   getIndexerTip(): Promise<CkbIndexerTip>;
   getBlockByNumber(blockNumber: NumLike): Promise<ClientBlock | undefined>;
   getBlockByHash(blockHash: HexLike): Promise<ClientBlock | undefined>;
+  getCellLive(outPoint: OutPointLike): Promise<Cell | undefined>;
   findCellsPaged(
     key: ClientIndexerSearchKeyLike,
     order?: "asc" | "desc",
@@ -229,6 +232,12 @@ export class CkbClient implements CkbReadClient {
   getBlockByHash(blockHash: HexLike): Promise<ClientBlock | undefined> {
     return this.#safeRead("CHAIN_READ_FAILED", "rpc", "get_block", () =>
       this.#chainOwner.value.getBlockByHashNoCache(blockHash),
+    );
+  }
+
+  getCellLive(outPoint: OutPointLike): Promise<Cell | undefined> {
+    return this.#safeRead("CHAIN_READ_FAILED", "rpc", "get_live_cell", () =>
+      this.#chainOwner.value.getCellLiveNoCache(outPoint, true, false),
     );
   }
 

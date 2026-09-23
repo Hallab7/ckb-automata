@@ -239,8 +239,14 @@ export const transactionAttempts = pgTable(
       .notNull()
       .references(() => networks.id, { onDelete: "cascade" }),
     jobId: hash("job_id"),
+    sequence: uint64("sequence"),
     operation: varchar("operation", { length: 24 }).notNull(),
     state: varchar("state", { length: 32 }).notNull(),
+    chainSnapshot: jsonb("chain_snapshot"),
+    intentHash: hash("intent_hash"),
+    unsignedTransaction: jsonb("unsigned_transaction"),
+    buildClaimToken: uuid("build_claim_token"),
+    buildClaimExpiresAt: timestamp("build_claim_expires_at", { withTimezone: true }),
     unsignedTxHash: hash("unsigned_tx_hash"),
     txHash: hash("tx_hash"),
     errorCode: varchar("error_code", { length: 96 }),
@@ -261,6 +267,11 @@ export const transactionAttempts = pgTable(
     uniqueIndex("transaction_attempts_network_tx_hash_uq")
       .on(table.networkId, table.txHash)
       .where(sql`${table.txHash} IS NOT NULL`),
+    uniqueIndex("transaction_attempts_active_execute_uq")
+      .on(table.networkId, table.jobId, table.sequence)
+      .where(
+        sql`${table.operation} = 'execute' AND ${table.sequence} IS NOT NULL AND ${table.state} IN ('draft', 'submitted', 'proposed', 'committed', 'confirmed')`,
+      ),
     check(
       "transaction_attempts_operation_ck",
       sql`${table.operation} IN ('create', 'execute', 'cancel', 'recover', 'top_up')`,
@@ -268,6 +279,14 @@ export const transactionAttempts = pgTable(
     check(
       "transaction_attempts_state_ck",
       sql`${table.state} IN ('draft', 'awaiting_signature', 'submitted', 'proposed', 'committed', 'confirmed', 'conflicted', 'dropped', 'cancelled', 'recovery_required', 'reorged')`,
+    ),
+    check(
+      "transaction_attempts_build_record_ck",
+      sql`((${table.chainSnapshot} IS NULL AND ${table.intentHash} IS NULL AND ${table.unsignedTransaction} IS NULL) OR (${table.chainSnapshot} IS NOT NULL AND ${table.intentHash} IS NOT NULL AND ${table.unsignedTransaction} IS NOT NULL))`,
+    ),
+    check(
+      "transaction_attempts_build_claim_ck",
+      sql`(${table.buildClaimToken} IS NULL) = (${table.buildClaimExpiresAt} IS NULL)`,
     ),
   ],
 );

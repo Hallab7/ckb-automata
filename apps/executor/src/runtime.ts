@@ -23,7 +23,15 @@ export interface ExecutorReadinessReport {
   };
 }
 
-export type ExecutorChainClient = Pick<CkbClient, "close" | "getGenesisHash" | "getTipHeader">;
+export type ExecutorChainClient = Pick<
+  CkbClient,
+  | "close"
+  | "findCellsPaged"
+  | "getCellLive"
+  | "getGenesisHash"
+  | "getTipHeader"
+  | "getTransactionStatus"
+>;
 
 export interface ExecutorQueueReadiness {
   ready(): Promise<void>;
@@ -72,6 +80,21 @@ export class ExecutorRuntime implements OnApplicationBootstrap, OnModuleDestroy 
   getTipHeader(): ReturnType<ExecutorChainClient["getTipHeader"]> {
     if (this.#state !== "ready") throw new Error("executor chain reads require ready state");
     return this.#chain.getTipHeader();
+  }
+
+  getCellLive(...args: Parameters<ExecutorChainClient["getCellLive"]>) {
+    if (this.#state !== "ready") throw new Error("executor chain reads require ready state");
+    return this.#chain.getCellLive(...args);
+  }
+
+  findCellsPaged(...args: Parameters<ExecutorChainClient["findCellsPaged"]>) {
+    if (this.#state !== "ready") throw new Error("executor chain reads require ready state");
+    return this.#chain.findCellsPaged(...args);
+  }
+
+  getTransactionStatus(...args: Parameters<ExecutorChainClient["getTransactionStatus"]>) {
+    if (this.#state !== "ready") throw new Error("executor chain reads require ready state");
+    return this.#chain.getTransactionStatus(...args);
   }
 
   readiness(): ExecutorReadinessReport {

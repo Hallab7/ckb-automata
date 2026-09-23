@@ -4,8 +4,12 @@ import type { Queue } from "bullmq";
 
 import { createCkbClient, type CkbClient } from "@ckb-automata/ccc";
 import type { AutomataEnvironment } from "@ckb-automata/config";
+import { deploymentRegistry, parseShannons } from "@ckb-automata/core";
 
 import { ExecutorAdapterRegistry, type RegisteredExecutorAdapter } from "./adapter.ts";
+import { ChainBuildSnapshotSource } from "./build-snapshot.ts";
+import { PostgresBuildAttemptStore } from "./build-store.ts";
+import { BuildCoordinator } from "./build-worker.ts";
 import { EligibilityCoordinator, PostgresEligibilityJobSource } from "./eligibility-worker.ts";
 import { DEADLINE_EXECUTOR_ADAPTER } from "./policies/deadline.ts";
 import { RECURRING_EXECUTOR_ADAPTER } from "./policies/recurring.ts";
@@ -36,6 +40,7 @@ Module({})(ExecutorModule);
 export interface ExecutorModuleDependencies {
   readonly adapters?: readonly RegisteredExecutorAdapter[];
   readonly createChainClient?: (environment: AutomataEnvironment) => ExecutorChainClient;
+  readonly enableBuildWorkers?: boolean;
   readonly enableEligibilityWorkers?: boolean;
   readonly logger: ExecutorEventLogger;
   readonly queuePrefix?: string;
@@ -102,6 +107,79 @@ export function createExecutorModule(
               }),
           },
         ];
+  const hasBuildConfiguration =
+    environment.EXECUTOR_LOCK_ARGS !== undefined &&
+    environment.EXECUTOR_TRANSACTION_FEE !== undefined;
+  if (
+    (environment.EXECUTOR_LOCK_ARGS === undefined) !==
+    (environment.EXECUTOR_TRANSACTION_FEE === undefined)
+  ) {
+    throw new Error("executor lock args and transaction fee must be configured together");
+  }
+  if (dependencies.enableBuildWorkers === true && !hasBuildConfiguration) {
+    throw new Error("transaction build worker configuration is required");
+  }
+  const buildProviders: Provider[] =
+    dependencies.enableBuildWorkers === false || !hasBuildConfiguration
+      ? []
+      : [
+          {
+            provide: BuildCoordinator,
+            inject: [
+              EXECUTOR_ENVIRONMENT,
+              ExecutorRuntime,
+              ExecutorAdapterRegistry,
+              DurableQueueRegistry,
+              EXECUTOR_LOGGER,
+            ],
+            useFactory: async (
+              configured: AutomataEnvironment,
+              runtime: ExecutorRuntime,
+              registry: ExecutorAdapterRegistry,
+              queues: DurableQueueRegistry,
+              logger: ExecutorEventLogger,
+            ) => {
+              const loaded = await deploymentRegistry.load(configured.CKB_GENESIS_HASH);
+              if (loaded.status !== "ok") {
+                throw new Error("executor deployment is unavailable for transaction building");
+              }
+              const lockArgs = configured.EXECUTOR_LOCK_ARGS;
+              const transactionFee = configured.EXECUTOR_TRANSACTION_FEE;
+              if (lockArgs === undefined || transactionFee === undefined) {
+                throw new Error("transaction build worker configuration is unavailable");
+              }
+              const secp = loaded.deployment.manifest.secp256k1Blake160;
+              const rewardLock = Object.freeze({
+                codeHash: secp.codeHash,
+                hashType: secp.hashType,
+                args: lockArgs as `0x${string}`,
+              });
+              return new BuildCoordinator({
+                runtime,
+                queues,
+                registry,
+                identity: Object.freeze({
+                  rewardLock,
+                  transactionFee: parseShannons(transactionFee),
+                }),
+                source: new ChainBuildSnapshotSource({
+                  deployment: loaded.deployment,
+                  runtime,
+                  rewardLock,
+                }),
+                store: new PostgresBuildAttemptStore(
+                  configured.DATABASE_URL,
+                  configured.CKB_NETWORK,
+                ),
+                redisUrl: configured.REDIS_URL,
+                logger,
+                ...(dependencies.queuePrefix === undefined
+                  ? {}
+                  : { prefix: dependencies.queuePrefix }),
+              });
+            },
+          },
+        ];
   return {
     module: ExecutorModule,
     imports,
@@ -149,6 +227,7 @@ export function createExecutorModule(
         },
       },
       ...eligibilityProviders,
+      ...buildProviders,
     ],
     exports: [ExecutorAdapterRegistry, ExecutorRuntime, EXECUTOR_QUEUES],
   };

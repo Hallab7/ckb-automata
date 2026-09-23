@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { parseHash32 } from "@ckb-automata/core";
 
-import { createExecutorApplication } from "./bootstrap.ts";
+import { createExecutorApplication, startExecutor } from "./bootstrap.ts";
 
 const GENESIS_HASH = parseHash32(`0x${"1".repeat(64)}`);
 
@@ -31,6 +31,15 @@ function chainFixture(genesisHash = GENESIS_HASH) {
       },
       async getTipHeader() {
         throw new Error("tip header is not used by bootstrap tests");
+      },
+      async getCellLive() {
+        throw new Error("live cells are not used by bootstrap tests");
+      },
+      async findCellsPaged() {
+        throw new Error("cell discovery is not used by bootstrap tests");
+      },
+      async getTransactionStatus() {
+        throw new Error("transactions are not used by bootstrap tests");
       },
       async close() {
         closes += 1;
@@ -123,6 +132,18 @@ test("invalid configuration prevents context creation", async () => {
     }),
   );
   assert.equal(creations, 0);
+});
+
+test("the production entrypoint requires public fee-cell configuration", async () => {
+  await assert.rejects(
+    startExecutor(environment(), {
+      createApplicationContext: async () => {
+        throw new Error("application context must not be created");
+      },
+      writer: () => undefined,
+    }),
+    /build worker configuration is required/,
+  );
 });
 
 test("wrong-network readiness fails closed and disposes the chain", async () => {

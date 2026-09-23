@@ -28,7 +28,7 @@ import type { ExecutorEventLogger, ExecutorRuntime } from "./runtime.ts";
 export const DISCOVERY_INTERVAL_MS = 5_000;
 export const MAX_DISCOVERY_JOBS = 500;
 
-interface EligibilityRow {
+export interface EligibilityRow {
   readonly network_id: string;
   readonly job_id: string;
   readonly sequence: string;
@@ -50,7 +50,7 @@ export interface EligibilityJobSource {
   close(): Promise<void>;
 }
 
-function toRecord(row: EligibilityRow): EligibilityJobRecord {
+export function eligibilityRecordFromRow(row: EligibilityRow): EligibilityJobRecord {
   if (row.policy_kind !== "deadline" && row.policy_kind !== "recurring") {
     throw new Error("live job has an unsupported policy kind");
   }
@@ -122,7 +122,7 @@ export class PostgresEligibilityJobSource implements EligibilityJobSource {
             ORDER BY job_id
             LIMIT ${limit}
           `;
-    return Object.freeze(rows.map(toRecord));
+    return Object.freeze(rows.map(eligibilityRecordFromRow));
   }
 
   async getLiveJob(jobId: string, sequence: string): Promise<EligibilityJobRecord | undefined> {
@@ -138,7 +138,7 @@ export class PostgresEligibilityJobSource implements EligibilityJobSource {
         AND state = 'live'
       LIMIT 1
     `;
-    return rows[0] ? toRecord(rows[0]) : undefined;
+    return rows[0] ? eligibilityRecordFromRow(rows[0]) : undefined;
   }
 
   async close(): Promise<void> {

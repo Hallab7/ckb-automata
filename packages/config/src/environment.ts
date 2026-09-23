@@ -12,6 +12,8 @@ export const AUTOMATA_ENV_KEYS = [
   "CKB_INDEXER_URL",
   "DATABASE_URL",
   "REDIS_URL",
+  "EXECUTOR_LOCK_ARGS",
+  "EXECUTOR_TRANSACTION_FEE",
   "PUBLIC_APP_ORIGIN",
   "WEBHOOK_ENCRYPTION_KEY",
   "ERROR_TRACKING_DSN",
@@ -40,6 +42,20 @@ const commonFields = {
   ERROR_TRACKING_DSN: z.preprocess(
     (value) => (value === "" || value === "local-placeholder-disabled" ? undefined : value),
     z.url().optional(),
+  ),
+  EXECUTOR_LOCK_ARGS: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z
+      .string()
+      .regex(/^0x[0-9a-f]{40}$/, "must be canonical 20-byte secp256k1 lock arguments")
+      .optional(),
+  ),
+  EXECUTOR_TRANSACTION_FEE: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z
+      .string()
+      .regex(/^(0|[1-9][0-9]*)$/, "must be a canonical decimal shannon amount")
+      .optional(),
   ),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.preprocess(
     (value) => (value === "" || value === "local-placeholder-disabled" ? undefined : value),

@@ -10,6 +10,7 @@ import { CkbClientError, createCkbClient } from "./ckb-client.ts";
 const GENESIS_HASH = `0x${"11".repeat(32)}`;
 const TIP_HASH = `0x${"22".repeat(32)}`;
 const PARENT_HASH = `0x${"33".repeat(32)}`;
+const LIVE_TX_HASH = `0x${"66".repeat(32)}`;
 
 interface RpcRequest {
   readonly id: number;
@@ -75,7 +76,27 @@ async function openServer(
 
 test("CCC wrapper reads chain and indexer responses", async (context) => {
   const chain = await openServer((request, response) => {
-    respond(response, request, request.method === "get_block_hash" ? GENESIS_HASH : tipHeader());
+    const result =
+      request.method === "get_block_hash"
+        ? GENESIS_HASH
+        : request.method === "get_live_cell"
+          ? {
+              cell: {
+                data: { content: "0x", hash: `0x${"00".repeat(32)}` },
+                output: {
+                  capacity: "0x174876e800",
+                  lock: {
+                    args: `0x${"77".repeat(20)}`,
+                    code_hash: `0x${"88".repeat(32)}`,
+                    hash_type: "type",
+                  },
+                  type: null,
+                },
+              },
+              status: "live",
+            }
+          : tipHeader();
+    respond(response, request, result);
   });
   const indexer = await openServer((request, response) => {
     respond(response, request, { block_number: "0x29", block_hash: PARENT_HASH });
@@ -97,6 +118,9 @@ test("CCC wrapper reads chain and indexer responses", async (context) => {
     blockNumber: 41n,
     blockHash: PARENT_HASH,
   });
+  const live = await client.getCellLive({ txHash: LIVE_TX_HASH, index: 0 });
+  assert.equal(live?.outPoint.txHash, LIVE_TX_HASH);
+  assert.equal(live?.cellOutput.capacity, 100_000_000_000n);
 });
 
 test("client configuration rejects unsafe endpoints and retry bounds", () => {

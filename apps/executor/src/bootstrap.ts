@@ -98,6 +98,7 @@ export interface ExecutorBootstrapDependencies {
     logger: LoggerService,
   ) => Promise<INestApplicationContext>;
   readonly createChainClient?: ExecutorModuleDependencies["createChainClient"];
+  readonly enableBuildWorkers?: boolean;
   readonly enableEligibilityWorkers?: boolean;
   readonly logger?: ExecutorLogger;
   readonly queuePrefix?: string;
@@ -127,6 +128,9 @@ export async function createExecutorApplication(
     ...(dependencies.createChainClient === undefined
       ? {}
       : { createChainClient: dependencies.createChainClient }),
+    ...(dependencies.enableBuildWorkers === undefined
+      ? {}
+      : { enableBuildWorkers: dependencies.enableBuildWorkers }),
     ...(dependencies.enableEligibilityWorkers === undefined
       ? {}
       : { enableEligibilityWorkers: dependencies.enableEligibilityWorkers }),
@@ -149,5 +153,8 @@ export async function startExecutor(
   input: Readonly<Record<string, string | undefined>> = process.env,
   dependencies: ExecutorBootstrapDependencies = {},
 ): Promise<ExecutorBootstrapResult> {
-  return createExecutorApplication(input, dependencies);
+  return createExecutorApplication(input, {
+    ...dependencies,
+    enableBuildWorkers: dependencies.enableBuildWorkers ?? true,
+  });
 }

@@ -16,6 +16,7 @@ import {
 import { AUTOMATA_QUEUES } from "@ckb-automata/telemetry";
 
 import { migrateDatabase } from "../../api/src/database/migrator.ts";
+import { PostgresBuildAttemptStore } from "../src/build-store.ts";
 import { createExecutorApplication } from "../src/bootstrap.ts";
 import { DurableQueueRegistry, parseRedisConnection } from "../src/queues.ts";
 
@@ -135,6 +136,15 @@ function chainFixture(state) {
         timestamp: "0x0",
       };
     },
+    async getCellLive() {
+      throw new Error("build worker is not configured by this test");
+    },
+    async findCellsPaged() {
+      throw new Error("build worker is not configured by this test");
+    },
+    async getTransactionStatus() {
+      throw new Error("build worker is not configured by this test");
+    },
     async close() {},
   };
 }
@@ -198,3 +208,48 @@ test(
     }
   },
 );
+
+test("concurrent build deliveries share one durable operational attempt", async () => {
+  const database = await createDatabase();
+  let store;
+  try {
+    const job = await seedJob(database.url);
+    store = new PostgresBuildAttemptStore(database.url, deployment.network);
+    const payload = {
+      ...job,
+      adapterId: "recurring-v1",
+      evaluatedAt: { blockHash: hash(90), blockNumber: "90" },
+    };
+    const claims = await Promise.all([store.claim(payload), store.claim(payload)]);
+    const claimed = claims.find((result) => result.status === "claimed");
+    const duplicate = claims.find((result) => result.status === "duplicate");
+    assert.ok(claimed && duplicate);
+    assert.equal(duplicate.attemptId, claimed.claim.attemptId);
+    assert.equal(
+      await store.complete(claimed.claim, { tip: payload.evaluatedAt }, hash(72), {
+        version: "0x0",
+      }),
+      true,
+    );
+    const replay = await store.claim(payload);
+    assert.equal(replay.status, "duplicate");
+    assert.equal(replay.attemptId, claimed.claim.attemptId);
+    assert.equal(replay.intentHash, hash(72));
+
+    const sql = postgres(database.url, { max: 1, onnotice: () => undefined });
+    try {
+      const [count] = await sql`
+        SELECT count(*)::integer AS value
+        FROM transaction_attempts
+        WHERE job_id = ${job.jobId} AND sequence = ${job.sequence}
+      `;
+      assert.equal(count.value, 1);
+    } finally {
+      await sql.end({ timeout: 2 });
+    }
+  } finally {
+    if (store) await store.close();
+    await database.admin.unsafe(`DROP DATABASE IF EXISTS "${database.name}" WITH (FORCE)`);
+    await database.admin.end({ timeout: 2 });
+  }
+});
