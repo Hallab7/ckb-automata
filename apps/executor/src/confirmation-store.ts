@@ -16,6 +16,8 @@ export const MAX_CONFIRMATION_ATTEMPTS = 500;
 
 interface AttemptRow {
   readonly id: string;
+  readonly job_id: string;
+  readonly sequence: string;
   readonly tx_hash: string;
   readonly state: ConfirmationAttempt["state"];
   readonly submitted_at: Date;
@@ -29,6 +31,12 @@ interface EvidenceRow {
   readonly executor_lock_hash?: string | null;
   readonly successor_tx_hash?: string | null;
   readonly successor_index?: string | null;
+}
+
+interface ReorgRow extends EvidenceRow {
+  readonly original_tx_hash: string;
+  readonly original_index: string;
+  readonly original_input_live: boolean;
 }
 
 function inclusion(
@@ -114,12 +122,13 @@ export class PostgresConfirmationStore implements ConfirmationStore {
 
   async load(attemptId: string, transactionHash: Hash32): Promise<ConfirmationAttempt | undefined> {
     const rows = await this.#sql<AttemptRow[]>`
-      SELECT id, tx_hash, state, submitted_at, committed_block_number::text
+      SELECT id, job_id, sequence::text, tx_hash, state, submitted_at,
+             committed_block_number::text
       FROM transaction_attempts
       WHERE network_id = ${this.#network}
         AND id = ${attemptId}
         AND tx_hash = ${transactionHash}
-        AND state IN ('submitted', 'proposed', 'committed')
+        AND state IN ('submitted', 'proposed', 'committed', 'reorged')
         AND submitted_at IS NOT NULL
       LIMIT 1
     `;
@@ -127,6 +136,8 @@ export class PostgresConfirmationStore implements ConfirmationStore {
     return row
       ? Object.freeze({
           attemptId: row.id,
+          jobId: parseHash32(row.job_id),
+          sequence: row.sequence,
           transactionHash: parseHash32(row.tx_hash),
           state: row.state,
           submittedAt: row.submitted_at,
@@ -209,7 +220,37 @@ export class PostgresConfirmationStore implements ConfirmationStore {
       ORDER BY event.block_number DESC, event.id DESC
       LIMIT 1
     `;
+    const reorgs = await this.#sql<ReorgRow[]>`
+      SELECT event.block_number::text, event.block_hash, event.tx_hash,
+             attempt.chain_snapshot->'job'->'outPoint'->>'txHash' AS original_tx_hash,
+             attempt.chain_snapshot->'job'->'outPoint'->>'index' AS original_index,
+             EXISTS (
+               SELECT 1
+               FROM jobs AS restored
+               WHERE restored.network_id = attempt.network_id
+                 AND restored.job_id = attempt.job_id
+                 AND restored.state = 'live'
+                 AND restored.outpoint_tx_hash =
+                     attempt.chain_snapshot->'job'->'outPoint'->>'txHash'
+                 AND restored.outpoint_index::text =
+                     attempt.chain_snapshot->'job'->'outPoint'->>'index'
+             ) AS original_input_live
+      FROM job_events AS event
+      JOIN transaction_attempts AS attempt
+        ON attempt.network_id = event.network_id AND attempt.job_id = event.job_id
+      WHERE attempt.id = ${attempt.attemptId}
+        AND event.source = 'indexed'
+        AND event.canonical = false
+        AND event.tx_hash = ${attempt.transactionHash}
+        AND event.block_number IS NOT NULL
+        AND event.block_hash IS NOT NULL
+        AND attempt.chain_snapshot->'job'->'outPoint'->>'txHash' IS NOT NULL
+        AND attempt.chain_snapshot->'job'->'outPoint'->>'index' IS NOT NULL
+      ORDER BY event.block_number DESC, event.id DESC
+      LIMIT 1
+    `;
     const conflict = conflicts[0];
+    const reorg = reorgs[0];
     return Object.freeze({
       requiredDepth: network.confirmation_depth,
       ...(network.checkpoint === null ? {} : { checkpointBlockNumber: network.checkpoint }),
@@ -218,6 +259,18 @@ export class PostgresConfirmationStore implements ConfirmationStore {
         ? {}
         : {
             conflict: contentionEvidence(conflict),
+          }),
+      ...(reorg === undefined
+        ? {}
+        : {
+            reorg: Object.freeze({
+              orphanedBlock: inclusion(reorg, "orphaned_indexed_event"),
+              originalOutPoint: Object.freeze({
+                txHash: parseHash32(reorg.original_tx_hash),
+                index: parseOutputIndex(reorg.original_index).toString(),
+              }),
+              originalInputLive: reorg.original_input_live,
+            }),
           }),
     });
   }
@@ -242,7 +295,12 @@ export class PostgresConfirmationStore implements ConfirmationStore {
                       ? {}
                       : { successorOutPoint: transition.successorOutPoint }),
                   })
-                : null
+                : transition.state === "reorged"
+                  ? sql.json({
+                      orphanedBlock: transition.orphanedBlock,
+                      originalOutPoint: transition.originalOutPoint,
+                    } as unknown as postgres.JSONValue)
+                  : null
             },
             updated_at = ${now}
         WHERE network_id = ${this.#network}
@@ -276,6 +334,12 @@ export class PostgresConfirmationStore implements ConfirmationStore {
             ...(transition.successorOutPoint === undefined
               ? {}
               : { successorOutPoint: transition.successorOutPoint }),
+            ...(transition.orphanedBlock === undefined
+              ? {}
+              : { orphanedBlock: transition.orphanedBlock }),
+            ...(transition.originalOutPoint === undefined
+              ? {}
+              : { originalOutPoint: transition.originalOutPoint }),
             ...(transition.confirmations === undefined
               ? {}
               : {
@@ -283,7 +347,7 @@ export class PostgresConfirmationStore implements ConfirmationStore {
                   requiredDepth: transition.requiredDepth,
                   evidenceSource: transition.block?.source,
                 }),
-          })},
+          } as unknown as postgres.JSONValue)},
           ${now}
         )
       `;

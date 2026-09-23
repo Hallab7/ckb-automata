@@ -14,6 +14,7 @@ import {
 } from "./confirmation.ts";
 
 const ATTEMPT_ID = "00000000-0000-4000-8000-000000000075";
+const JOB_ID = parseHash32(`0x${"74".repeat(32)}`);
 const TX_HASH = parseHash32(`0x${"75".repeat(32)}`);
 const BLOCK_HASH = parseHash32(`0x${"50".repeat(32)}`);
 
@@ -24,6 +25,8 @@ function attempt(
 ): ConfirmationAttempt {
   return Object.freeze({
     attemptId: ATTEMPT_ID,
+    jobId: JOB_ID,
+    sequence: "4",
     transactionHash: TX_HASH,
     state,
     submittedAt,
@@ -154,6 +157,51 @@ test("a canonical competing spend conflicts the attempt before RPC status", () =
       relatedTransactionHash: conflict.transactionHash,
       winningExecutorLockHash: conflict.executorLockHash,
       successorOutPoint: conflict.successorOutPoint,
+    },
+  );
+});
+
+test("only an orphan with its exact original input restored enters recovery", async () => {
+  const originalOutPoint = Object.freeze({
+    txHash: parseHash32(`0x${"73".repeat(32)}`),
+    index: "0",
+  });
+  const orphanedBlock = Object.freeze({
+    blockNumber: "100",
+    blockHash: BLOCK_HASH,
+    source: "orphaned_indexed_event" as const,
+  });
+  const unavailable = {
+    requiredDepth: 2,
+    reorg: { orphanedBlock, originalOutPoint, originalInputLive: false },
+  } satisfies ConfirmationEvidence;
+  assert.equal(
+    deriveConfirmationTransition(
+      attempt("committed", undefined, "100"),
+      rpc("unknown"),
+      unavailable,
+      new Date(),
+    ),
+    undefined,
+  );
+  const restored = {
+    requiredDepth: 2,
+    reorg: { orphanedBlock, originalOutPoint, originalInputLive: true },
+  } satisfies ConfirmationEvidence;
+  assert.deepEqual(
+    deriveConfirmationTransition(
+      attempt("committed", undefined, "100"),
+      rpc("unknown"),
+      restored,
+      new Date(),
+    ),
+    {
+      state: "reorged",
+      eventType: "transaction_reorged",
+      observedStatus: "unknown",
+      errorCode: "EXECUTOR_TX_REORGED",
+      orphanedBlock,
+      originalOutPoint,
     },
   );
 });

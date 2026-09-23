@@ -16,6 +16,7 @@ export {
   type ConfirmationEvidence,
   type ConfirmationInclusion,
   type ConfirmationQueuePayload,
+  type ConfirmationRecovery,
   type ConfirmationResult,
   type ConfirmationState,
   type ConfirmationStore,

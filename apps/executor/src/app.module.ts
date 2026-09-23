@@ -303,6 +303,20 @@ export function createExecutorModule(
                     getTransactionStatus: (transactionHash) =>
                       runtime.getTransactionStatus(transactionHash),
                   },
+                  recovery: {
+                    async requeue(attempt) {
+                      await queues.enqueue(
+                        "evaluate",
+                        "evaluate-job",
+                        `${attempt.jobId}/${attempt.sequence}/reorg-${attempt.attemptId}`,
+                        Object.freeze({
+                          jobId: attempt.jobId,
+                          sequence: attempt.sequence,
+                          wakeSequence: 0,
+                        }),
+                      );
+                    },
+                  },
                 }),
                 redisUrl: environment.REDIS_URL,
                 logger,

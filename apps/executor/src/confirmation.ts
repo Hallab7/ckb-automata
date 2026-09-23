@@ -3,7 +3,7 @@ import { parseBlockNumber, parseHash32, type Hash32 } from "@ckb-automata/core";
 export const CONFIRMATION_DROP_AFTER_MS = 10 * 60_000;
 
 export type ConfirmationState =
-  "submitted" | "proposed" | "committed" | "confirmed" | "conflicted" | "dropped";
+  "submitted" | "proposed" | "committed" | "confirmed" | "conflicted" | "dropped" | "reorged";
 
 export interface ConfirmationQueuePayload {
   readonly attemptId: string;
@@ -12,8 +12,10 @@ export interface ConfirmationQueuePayload {
 
 export interface ConfirmationAttempt {
   readonly attemptId: string;
+  readonly jobId: Hash32;
+  readonly sequence: string;
   readonly transactionHash: Hash32;
-  readonly state: "submitted" | "proposed" | "committed";
+  readonly state: "submitted" | "proposed" | "committed" | "reorged";
   readonly submittedAt: Date;
   readonly committedBlockNumber?: string;
 }
@@ -21,7 +23,7 @@ export interface ConfirmationAttempt {
 export interface ConfirmationInclusion {
   readonly blockNumber: string;
   readonly blockHash: Hash32;
-  readonly source: "indexed_event" | "rpc_canonical_block";
+  readonly source: "indexed_event" | "rpc_canonical_block" | "orphaned_indexed_event";
 }
 
 export interface ConfirmationEvidence {
@@ -35,6 +37,14 @@ export interface ConfirmationEvidence {
       readonly txHash: Hash32;
       readonly index: string;
     };
+  };
+  readonly reorg?: {
+    readonly orphanedBlock: ConfirmationInclusion;
+    readonly originalOutPoint: {
+      readonly txHash: Hash32;
+      readonly index: string;
+    };
+    readonly originalInputLive: boolean;
   };
 }
 
@@ -57,6 +67,11 @@ export interface ConfirmationTransition {
   readonly relatedTransactionHash?: Hash32;
   readonly winningExecutorLockHash?: Hash32;
   readonly successorOutPoint?: {
+    readonly txHash: Hash32;
+    readonly index: string;
+  };
+  readonly orphanedBlock?: ConfirmationInclusion;
+  readonly originalOutPoint?: {
     readonly txHash: Hash32;
     readonly index: string;
   };
@@ -88,8 +103,12 @@ export interface ConfirmationChain {
   >;
 }
 
+export interface ConfirmationRecovery {
+  requeue(attempt: ConfirmationAttempt): Promise<void>;
+}
+
 export type ConfirmationResult =
-  | { readonly status: "stale" | "unchanged" }
+  | { readonly status: "stale" | "unchanged" | "requeued" }
   | {
       readonly status: "transitioned";
       readonly state: Exclude<ConfirmationState, "submitted">;
@@ -148,6 +167,19 @@ export function deriveConfirmationTransition(
       ...(evidence.conflict.successorOutPoint === undefined
         ? {}
         : { successorOutPoint: evidence.conflict.successorOutPoint }),
+    });
+  }
+  if (
+    evidence.reorg?.originalInputLive === true &&
+    (attempt.state === "committed" || attempt.state === "reorged")
+  ) {
+    return Object.freeze({
+      state: "reorged",
+      eventType: "transaction_reorged",
+      observedStatus: rpc?.status ?? "unavailable",
+      errorCode: "EXECUTOR_TX_REORGED",
+      orphanedBlock: evidence.reorg.orphanedBlock,
+      originalOutPoint: evidence.reorg.originalOutPoint,
     });
   }
   if (rpc?.status === "proposed" && attempt.state === "submitted") {
@@ -218,17 +250,20 @@ export class ConfirmationService {
   readonly #chain: ConfirmationChain;
   readonly #now: () => Date;
   readonly #dropAfterMs: number;
+  readonly #recovery: ConfirmationRecovery | undefined;
 
   constructor(options: {
     readonly store: ConfirmationStore;
     readonly chain: ConfirmationChain;
     readonly now?: () => Date;
     readonly dropAfterMs?: number;
+    readonly recovery?: ConfirmationRecovery;
   }) {
     this.#store = options.store;
     this.#chain = options.chain;
     this.#now = options.now ?? (() => new Date());
     this.#dropAfterMs = options.dropAfterMs ?? CONFIRMATION_DROP_AFTER_MS;
+    this.#recovery = options.recovery;
   }
 
   async track(payload: ConfirmationQueuePayload): Promise<ConfirmationResult> {
@@ -257,8 +292,17 @@ export class ConfirmationService {
       if (rpcError !== undefined) throw rpcError;
       return Object.freeze({ status: "unchanged" });
     }
+    if (transition.state === "reorged" && attempt.state === "reorged") {
+      if (!this.#recovery) throw new Error("confirmation recovery queue is unavailable");
+      await this.#recovery.requeue(attempt);
+      return Object.freeze({ status: "requeued" });
+    }
     if (!(await this.#store.apply(attempt, transition))) {
       return Object.freeze({ status: "stale" });
+    }
+    if (transition.state === "reorged") {
+      if (!this.#recovery) throw new Error("confirmation recovery queue is unavailable");
+      await this.#recovery.requeue(attempt);
     }
     return Object.freeze({ status: "transitioned", state: transition.state });
   }
