@@ -174,6 +174,7 @@ function WalletSessionBridge({ children }: Readonly<{ children: ReactNode }>) {
   const [details, setDetails] = useState<{
     readonly address?: string;
     readonly balanceShannons?: bigint;
+    readonly ownerLockHash?: string;
     readonly signer?: ccc.Signer;
     readonly status: WalletSession["detailsStatus"];
   }>({ status: "idle" });
@@ -182,20 +183,25 @@ function WalletSessionBridge({ children }: Readonly<{ children: ReactNode }>) {
     if (signer === undefined || status !== "ready") return;
     let active = true;
     setDetails({ signer, status: "loading" });
-    void Promise.allSettled([signer.getRecommendedAddress(), signer.getBalance()]).then(
-      ([addressResult, balanceResult]) => {
-        if (!active) return;
-        setDetails({
-          ...(addressResult.status === "fulfilled" ? { address: addressResult.value } : {}),
-          ...(balanceResult.status === "fulfilled" ? { balanceShannons: balanceResult.value } : {}),
-          signer,
-          status:
-            addressResult.status === "fulfilled" && balanceResult.status === "fulfilled"
-              ? "ready"
-              : "error",
-        });
-      },
-    );
+    void Promise.allSettled([
+      signer.getRecommendedAddress(),
+      signer.getBalance(),
+      signer.getRecommendedAddressObj(),
+    ]).then(([addressResult, balanceResult, addressObjectResult]) => {
+      if (!active) return;
+      setDetails({
+        ...(addressResult.status === "fulfilled" ? { address: addressResult.value } : {}),
+        ...(balanceResult.status === "fulfilled" ? { balanceShannons: balanceResult.value } : {}),
+        ...(addressObjectResult.status === "fulfilled"
+          ? { ownerLockHash: ccc.hashCkb(addressObjectResult.value.script.toBytes()) }
+          : {}),
+        signer,
+        status:
+          addressResult.status === "fulfilled" && balanceResult.status === "fulfilled"
+            ? "ready"
+            : "error",
+      });
+    });
     return () => {
       active = false;
     };
@@ -211,6 +217,7 @@ function WalletSessionBridge({ children }: Readonly<{ children: ReactNode }>) {
       disconnect: () => connector.disconnect(),
       isConnectorOpen: connector.isOpen,
       open: () => connector.open(),
+      ownerLockHash: status === "ready" ? currentDetails.ownerLockHash : undefined,
       refreshDetails: () => setRefreshKey((current) => current + 1),
       signer,
       status,

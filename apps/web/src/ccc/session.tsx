@@ -15,6 +15,7 @@ export interface WalletSession {
   readonly disconnect: () => void;
   readonly isConnectorOpen: boolean;
   readonly open: () => void;
+  readonly ownerLockHash: string | undefined;
   readonly refreshDetails: () => void;
   readonly signer: Signer | undefined;
   readonly status: WalletReadiness;

@@ -41,6 +41,7 @@ test("App Router exposes every planned product route", async () => {
   ]);
   assert.ok(routes.includes("/fixtures/visual-system"));
   assert.ok(routes.includes("/fixtures/wallet-provider"));
+  assert.ok(routes.includes("/fixtures/automation-dashboard"));
   for (const boundary of [
     "error.tsx",
     "global-error.tsx",
