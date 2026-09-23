@@ -58,7 +58,7 @@ test("every durable queue has bounded retry and retention policy", () => {
     assert.equal(policy.removeOnFail.age > policy.removeOnComplete.age, true);
     assert.equal(policy.removeOnFail.count >= policy.removeOnComplete.count, true);
   }
-  assert.equal(QUEUE_POLICIES["dead-letter"].attempts, 1);
+  assert.equal(QUEUE_POLICIES["dead-letter"].attempts, 12);
 });
 
 test("stable IDs bind both queue and idempotency key without reserved separators", () => {
@@ -145,7 +145,14 @@ test("registry readiness fails within its bounded startup deadline", async () =>
 test("terminal failures are copied to the retained dead-letter queue", async () => {
   const { registry, fixtures } = registryFixture();
   const sourceJobId = stableQueueJobId("submit", "job-9");
-  await registry.deadLetter("submit", sourceJobId, "SUBMISSION_REJECTED");
+  const failedAt = new Date("2026-09-23T15:00:00.000Z");
+  const sourceJob = {
+    id: sourceJobId,
+    name: "submit-transaction",
+    data: { schemaVersion: 1 as const, trace: {}, payload: { attemptId: "attempt-9" } },
+    attemptsMade: 3,
+  };
+  await registry.deadLetter("submit", sourceJob, "SUBMISSION_REJECTED", failedAt);
   const deadLetter = fixtures.find(({ queue }) => queue.name === "dead-letter");
   assert.ok(deadLetter);
   assert.deepEqual(deadLetter.additions[0], {
@@ -153,12 +160,20 @@ test("terminal failures are copied to the retained dead-letter queue", async () 
     data: {
       schemaVersion: 1,
       trace: {},
-      payload: { sourceQueue: "submit", sourceJobId, failureCode: "SUBMISSION_REJECTED" },
+      payload: {
+        sourceQueue: "submit",
+        sourceJobId,
+        sourceOperation: "submit-transaction",
+        sourceEnvelope: sourceJob.data,
+        failureCode: "SUBMISSION_REJECTED",
+        attempts: 3,
+        failedAt: failedAt.toISOString(),
+      },
     },
     options: {
       jobId: stableQueueJobId("dead-letter", `submit/${sourceJobId}/SUBMISSION_REJECTED`),
       delay: 0,
     },
   });
-  assert.throws(() => registry.deadLetter("submit", sourceJobId, "raw message"));
+  assert.throws(() => registry.deadLetter("submit", sourceJob, "raw message"));
 });

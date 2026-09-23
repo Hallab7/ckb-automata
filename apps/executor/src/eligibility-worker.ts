@@ -20,6 +20,7 @@ import {
 import {
   DEFAULT_QUEUE_PREFIX,
   DurableQueueRegistry,
+  forwardTerminalFailures,
   parseRedisConnection,
   type QueueJobEnvelope,
 } from "./queues.ts";
@@ -260,6 +261,8 @@ export class EligibilityCoordinator implements OnApplicationBootstrap, OnModuleD
         workerOptions,
       ),
     ];
+    forwardTerminalFailures(this.#workers[0]!, "discovery", this.#queues, this.#logger);
+    forwardTerminalFailures(this.#workers[1]!, "evaluate", this.#queues, this.#logger);
     await Promise.all(this.#workers.map((worker) => worker.waitUntilReady()));
     await this.#runtime.run(() => this.#scanAndSchedule(nextSlot(this.#now())));
     this.#logger.info("executor.eligibility.started", "Eligibility workers are ready");

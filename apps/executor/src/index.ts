@@ -7,6 +7,22 @@ export { PostgresBuildAttemptStore } from "./build-store.ts";
 export { BuildCoordinator } from "./build-worker.ts";
 export { PostgresConfirmationStore, MAX_CONFIRMATION_ATTEMPTS } from "./confirmation-store.ts";
 export { CONFIRMATION_POLL_MS, ConfirmationCoordinator } from "./confirmation-worker.ts";
+export { PostgresDeadLetterStore } from "./dead-letter-store.ts";
+export { DeadLetterCoordinator } from "./dead-letter-worker.ts";
+export {
+  DeadLetterOperations,
+  parseDeadLetterId,
+  parseDeadLetterOperator,
+  parseDeadLetterPayload,
+  parseDeadLetterReason,
+  type DeadLetterAction,
+  type DeadLetterActionKind,
+  type DeadLetterCloseDecision,
+  type DeadLetterRecord,
+  type DeadLetterReplayDecision,
+  type DeadLetterSourceQueue,
+  type DeadLetterStore,
+} from "./dead-letter.ts";
 export {
   CONFIRMATION_DROP_AFTER_MS,
   ConfirmationService,
@@ -73,6 +89,7 @@ export {
   QUEUE_READINESS_TIMEOUT_MS,
   QUEUE_POLICIES,
   DurableQueueRegistry,
+  forwardTerminalFailures,
   parseRedisConnection,
   queueRegistrationOptions,
   queueRootOptions,

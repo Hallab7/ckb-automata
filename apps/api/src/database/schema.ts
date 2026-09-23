@@ -527,6 +527,7 @@ export const deadLetters = pgTable(
     createdAt: createdAt(),
   },
   (table) => [
+    uniqueIndex("dead_letters_queue_job_uq").on(table.queue, table.jobKey),
     index("dead_letters_unresolved_idx")
       .on(table.queue, table.failedAt)
       .where(sql`${table.resolvedAt} IS NULL`),
@@ -534,6 +535,48 @@ export const deadLetters = pgTable(
     check(
       "dead_letters_resolution_ck",
       sql`${table.resolvedAt} IS NULL OR ${table.resolvedAt} >= ${table.failedAt}`,
+    ),
+  ],
+);
+
+export const deadLetterActions = pgTable(
+  "dead_letter_actions",
+  {
+    id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+    deadLetterId: bigint("dead_letter_id", { mode: "number" })
+      .notNull()
+      .references(() => deadLetters.id, { onDelete: "cascade" }),
+    action: varchar("action", { length: 16 }).notNull(),
+    operator: varchar("operator", { length: 128 }).notNull(),
+    reason: varchar("reason", { length: 512 }),
+    replayJobId: varchar("replay_job_id", { length: 256 }),
+    dispatchedAt: timestamp("dispatched_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("dead_letter_actions_timeline_idx").on(table.deadLetterId, table.id),
+    uniqueIndex("dead_letter_actions_replay_uq")
+      .on(table.deadLetterId)
+      .where(sql`${table.action} = 'replay'`),
+    uniqueIndex("dead_letter_actions_close_uq")
+      .on(table.deadLetterId)
+      .where(sql`${table.action} = 'close'`),
+    check("dead_letter_actions_action_ck", sql`${table.action} IN ('inspect', 'replay', 'close')`),
+    check(
+      "dead_letter_actions_operator_ck",
+      sql`${table.operator} ~ '^[A-Za-z0-9][A-Za-z0-9._@-]{1,127}$'`,
+    ),
+    check(
+      "dead_letter_actions_reason_ck",
+      sql`((${table.action} = 'inspect' AND ${table.reason} IS NULL) OR (${table.action} IN ('replay', 'close') AND ${table.reason} IS NOT NULL AND length(${table.reason}) BETWEEN 8 AND 512))`,
+    ),
+    check(
+      "dead_letter_actions_replay_job_ck",
+      sql`((${table.action} = 'replay' AND ${table.replayJobId} IS NOT NULL) OR (${table.action} <> 'replay' AND ${table.replayJobId} IS NULL))`,
+    ),
+    check(
+      "dead_letter_actions_dispatch_ck",
+      sql`${table.action} = 'replay' OR ${table.dispatchedAt} IS NULL`,
     ),
   ],
 );
@@ -557,6 +600,7 @@ export const schema = {
   authChallenges,
   authSessions,
   canonicalBlocks,
+  deadLetterActions,
   deadLetters,
   demoScenarios,
   executorReceipts,

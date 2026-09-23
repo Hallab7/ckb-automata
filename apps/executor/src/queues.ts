@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { clearTimeout, setTimeout } from "node:timers";
 
-import type { Queue, Job, ConnectionOptions, JobsOptions } from "bullmq";
+import type { Queue, Job, ConnectionOptions, JobsOptions, Worker } from "bullmq";
 
 import {
   AUTOMATA_QUEUES,
@@ -10,6 +10,8 @@ import {
   type TelemetryRuntime,
   type TraceCarrier,
 } from "@ckb-automata/telemetry";
+
+import { executorFailureCode } from "./retry.ts";
 
 export const DEFAULT_QUEUE_PREFIX = "ckb-automata";
 export const MAX_QUEUE_DELAY_MS = 30 * 24 * 60 * 60 * 1_000;
@@ -45,7 +47,7 @@ export const QUEUE_POLICIES = Object.freeze({
   submit: policy(3, 2_000),
   confirm: policy(12, 5_000),
   notify: policy(5, 5_000),
-  "dead-letter": policy(1, 1_000),
+  "dead-letter": policy(12, 2_000),
 } satisfies Readonly<Record<AutomataQueue, QueuePolicy>>);
 
 export interface QueueJobEnvelope<T = unknown> {
@@ -57,7 +59,15 @@ export interface QueueJobEnvelope<T = unknown> {
 export interface DeadLetterPayload {
   readonly sourceQueue: Exclude<AutomataQueue, "dead-letter">;
   readonly sourceJobId: string;
+  readonly sourceOperation: string;
+  readonly sourceEnvelope: QueueJobEnvelope<unknown>;
   readonly failureCode: string;
+  readonly attempts: number;
+  readonly failedAt: string;
+}
+
+interface DeadLetterEventLogger {
+  error(event: string, message: string, fields?: Readonly<Record<string, unknown>>): void;
 }
 
 function assertQueuePrefix(prefix: string): string {
@@ -208,20 +218,69 @@ export class DurableQueueRegistry {
 
   deadLetter(
     sourceQueue: Exclude<AutomataQueue, "dead-letter">,
-    sourceJobId: string,
+    sourceJob: Pick<Job<QueueJobEnvelope<unknown>>, "id" | "name" | "data" | "attemptsMade">,
     failureCode: string,
+    failedAt = new Date(),
   ): Promise<Job<QueueJobEnvelope<DeadLetterPayload>>> {
-    if (!/^automata-[a-z-]+-[0-9a-f]{64}$/.test(sourceJobId)) {
+    const sourceJobId = sourceJob.id;
+    if (typeof sourceJobId !== "string" || !/^automata-[a-z-]+-[0-9a-f]{64}$/.test(sourceJobId)) {
       throw new TypeError("dead-letter source job ID is invalid");
+    }
+    assertOperation(sourceJob.name);
+    if (
+      sourceJob.data.schemaVersion !== 1 ||
+      typeof sourceJob.data.trace !== "object" ||
+      sourceJob.data.trace === null
+    ) {
+      throw new TypeError("dead-letter source envelope is invalid");
     }
     if (!/^[A-Z][A-Z0-9_]{2,63}$/.test(failureCode)) {
       throw new TypeError("dead-letter failure code is invalid");
     }
+    if (!Number.isSafeInteger(sourceJob.attemptsMade) || sourceJob.attemptsMade < 1) {
+      throw new TypeError("dead-letter attempt count is invalid");
+    }
+    if (!Number.isFinite(failedAt.getTime()))
+      throw new TypeError("dead-letter failure time is invalid");
     return this.enqueue(
       "dead-letter",
       "terminal-failure",
       `${sourceQueue}/${sourceJobId}/${failureCode}`,
-      Object.freeze({ sourceQueue, sourceJobId, failureCode }),
+      Object.freeze({
+        sourceQueue,
+        sourceJobId,
+        sourceOperation: sourceJob.name,
+        sourceEnvelope: sourceJob.data,
+        failureCode,
+        attempts: sourceJob.attemptsMade,
+        failedAt: failedAt.toISOString(),
+      }),
     );
   }
+}
+
+export function forwardTerminalFailures(
+  worker: Pick<Worker, "on">,
+  sourceQueue: Exclude<AutomataQueue, "dead-letter">,
+  queues: DurableQueueRegistry,
+  logger: DeadLetterEventLogger,
+): void {
+  worker.on("failed", (job, error) => {
+    if (!job) return;
+    const attempts = job.opts.attempts ?? QUEUE_POLICIES[sourceQueue].attempts;
+    const terminal = error.name === "UnrecoverableError" || job.attemptsMade >= attempts;
+    if (!terminal) return;
+    const failureCode = executorFailureCode(error) ?? "EXECUTOR_RETRY_EXHAUSTED";
+    void queues
+      .deadLetter(sourceQueue, job as Job<QueueJobEnvelope<unknown>>, failureCode)
+      .catch((forwardingError: unknown) => {
+        logger.error("executor.dead_letter.forward_failed", "Dead-letter forwarding failed", {
+          queue: sourceQueue,
+          jobId: job.id,
+          failureCode,
+          forwardingError:
+            forwardingError instanceof Error ? forwardingError.name : "UnknownFailure",
+        });
+      });
+  });
 }

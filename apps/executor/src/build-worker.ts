@@ -13,6 +13,7 @@ import type { BuildQueuePayload } from "./eligibility.ts";
 import {
   DEFAULT_QUEUE_PREFIX,
   DurableQueueRegistry,
+  forwardTerminalFailures,
   parseRedisConnection,
   type QueueJobEnvelope,
 } from "./queues.ts";
@@ -88,6 +89,7 @@ export class BuildCoordinator implements OnApplicationBootstrap, OnModuleDestroy
         prefix: this.#prefix,
       },
     );
+    forwardTerminalFailures(this.#worker, "build", this.#queues, this.#logger);
     await this.#worker.waitUntilReady();
     this.#logger.info("executor.build.started", "Transaction build worker is ready");
   }

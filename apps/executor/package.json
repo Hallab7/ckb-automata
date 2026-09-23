@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "dead-letter": "node src/dead-letter-cli.ts",
     "start": "node dist/main.js",
     "test": "node --test src/**/*.test.ts",
     "test:integration": "node --test --test-concurrency=1 integration/*.test.mjs",

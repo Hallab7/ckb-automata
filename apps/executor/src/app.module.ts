@@ -13,6 +13,8 @@ import { BuildCoordinator } from "./build-worker.ts";
 import { PostgresConfirmationStore } from "./confirmation-store.ts";
 import { ConfirmationCoordinator } from "./confirmation-worker.ts";
 import { ConfirmationService } from "./confirmation.ts";
+import { PostgresDeadLetterStore } from "./dead-letter-store.ts";
+import { DeadLetterCoordinator } from "./dead-letter-worker.ts";
 import { EligibilityCoordinator, PostgresEligibilityJobSource } from "./eligibility-worker.ts";
 import { DEADLINE_EXECUTOR_ADAPTER } from "./policies/deadline.ts";
 import { RECURRING_EXECUTOR_ADAPTER } from "./policies/recurring.ts";
@@ -50,6 +52,7 @@ Module({})(ExecutorModule);
 export interface ExecutorModuleDependencies {
   readonly adapters?: readonly RegisteredExecutorAdapter[];
   readonly createChainClient?: (environment: AutomataEnvironment) => ExecutorChainClient;
+  readonly enableDeadLetterWorkers?: boolean;
   readonly enableBuildWorkers?: boolean;
   readonly enableConfirmationWorkers?: boolean;
   readonly enableEligibilityWorkers?: boolean;
@@ -210,10 +213,11 @@ export function createExecutorModule(
       : [
           {
             provide: SimulationCoordinator,
-            inject: [EXECUTOR_ENVIRONMENT, ExecutorRuntime, EXECUTOR_LOGGER],
+            inject: [EXECUTOR_ENVIRONMENT, ExecutorRuntime, DurableQueueRegistry, EXECUTOR_LOGGER],
             useFactory: async (
               configured: AutomataEnvironment,
               runtime: ExecutorRuntime,
+              queues: DurableQueueRegistry,
               logger: ExecutorEventLogger,
             ) => {
               const loaded = await deploymentRegistry.load(configured.CKB_GENESIS_HASH);
@@ -247,6 +251,7 @@ export function createExecutorModule(
               const submissionStore = new PostgresSubmissionStore(configured.DATABASE_URL);
               return new SimulationCoordinator({
                 runtime,
+                queues,
                 store,
                 service: new SimulationGateService({
                   store,
@@ -350,6 +355,25 @@ export function createExecutorModule(
             },
           },
         ];
+  const deadLetterProviders: Provider[] =
+    dependencies.enableDeadLetterWorkers === false || dependencies.queues !== undefined
+      ? []
+      : [
+          {
+            provide: DeadLetterCoordinator,
+            inject: [ExecutorRuntime, EXECUTOR_LOGGER],
+            useFactory: (runtime: ExecutorRuntime, logger: ExecutorEventLogger) =>
+              new DeadLetterCoordinator({
+                runtime,
+                store: new PostgresDeadLetterStore(environment.DATABASE_URL),
+                redisUrl: environment.REDIS_URL,
+                logger,
+                ...(dependencies.queuePrefix === undefined
+                  ? {}
+                  : { prefix: dependencies.queuePrefix }),
+              }),
+          },
+        ];
   return {
     module: ExecutorModule,
     imports,
@@ -400,6 +424,7 @@ export function createExecutorModule(
       ...buildProviders,
       ...simulationProviders,
       ...confirmationProviders,
+      ...deadLetterProviders,
     ],
     exports: [ExecutorAdapterRegistry, ExecutorRuntime, EXECUTOR_QUEUES],
   };

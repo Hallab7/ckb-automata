@@ -12,6 +12,7 @@ import { MAX_CONFIRMATION_ATTEMPTS } from "./confirmation-store.ts";
 import {
   DEFAULT_QUEUE_PREFIX,
   DurableQueueRegistry,
+  forwardTerminalFailures,
   parseRedisConnection,
   type QueueJobEnvelope,
 } from "./queues.ts";
@@ -117,6 +118,7 @@ export class ConfirmationCoordinator implements OnApplicationBootstrap, OnModule
         ),
       { connection: parseRedisConnection(this.#redisUrl), prefix: this.#prefix },
     );
+    forwardTerminalFailures(this.#worker, "confirm", this.#queues, this.#logger);
     await this.#worker.waitUntilReady();
     await this.#runtime.run(() => this.#scanAndSchedule(nextSlot(this.#now())));
     this.#logger.info("executor.confirmation.started", "Confirmation worker is ready");

@@ -99,6 +99,7 @@ export interface ExecutorBootstrapDependencies {
     logger: LoggerService,
   ) => Promise<INestApplicationContext>;
   readonly createChainClient?: ExecutorModuleDependencies["createChainClient"];
+  readonly enableDeadLetterWorkers?: boolean;
   readonly enableBuildWorkers?: boolean;
   readonly enableConfirmationWorkers?: boolean;
   readonly enableEligibilityWorkers?: boolean;
@@ -131,6 +132,9 @@ export async function createExecutorApplication(
     ...(dependencies.createChainClient === undefined
       ? {}
       : { createChainClient: dependencies.createChainClient }),
+    ...(dependencies.enableDeadLetterWorkers === undefined
+      ? {}
+      : { enableDeadLetterWorkers: dependencies.enableDeadLetterWorkers }),
     ...(dependencies.enableBuildWorkers === undefined
       ? {}
       : { enableBuildWorkers: dependencies.enableBuildWorkers }),

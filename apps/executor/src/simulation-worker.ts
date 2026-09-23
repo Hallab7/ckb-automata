@@ -8,7 +8,13 @@ import {
   type SimulationQueuePayload,
   type SimulationStore,
 } from "./simulation.ts";
-import { DEFAULT_QUEUE_PREFIX, parseRedisConnection, type QueueJobEnvelope } from "./queues.ts";
+import {
+  DEFAULT_QUEUE_PREFIX,
+  DurableQueueRegistry,
+  forwardTerminalFailures,
+  parseRedisConnection,
+  type QueueJobEnvelope,
+} from "./queues.ts";
 import { executeWithRetryPolicy } from "./retry.ts";
 import type { ExecutorEventLogger, ExecutorRuntime } from "./runtime.ts";
 import type { SubmissionService, SubmissionStore } from "./submission.ts";
@@ -38,6 +44,7 @@ function payload(job: Job<QueueJobEnvelope<SimulationQueuePayload>>): Simulation
 
 export class SimulationCoordinator implements OnApplicationBootstrap, OnModuleDestroy {
   readonly #runtime: ExecutorRuntime;
+  readonly #queues: DurableQueueRegistry;
   readonly #store: SimulationStore & { close(): Promise<void> };
   readonly #service: SimulationGateService;
   readonly #submission: SubmissionService;
@@ -49,6 +56,7 @@ export class SimulationCoordinator implements OnApplicationBootstrap, OnModuleDe
 
   constructor(options: {
     readonly runtime: ExecutorRuntime;
+    readonly queues: DurableQueueRegistry;
     readonly store: SimulationStore & { close(): Promise<void> };
     readonly service: SimulationGateService;
     readonly submission: SubmissionService;
@@ -58,6 +66,7 @@ export class SimulationCoordinator implements OnApplicationBootstrap, OnModuleDe
     readonly logger: ExecutorEventLogger;
   }) {
     this.#runtime = options.runtime;
+    this.#queues = options.queues;
     this.#store = options.store;
     this.#service = options.service;
     this.#submission = options.submission;
@@ -84,6 +93,7 @@ export class SimulationCoordinator implements OnApplicationBootstrap, OnModuleDe
         prefix: this.#prefix,
       },
     );
+    forwardTerminalFailures(this.#worker, "submit", this.#queues, this.#logger);
     await this.#worker.waitUntilReady();
     this.#logger.info("executor.simulation.started", "Dry-run and profitability worker is ready");
   }
