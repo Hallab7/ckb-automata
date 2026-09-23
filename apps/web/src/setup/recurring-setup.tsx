@@ -24,6 +24,12 @@ import {
   reviewStateError,
   type CreationReviewState,
 } from "./creation-review.tsx";
+import {
+  CreationApproval,
+  CreationSubmissionResult,
+  submissionStateError,
+  type CreationSubmissionState,
+} from "./creation-submission.tsx";
 
 function error(context: SetupStepRenderContext, name: string) {
   const message = context.errors[name];
@@ -210,9 +216,13 @@ function RecurringFunding(context: SetupStepRenderContext) {
 function RecurringStep({
   context,
   onReviewStateChange,
+  onSubmissionStateChange,
+  reviewState,
 }: Readonly<{
   context: SetupStepRenderContext;
   onReviewStateChange: (state: CreationReviewState) => void;
+  onSubmissionStateChange: (state: CreationSubmissionState) => void;
+  reviewState: CreationReviewState;
 }>) {
   if (context.step === "details") return <RecurringDetails {...context} />;
   if (context.step === "timing") return <RecurringTiming {...context} />;
@@ -226,21 +236,32 @@ function RecurringStep({
       />
     );
   }
-  const title =
-    context.step === "approval" ? "Wallet approval pending" : "No transaction submitted";
-  return (
-    <div className="setup-step__empty">
-      <h2>{title}</h2>
-      <p>The recurring parameters are saved in this browser session.</p>
-    </div>
-  );
+  if (context.step === "approval") {
+    return (
+      <CreationApproval
+        draft={context.draft}
+        onStateChange={onSubmissionStateChange}
+        reviewState={reviewState}
+        template="recurring"
+      />
+    );
+  }
+  return <CreationSubmissionResult template="recurring" />;
 }
 
 export function RecurringSetup() {
   const session = useWalletSession();
   const [reviewState, setReviewState] = useState<CreationReviewState>({ key: "", status: "idle" });
+  const [submissionState, setSubmissionState] = useState<CreationSubmissionState>({
+    key: "",
+    status: "idle",
+  });
   const onReviewStateChange = useCallback(
     (state: CreationReviewState) => setReviewState(state),
+    [],
+  );
+  const onSubmissionStateChange = useCallback(
+    (state: CreationSubmissionState) => setSubmissionState(state),
     [],
   );
   const validationContext: RecurringValidationContext = {
@@ -253,7 +274,12 @@ export function RecurringSetup() {
     <SetupStepper
       initialDraft={RECURRING_INITIAL_DRAFT}
       renderStep={(context) => (
-        <RecurringStep context={context} onReviewStateChange={onReviewStateChange} />
+        <RecurringStep
+          context={context}
+          onReviewStateChange={onReviewStateChange}
+          onSubmissionStateChange={onSubmissionStateChange}
+          reviewState={reviewState}
+        />
       )}
       template="recurring"
       validateStep={(step, draft) => {
@@ -263,6 +289,13 @@ export function RecurringSetup() {
             creationReviewKey("recurring", draft, session.ownerLockHash),
           );
           return message === undefined ? {} : { review: message };
+        }
+        if (step === "approval") {
+          const message = submissionStateError(
+            submissionState,
+            creationReviewKey("recurring", draft, session.ownerLockHash),
+          );
+          return message === undefined ? {} : { approval: message };
         }
         return validateRecurringStep(step, draft, validationContext);
       }}

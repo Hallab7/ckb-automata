@@ -385,9 +385,13 @@ test("review uses CCC completion without invoking a wallet signature", async () 
     readFile(new URL("../ccc/ccc-provider.tsx", import.meta.url), "utf8"),
     readFile(new URL("./creation-review.tsx", import.meta.url), "utf8"),
   ]);
-  assert.match(provider, /await completed\.completeFeeBy\(currentSigner\)/);
+  const completionStart = provider.indexOf("completeForReview:");
+  const completionEnd = provider.indexOf("detailsStatus:", completionStart);
+  const completion = provider.slice(completionStart, completionEnd);
+  assert.match(completion, /await completed\.completeFeeBy\(currentSigner\)/);
   assert.match(provider, /getHeaderByNumber\(0\)/);
-  assert.doesNotMatch(provider, /sign(?:Only)?Transaction\(/);
+  assert.doesNotMatch(completion, /sign(?:Only)?Transaction\(/);
   assert.match(review, /reviewStateError/);
+  assert.match(review, /freezeReviewedTransaction\(completed\.transaction\)/);
   assert.match(review, /connected wallet network does not match the reviewed deployment/i);
 });

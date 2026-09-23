@@ -28,13 +28,25 @@ export interface WalletSession {
   readonly resolveReviewInput: (
     input: UnsignedDeadlineTransaction["inputs"][number],
   ) => Promise<{ readonly capacity: bigint; readonly lockHash: string }>;
+  readonly resolveLiveReviewInput: (
+    input: UnsignedDeadlineTransaction["inputs"][number],
+  ) => Promise<{ readonly capacity: bigint; readonly lockHash: string }>;
   readonly reviewLockHash: (script: ScriptIdentity) => string;
   readonly selectDeadlinePledge: () => Promise<{
     readonly index: string;
     readonly txHash: string;
   }>;
   readonly signer: Signer | undefined;
+  readonly signReviewedTransaction: (
+    transaction: UnsignedDeadlineTransaction,
+    expectedHash: string,
+    snapshot: { readonly blockHash: string; readonly blockNumber: string },
+  ) => Promise<UnsignedDeadlineTransaction>;
   readonly status: WalletReadiness;
+  readonly submitSignedTransaction: (
+    transaction: UnsignedDeadlineTransaction,
+    expectedHash: string,
+  ) => Promise<string>;
   readonly walletName: string | undefined;
 }
 

@@ -60,8 +60,8 @@ function reviewedTransaction(transaction: ccc.Transaction): UnsignedDeadlineTran
   };
 }
 
-function cccTransaction(transaction: UnsignedDeadlineTransaction): ccc.Transaction {
-  return ccc.Transaction.from({
+function cccTransactionLike(transaction: UnsignedDeadlineTransaction): ccc.TransactionLike {
+  return {
     version: transaction.version,
     cellDeps: transaction.cellDeps.map((dependency) => ({
       outPoint: { ...dependency.outPoint },
@@ -79,7 +79,11 @@ function cccTransaction(transaction: UnsignedDeadlineTransaction): ccc.Transacti
     })),
     outputsData: [...transaction.outputsData],
     witnesses: [...transaction.witnesses],
-  });
+  };
+}
+
+function cccTransaction(transaction: UnsignedDeadlineTransaction): ccc.Transaction {
+  return ccc.Transaction.from(cccTransactionLike(transaction));
 }
 
 function installConnectorClientGuard(): void {
@@ -327,6 +331,17 @@ function WalletSessionBridge({ children }: Readonly<{ children: ReactNode }>) {
           lockHash: ccc.hashCkb(cell.cellOutput.lock.toBytes()),
         });
       },
+      resolveLiveReviewInput: async (input) => {
+        const currentSigner = requireSigner();
+        const cell = await currentSigner.client.getCellLive(input.previousOutput, true, true);
+        if (cell === undefined) {
+          throw new Error("A reviewed wallet input is no longer live. Build a fresh review.");
+        }
+        return Object.freeze({
+          capacity: cell.cellOutput.capacity,
+          lockHash: ccc.hashCkb(cell.cellOutput.lock.toBytes()),
+        });
+      },
       reviewLockHash: (scriptValue) => ccc.hashCkb(ccc.Script.from(scriptValue).toBytes()),
       selectDeadlinePledge: async () => {
         const currentSigner = requireSigner();
@@ -344,7 +359,52 @@ function WalletSessionBridge({ children }: Readonly<{ children: ReactNode }>) {
         );
       },
       signer,
+      signReviewedTransaction: async (transaction, expectedHash, snapshot) => {
+        const currentSigner = requireSigner();
+        const tip = await currentSigner.client.getTipHeader();
+        if (tip.number.toString() !== snapshot.blockNumber || tip.hash !== snapshot.blockHash) {
+          throw new Error("The reviewed chain snapshot is stale. Build a fresh review.");
+        }
+        const unsigned = cccTransaction(transaction);
+        if (unsigned.hash() !== expectedHash) {
+          throw new Error("The transaction changed after review. Build a fresh review.");
+        }
+        for (const input of unsigned.inputs) {
+          if (
+            (await currentSigner.client.getCellLive(input.previousOutput, true, true)) === undefined
+          ) {
+            throw new Error("A reviewed wallet input is no longer live. Build a fresh review.");
+          }
+        }
+        const signed = await currentSigner.signOnlyTransaction(cccTransactionLike(transaction));
+        if (signed.hash() !== expectedHash) {
+          throw new Error("The wallet changed the reviewed transaction while signing.");
+        }
+        return reviewedTransaction(signed);
+      },
       status,
+      submitSignedTransaction: async (transaction, expectedHash) => {
+        const currentSigner = requireSigner();
+        const signed = cccTransaction(transaction);
+        if (signed.hash() !== expectedHash) {
+          throw new Error("The signed transaction no longer matches the reviewed transaction.");
+        }
+        try {
+          const submittedHash = await currentSigner.client.sendTransaction(
+            cccTransactionLike(transaction),
+          );
+          if (submittedHash !== expectedHash) {
+            throw new Error("The CKB node returned a different transaction hash.");
+          }
+          return submittedHash;
+        } catch (error) {
+          const observed = await currentSigner.client
+            .getTransaction(expectedHash)
+            .catch(() => undefined);
+          if (observed !== undefined) return expectedHash;
+          throw error;
+        }
+      },
       walletName: connector.wallet?.name,
     };
   }, [connector, currentDetails, signer, status]);

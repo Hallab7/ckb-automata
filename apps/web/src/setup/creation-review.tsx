@@ -78,6 +78,42 @@ function nonce(): string {
   return ((BigInt(words[0] ?? 0) << 32n) | BigInt(words[1] ?? 0)).toString();
 }
 
+export function freezeReviewedTransaction(
+  transaction: UnsignedDeadlineTransaction,
+): UnsignedDeadlineTransaction {
+  return Object.freeze({
+    version: transaction.version,
+    cellDeps: Object.freeze(
+      transaction.cellDeps.map((dependency) =>
+        Object.freeze({
+          depType: dependency.depType,
+          outPoint: Object.freeze({ ...dependency.outPoint }),
+        }),
+      ),
+    ),
+    headerDeps: Object.freeze([...transaction.headerDeps]),
+    inputs: Object.freeze(
+      transaction.inputs.map((input) =>
+        Object.freeze({
+          previousOutput: Object.freeze({ ...input.previousOutput }),
+          since: input.since,
+        }),
+      ),
+    ),
+    outputs: Object.freeze(
+      transaction.outputs.map((output) =>
+        Object.freeze({
+          capacity: output.capacity,
+          lock: Object.freeze({ ...output.lock }),
+          type: output.type === null ? null : Object.freeze({ ...output.type }),
+        }),
+      ),
+    ),
+    outputsData: Object.freeze([...transaction.outputsData]),
+    witnesses: Object.freeze([...transaction.witnesses]),
+  });
+}
+
 async function requestFromDraft(
   template: SetupTemplateId,
   draft: SetupDraft,
@@ -168,19 +204,14 @@ async function loadReview(
   const completed = await session.completeForReview(
     artifact.transaction as unknown as UnsignedDeadlineTransaction,
   );
-  const model = await verifyCreationReview(
-    request,
-    artifact,
-    completed.transaction,
-    completed.hash,
-    {
-      deployment: deployment.deployment,
-      hashLock: session.reviewLockHash,
-      ownerInputLockHashes: await session.getSignerLockHashes(),
-      resolveInput: session.resolveReviewInput,
-    },
-  );
-  return Object.freeze({ artifact, key, model, request, transaction: completed.transaction });
+  const transaction = freezeReviewedTransaction(completed.transaction);
+  const model = await verifyCreationReview(request, artifact, transaction, completed.hash, {
+    deployment: deployment.deployment,
+    hashLock: session.reviewLockHash,
+    ownerInputLockHashes: await session.getSignerLockHashes(),
+    resolveInput: session.resolveReviewInput,
+  });
+  return Object.freeze({ artifact, key, model, request, transaction });
 }
 
 function failureMessage(error: unknown): string {

@@ -21,6 +21,12 @@ import {
   reviewStateError,
   type CreationReviewState,
 } from "./creation-review.tsx";
+import {
+  CreationApproval,
+  CreationSubmissionResult,
+  submissionStateError,
+  type CreationSubmissionState,
+} from "./creation-submission.tsx";
 
 function error(context: SetupStepRenderContext, name: string) {
   const message = context.errors[name];
@@ -177,9 +183,13 @@ function DeadlineFunding(context: SetupStepRenderContext) {
 function DeadlineStep({
   context,
   onReviewStateChange,
+  onSubmissionStateChange,
+  reviewState,
 }: Readonly<{
   context: SetupStepRenderContext;
   onReviewStateChange: (state: CreationReviewState) => void;
+  onSubmissionStateChange: (state: CreationSubmissionState) => void;
+  reviewState: CreationReviewState;
 }>) {
   if (context.step === "details") return <DeadlineDetails {...context} />;
   if (context.step === "timing") return <DeadlineTiming {...context} />;
@@ -193,21 +203,32 @@ function DeadlineStep({
       />
     );
   }
-  const title =
-    context.step === "approval" ? "Wallet approval pending" : "No transaction submitted";
-  return (
-    <div className="setup-step__empty">
-      <h2>{title}</h2>
-      <p>The deadline parameters are saved in this browser session.</p>
-    </div>
-  );
+  if (context.step === "approval") {
+    return (
+      <CreationApproval
+        draft={context.draft}
+        onStateChange={onSubmissionStateChange}
+        reviewState={reviewState}
+        template="deadline"
+      />
+    );
+  }
+  return <CreationSubmissionResult template="deadline" />;
 }
 
 export function DeadlineSetup() {
   const session = useWalletSession();
   const [reviewState, setReviewState] = useState<CreationReviewState>({ key: "", status: "idle" });
+  const [submissionState, setSubmissionState] = useState<CreationSubmissionState>({
+    key: "",
+    status: "idle",
+  });
   const onReviewStateChange = useCallback(
     (state: CreationReviewState) => setReviewState(state),
+    [],
+  );
+  const onSubmissionStateChange = useCallback(
+    (state: CreationSubmissionState) => setSubmissionState(state),
     [],
   );
   const validationContext: DeadlineValidationContext = {
@@ -220,7 +241,12 @@ export function DeadlineSetup() {
     <SetupStepper
       initialDraft={DEADLINE_INITIAL_DRAFT}
       renderStep={(context) => (
-        <DeadlineStep context={context} onReviewStateChange={onReviewStateChange} />
+        <DeadlineStep
+          context={context}
+          onReviewStateChange={onReviewStateChange}
+          onSubmissionStateChange={onSubmissionStateChange}
+          reviewState={reviewState}
+        />
       )}
       template="deadline"
       validateStep={(step, draft) => {
@@ -230,6 +256,13 @@ export function DeadlineSetup() {
             creationReviewKey("deadline", draft, session.ownerLockHash),
           );
           return message === undefined ? {} : { review: message };
+        }
+        if (step === "approval") {
+          const message = submissionStateError(
+            submissionState,
+            creationReviewKey("deadline", draft, session.ownerLockHash),
+          );
+          return message === undefined ? {} : { approval: message };
         }
         return validateDeadlineStep(step, draft, validationContext);
       }}
