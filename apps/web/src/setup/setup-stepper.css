@@ -1,0 +1,130 @@
+.setup-flow {
+  gap: var(--ui-space-5);
+}
+
+.setup-flow__eyebrow {
+  color: var(--ui-color-warning) !important;
+  font-size: 0.75rem;
+  font-weight: 750;
+  margin: 0 0 var(--ui-space-1) !important;
+  text-transform: uppercase;
+}
+
+.setup-progress {
+  overflow-x: auto;
+  padding-bottom: var(--ui-space-1);
+}
+
+.setup-progress ol {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(7rem, 1fr));
+  list-style: none;
+  margin: 0;
+  min-width: 49rem;
+  padding: 0;
+}
+
+.setup-progress li {
+  border-bottom: 2px solid var(--ui-color-border);
+  min-width: 0;
+}
+
+.setup-progress li[data-active="true"] {
+  border-bottom-color: var(--ui-color-accent);
+}
+
+.setup-progress li[data-complete="true"] {
+  border-bottom-color: var(--ui-color-success);
+}
+
+.setup-progress button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--ui-color-text-muted);
+  cursor: pointer;
+  display: flex;
+  font-size: 0.75rem;
+  font-weight: 650;
+  gap: var(--ui-space-2);
+  min-height: 3rem;
+  padding: var(--ui-space-2);
+  text-align: left;
+  width: 100%;
+}
+
+.setup-progress button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.setup-progress button[aria-current="step"] {
+  color: var(--ui-color-accent);
+}
+
+.setup-progress li[data-complete="true"] button {
+  color: var(--ui-color-success);
+}
+
+.setup-progress__marker {
+  align-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 1.5rem;
+  justify-content: center;
+  width: 1.5rem;
+}
+
+.setup-step {
+  background: var(--ui-color-surface);
+  border: 1px solid var(--ui-color-border);
+  border-radius: var(--ui-radius-lg);
+  min-height: 18rem;
+  padding: var(--ui-space-6);
+}
+
+.setup-step__empty,
+.setup-step__group {
+  display: grid;
+  gap: var(--ui-space-4);
+  max-width: 42rem;
+}
+
+.setup-step h2 {
+  font-size: 1.125rem;
+  margin: 0;
+  text-transform: capitalize;
+}
+
+.setup-step p {
+  color: var(--ui-color-text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.setup-actions {
+  align-items: center;
+  border-top: 1px solid var(--ui-color-border);
+  display: flex;
+  justify-content: space-between;
+  padding-top: var(--ui-space-4);
+}
+
+@media (max-width: 30rem) {
+  .setup-step {
+    min-height: 15rem;
+    padding: var(--ui-space-4);
+  }
+
+  .setup-actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+    gap: var(--ui-space-3);
+  }
+
+  .setup-actions .ui-button {
+    width: 100%;
+  }
+}

@@ -1,5 +1,5 @@
-import { ScaffoldPage } from "../../../../../src/scaffold/scaffold-page.tsx";
+import { AutomationSetup } from "../../../../../src/setup/automation-setup.tsx";
 
 export default function NewRecurringAutomationPage() {
-  return <ScaffoldPage title="New recurring automation" />;
+  return <AutomationSetup template="recurring" />;
 }

@@ -1,5 +1,5 @@
-import { ScaffoldPage } from "../../../../../src/scaffold/scaffold-page.tsx";
+import { AutomationSetup } from "../../../../../src/setup/automation-setup.tsx";
 
 export default function NewDeadlineAutomationPage() {
-  return <ScaffoldPage title="New deadline automation" />;
+  return <AutomationSetup template="deadline" />;
 }
