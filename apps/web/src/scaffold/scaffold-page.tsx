@@ -1,8 +1,25 @@
-export function ScaffoldPage({ detail, title }: Readonly<{ detail?: string; title: string }>) {
+import type { ReactNode } from "react";
+
+import { PageHeader } from "../shell/page-header.tsx";
+
+export function ScaffoldPage({
+  action,
+  description,
+  detail,
+  title,
+}: Readonly<{
+  action?: ReactNode;
+  description?: string;
+  detail?: string;
+  title: string;
+}>) {
   return (
-    <main>
-      <h1>{title}</h1>
-      {detail === undefined ? null : <p>{detail}</p>}
-    </main>
+    <section className="app-page" aria-labelledby="page-title">
+      <PageHeader action={action} description={description} detail={detail} title={title} />
+      <div className="app-empty-state">
+        <h2>No records to show</h2>
+        <p>Operational data will appear here when it becomes available.</p>
+      </div>
+    </section>
   );
 }
