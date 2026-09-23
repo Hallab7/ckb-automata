@@ -1,5 +1,5 @@
-import { ScaffoldPage } from "../../../../src/scaffold/scaffold-page.tsx";
+import { TemplateGallery } from "../../../../src/templates/template-gallery.tsx";
 
 export default function NewAutomationPage() {
-  return <ScaffoldPage title="New automation" />;
+  return <TemplateGallery />;
 }

@@ -2,4 +2,5 @@
 @import "@ckb-automata/ui/styles.css";
 @import "../src/shell/app-shell.css";
 @import "../src/dashboard/dashboard.css";
+@import "../src/templates/template-gallery.css";
 @source "../../../packages/ui/src";
