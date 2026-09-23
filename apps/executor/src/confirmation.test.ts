@@ -12,11 +12,25 @@ import {
   type ConfirmationTransition,
   type RpcTransactionObservation,
 } from "./confirmation.ts";
+import { ExecutorReceiptSigner } from "./receipt.ts";
+import { operatorLockArgs } from "./signing.ts";
 
 const ATTEMPT_ID = "00000000-0000-4000-8000-000000000075";
 const JOB_ID = parseHash32(`0x${"74".repeat(32)}`);
 const TX_HASH = parseHash32(`0x${"75".repeat(32)}`);
 const BLOCK_HASH = parseHash32(`0x${"50".repeat(32)}`);
+const PRIVATE_KEY = `0x${"08".repeat(32)}`;
+const RECEIPTS = new ExecutorReceiptSigner({
+  network: "ckb_dev",
+  privateKey: PRIVATE_KEY,
+  executorLock: {
+    codeHash: parseHash32(`0x${"01".repeat(32)}`),
+    hashType: "type",
+    args: operatorLockArgs(PRIVATE_KEY),
+  },
+  version: "0.0.0-test",
+  revision: "1234567",
+});
 
 function attempt(
   state: ConfirmationAttempt["state"] = "submitted",
@@ -236,6 +250,7 @@ test("service rejects RPC hash drift and applies a verified proposal", async () 
   let returnedHash = TX_HASH;
   const service = new ConfirmationService({
     store,
+    receipts: RECEIPTS,
     chain: {
       async getTransactionStatus() {
         return {
@@ -271,6 +286,7 @@ test("canonical evidence progresses during RPC outage without inferring a drop",
   };
   const service = new ConfirmationService({
     store,
+    receipts: RECEIPTS,
     now: () => new Date("2026-09-23T11:00:00.000Z"),
     dropAfterMs: 1,
     chain: {

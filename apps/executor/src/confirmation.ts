@@ -1,5 +1,7 @@
 import { parseBlockNumber, parseHash32, type Hash32 } from "@ckb-automata/core";
 
+import type { ConfirmationReceiptIssuer, ExecutorReceipt } from "./receipt.ts";
+
 export const CONFIRMATION_DROP_AFTER_MS = 10 * 60_000;
 
 export type ConfirmationState =
@@ -87,7 +89,11 @@ export interface ConfirmationStore {
     attempt: ConfirmationAttempt,
     rpc: RpcTransactionObservation | undefined,
   ): Promise<ConfirmationEvidence>;
-  apply(attempt: ConfirmationAttempt, transition: ConfirmationTransition): Promise<boolean>;
+  apply(
+    attempt: ConfirmationAttempt,
+    transition: ConfirmationTransition,
+    receipt?: ExecutorReceipt,
+  ): Promise<boolean>;
 }
 
 export interface ConfirmationChain {
@@ -251,6 +257,7 @@ export class ConfirmationService {
   readonly #now: () => Date;
   readonly #dropAfterMs: number;
   readonly #recovery: ConfirmationRecovery | undefined;
+  readonly #receipts: ConfirmationReceiptIssuer;
 
   constructor(options: {
     readonly store: ConfirmationStore;
@@ -258,12 +265,14 @@ export class ConfirmationService {
     readonly now?: () => Date;
     readonly dropAfterMs?: number;
     readonly recovery?: ConfirmationRecovery;
+    readonly receipts: ConfirmationReceiptIssuer;
   }) {
     this.#store = options.store;
     this.#chain = options.chain;
     this.#now = options.now ?? (() => new Date());
     this.#dropAfterMs = options.dropAfterMs ?? CONFIRMATION_DROP_AFTER_MS;
     this.#recovery = options.recovery;
+    this.#receipts = options.receipts;
   }
 
   async track(payload: ConfirmationQueuePayload): Promise<ConfirmationResult> {
@@ -297,7 +306,11 @@ export class ConfirmationService {
       await this.#recovery.requeue(attempt);
       return Object.freeze({ status: "requeued" });
     }
-    if (!(await this.#store.apply(attempt, transition))) {
+    const now = this.#now();
+    const receipt = ["confirmed", "conflicted", "dropped"].includes(transition.state)
+      ? this.#receipts.issue(attempt, transition, now)
+      : undefined;
+    if (!(await this.#store.apply(attempt, transition, receipt))) {
       return Object.freeze({ status: "stale" });
     }
     if (transition.state === "reorged") {

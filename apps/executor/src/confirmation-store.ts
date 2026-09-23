@@ -11,6 +11,7 @@ import type {
   ConfirmationTransition,
   RpcTransactionObservation,
 } from "./confirmation.ts";
+import { verifyExecutorReceipt, type ExecutorReceipt } from "./receipt.ts";
 
 export const MAX_CONFIRMATION_ATTEMPTS = 500;
 
@@ -275,7 +276,26 @@ export class PostgresConfirmationStore implements ConfirmationStore {
     });
   }
 
-  async apply(attempt: ConfirmationAttempt, transition: ConfirmationTransition): Promise<boolean> {
+  async apply(
+    attempt: ConfirmationAttempt,
+    transition: ConfirmationTransition,
+    receipt?: ExecutorReceipt,
+  ): Promise<boolean> {
+    const requiresReceipt = ["confirmed", "conflicted", "dropped"].includes(transition.state);
+    if (requiresReceipt !== (receipt !== undefined)) {
+      throw new Error("terminal confirmation transitions require exactly one executor receipt");
+    }
+    if (
+      receipt !== undefined &&
+      (receipt.attemptId !== attempt.attemptId ||
+        receipt.payload.transactionHash !== attempt.transactionHash ||
+        receipt.payload.outcome.state !== transition.state)
+    ) {
+      throw new Error("executor receipt does not match its confirmation transition");
+    }
+    if (receipt !== undefined && !verifyExecutorReceipt(receipt)) {
+      throw new Error("executor receipt signature or identity is invalid");
+    }
     const now = this.#now();
     return this.#sql.begin(async (sql) => {
       const rows = await sql<{ readonly network_id: string; readonly job_id: string }[]>`
@@ -312,6 +332,17 @@ export class PostgresConfirmationStore implements ConfirmationStore {
       `;
       const updated = rows[0];
       if (!updated) return false;
+      if (receipt !== undefined) {
+        await sql`
+          INSERT INTO executor_receipts (
+            id, attempt_id, executor_lock_hash, payload, signature, key_id, created_at
+          ) VALUES (
+            ${receipt.receiptId}, ${receipt.attemptId}, ${receipt.executorLockHash},
+            ${sql.json(receipt.payload as unknown as postgres.JSONValue)},
+            ${receipt.signature}, ${receipt.keyId}, ${receipt.createdAt}
+          )
+        `;
+      }
       await sql`
         INSERT INTO job_events (
           network_id, job_id, event_type, source, block_number, block_hash,

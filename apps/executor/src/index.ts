@@ -101,6 +101,17 @@ export {
 } from "./runtime.ts";
 export { operatorLockArgs, signOperatorFeeInput } from "./signing.ts";
 export {
+  EXECUTOR_RECEIPT_AUTHORITY,
+  EXECUTOR_RECEIPT_SCHEMA,
+  ExecutorReceiptSigner,
+  executorReceiptDigest,
+  verifyExecutorReceipt,
+  type ConfirmationReceiptIssuer,
+  type ExecutorReceipt,
+  type ExecutorReceiptOutcome,
+  type ExecutorReceiptPayload,
+} from "./receipt.ts";
+export {
   SimulationGateService,
   parseStoredTransaction,
   type SimulationAttempt,

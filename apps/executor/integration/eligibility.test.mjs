@@ -19,6 +19,8 @@ import { migrateDatabase } from "../../api/src/database/migrator.ts";
 import { PostgresBuildAttemptStore } from "../src/build-store.ts";
 import { PostgresConfirmationStore } from "../src/confirmation-store.ts";
 import { ConfirmationService } from "../src/confirmation.ts";
+import { ExecutorReceiptSigner } from "../src/receipt.ts";
+import { operatorLockArgs } from "../src/signing.ts";
 import { PostgresSimulationStore } from "../src/simulation-store.ts";
 import { PostgresSubmissionStore } from "../src/submission-store.ts";
 import { createExecutorApplication } from "../src/bootstrap.ts";
@@ -42,6 +44,19 @@ const deployment = loaded.deployment;
 function hash(byte) {
   return parseHash32(`0x${byte.toString(16).padStart(2, "0").repeat(32)}`);
 }
+
+const receiptPrivateKey = `0x${"0b".repeat(32)}`;
+const receipts = new ExecutorReceiptSigner({
+  network: deployment.network,
+  privateKey: receiptPrivateKey,
+  executorLock: {
+    codeHash: hash(5),
+    hashType: "type",
+    args: operatorLockArgs(receiptPrivateKey),
+  },
+  version: "0.0.0-test",
+  revision: "1234567",
+});
 
 async function createDatabase() {
   const name = `automata_eligibility_${randomBytes(6).toString("hex")}`;
@@ -314,6 +329,8 @@ test("concurrent build deliveries share one durable operational attempt", async 
     );
     const confirmation = new ConfirmationService({
       store: confirmationStore,
+      receipts,
+      now: () => new Date("2026-09-23T10:01:00.000Z"),
       chain: {
         async getTransactionStatus() {
           return { status: "pending", transaction: { hash: () => hash(72) } };

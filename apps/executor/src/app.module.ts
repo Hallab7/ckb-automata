@@ -17,6 +17,7 @@ import { EligibilityCoordinator, PostgresEligibilityJobSource } from "./eligibil
 import { DEADLINE_EXECUTOR_ADAPTER } from "./policies/deadline.ts";
 import { RECURRING_EXECUTOR_ADAPTER } from "./policies/recurring.ts";
 import { DurableQueueRegistry, queueRegistrationOptions, queueRootOptions } from "./queues.ts";
+import { ExecutorReceiptSigner } from "./receipt.ts";
 import {
   ExecutorRuntime,
   type ExecutorChainClient,
@@ -284,11 +285,26 @@ export function createExecutorModule(
           {
             provide: ConfirmationCoordinator,
             inject: [ExecutorRuntime, DurableQueueRegistry, EXECUTOR_LOGGER],
-            useFactory: (
+            useFactory: async (
               runtime: ExecutorRuntime,
               queues: DurableQueueRegistry,
               logger: ExecutorEventLogger,
             ) => {
+              const privateKey = environment.EXECUTOR_FEE_PRIVATE_KEY;
+              const lockArgs = environment.EXECUTOR_LOCK_ARGS;
+              if (privateKey === undefined || lockArgs === undefined) {
+                throw new Error("confirmation receipt signing configuration is unavailable");
+              }
+              const loaded = await deploymentRegistry.load(environment.CKB_GENESIS_HASH);
+              if (loaded.status !== "ok") {
+                throw new Error("executor deployment is unavailable for receipt signing");
+              }
+              const secp = loaded.deployment.manifest.secp256k1Blake160;
+              const executorLock = Object.freeze({
+                codeHash: secp.codeHash,
+                hashType: secp.hashType,
+                args: lockArgs as `0x${string}`,
+              });
               const store = new PostgresConfirmationStore(
                 environment.DATABASE_URL,
                 environment.CKB_NETWORK,
@@ -303,6 +319,13 @@ export function createExecutorModule(
                     getTransactionStatus: (transactionHash) =>
                       runtime.getTransactionStatus(transactionHash),
                   },
+                  receipts: new ExecutorReceiptSigner({
+                    network: environment.CKB_NETWORK,
+                    privateKey,
+                    executorLock,
+                    version: environment.RELEASE_VERSION ?? "0.0.0",
+                    revision: environment.RELEASE_REVISION ?? "unversioned",
+                  }),
                   recovery: {
                     async requeue(attempt) {
                       await queues.enqueue(

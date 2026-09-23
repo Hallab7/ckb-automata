@@ -8,6 +8,8 @@ import postgres from "postgres";
 import { migrateDatabase } from "../../api/src/database/migrator.ts";
 import { PostgresConfirmationStore } from "../src/confirmation-store.ts";
 import { ConfirmationService } from "../src/confirmation.ts";
+import { ExecutorReceiptSigner, verifyExecutorReceipt } from "../src/receipt.ts";
+import { operatorLockArgs } from "../src/signing.ts";
 
 const databaseUrl = process.env["AUTOMATA_INTEGRATION_DATABASE_URL"];
 if (!databaseUrl) throw new Error("AUTOMATA_INTEGRATION_DATABASE_URL is required");
@@ -18,6 +20,19 @@ const now = new Date("2026-09-23T13:00:00.000Z");
 function hash(byte) {
   return `0x${byte.toString(16).padStart(2, "0").repeat(32)}`;
 }
+
+const receiptPrivateKey = `0x${"0c".repeat(32)}`;
+const receipts = new ExecutorReceiptSigner({
+  network,
+  privateKey: receiptPrivateKey,
+  executorLock: {
+    codeHash: hash(5),
+    hashType: "type",
+    args: operatorLockArgs(receiptPrivateKey),
+  },
+  version: "0.0.0-test",
+  revision: "1234567",
+});
 
 async function createDatabase() {
   const name = `automata_reorg_${randomBytes(6).toString("hex")}`;
@@ -121,6 +136,8 @@ async function seedAttempt(url, byte, replacement) {
 function service(store, attempt, requeued) {
   return new ConfirmationService({
     store,
+    receipts,
+    now: () => now,
     chain: {
       async getTransactionStatus() {
         return {
@@ -207,6 +224,26 @@ test("reorg recovery requeues only a restored canonical input", async () => {
         WHERE event_type = 'transaction_reorged'
       `;
       assert.equal(events.value, 1);
+      const signed = await sql`
+        SELECT id::text, attempt_id::text, executor_lock_hash, payload, signature, key_id,
+               created_at
+        FROM executor_receipts
+      `;
+      assert.equal(signed.length, 1);
+      assert.equal(signed[0].attempt_id, replaced.attemptId);
+      assert.equal(signed[0].payload.authority, "non_authoritative");
+      assert.equal(
+        verifyExecutorReceipt({
+          receiptId: signed[0].id,
+          attemptId: signed[0].attempt_id,
+          executorLockHash: signed[0].executor_lock_hash,
+          payload: signed[0].payload,
+          signature: signed[0].signature,
+          keyId: signed[0].key_id,
+          createdAt: signed[0].created_at,
+        }),
+        true,
+      );
     } finally {
       await sql.end({ timeout: 2 });
     }

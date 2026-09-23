@@ -8,6 +8,8 @@ import postgres from "postgres";
 import { migrateDatabase } from "../../api/src/database/migrator.ts";
 import { PostgresConfirmationStore } from "../src/confirmation-store.ts";
 import { ConfirmationService } from "../src/confirmation.ts";
+import { ExecutorReceiptSigner } from "../src/receipt.ts";
+import { operatorLockArgs } from "../src/signing.ts";
 
 const databaseUrl = process.env["AUTOMATA_INTEGRATION_DATABASE_URL"];
 if (!databaseUrl) throw new Error("AUTOMATA_INTEGRATION_DATABASE_URL is required");
@@ -18,6 +20,19 @@ const now = new Date("2026-09-23T12:00:00.000Z");
 function hash(byte) {
   return `0x${byte.toString(16).padStart(2, "0").repeat(32)}`;
 }
+
+const receiptPrivateKey = `0x${"0a".repeat(32)}`;
+const receipts = new ExecutorReceiptSigner({
+  network,
+  privateKey: receiptPrivateKey,
+  executorLock: {
+    codeHash: hash(5),
+    hashType: "type",
+    args: operatorLockArgs(receiptPrivateKey),
+  },
+  version: "0.0.0-test",
+  revision: "1234567",
+});
 
 async function createDatabase() {
   const name = `automata_contention_${randomBytes(6).toString("hex")}`;
@@ -119,7 +134,7 @@ test("two executor instances record one accurate losing contention result", asyn
     const services = Array.from({ length: 2 }, () => {
       const store = new PostgresConfirmationStore(database.url, network, () => now);
       stores.push(store);
-      return new ConfirmationService({ store, chain });
+      return new ConfirmationService({ store, chain, receipts, now: () => now });
     });
     const results = await Promise.all(
       services.map((service) =>
