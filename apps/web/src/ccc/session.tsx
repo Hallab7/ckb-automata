@@ -8,10 +8,14 @@ import type { Signer } from "@ckb-ccc/connector-react";
 import type { WalletReadiness } from "./policy.ts";
 
 export interface WalletSession {
+  readonly address: string | undefined;
+  readonly balanceShannons: bigint | undefined;
   readonly close: () => void;
+  readonly detailsStatus: "error" | "idle" | "loading" | "ready";
   readonly disconnect: () => void;
   readonly isConnectorOpen: boolean;
   readonly open: () => void;
+  readonly refreshDetails: () => void;
   readonly signer: Signer | undefined;
   readonly status: WalletReadiness;
   readonly walletName: string | undefined;

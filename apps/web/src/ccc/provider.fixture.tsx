@@ -1,6 +1,8 @@
 "use client";
 
 import { useAutomataSigner, useWalletSession } from "./session.tsx";
+import { WalletControl } from "./wallet-control.tsx";
+import { NotificationCenter } from "../shell/notification-center.tsx";
 
 function WalletProviderFixtureContent() {
   const session = useWalletSession();
@@ -21,20 +23,36 @@ function WalletProviderFixtureContent() {
         <dd data-signer-ready={signer === undefined ? "false" : "true"}>
           {signer === undefined ? "Unavailable" : "Available"}
         </dd>
+        <dt>Details</dt>
+        <dd data-wallet-details={session.detailsStatus}>{session.detailsStatus}</dd>
+        <dt>Balance</dt>
+        <dd data-wallet-balance={session.balanceShannons?.toString() ?? "unavailable"}>
+          {session.balanceShannons?.toString() ?? "Unavailable"}
+        </dd>
       </dl>
       {session.status === "ready" ? (
         <button
           className="ui-button ui-button--secondary"
+          data-fixture-wallet-action="disconnect"
           onClick={session.disconnect}
           type="button"
         >
           Disconnect
         </button>
       ) : (
-        <button className="ui-button ui-button--primary" onClick={session.open} type="button">
+        <button
+          className="ui-button ui-button--primary"
+          data-fixture-wallet-action="connect"
+          onClick={session.open}
+          type="button"
+        >
           Connect wallet
         </button>
       )}
+      <div className="wallet-control-fixture">
+        <WalletControl />
+      </div>
+      <NotificationCenter />
     </main>
   );
 }

@@ -4,6 +4,7 @@ import test from "node:test";
 
 const shellSource = await readFile(new URL("./app-shell.tsx", import.meta.url), "utf8");
 const shellStyles = await readFile(new URL("./app-shell.css", import.meta.url), "utf8");
+const walletSource = await readFile(new URL("../ccc/wallet-control.tsx", import.meta.url), "utf8");
 
 test("application shell exposes keyboard and landmark navigation", () => {
   assert.match(shellSource, /href="#main-content"/);
@@ -17,9 +18,12 @@ test("application shell exposes keyboard and landmark navigation", () => {
 test("network, wallet, and notification state remain explicit in text", () => {
   assert.match(shellSource, /app-network-badge__prefix/);
   assert.match(shellSource, /Testnet/);
-  assert.match(shellSource, /Connect wallet/);
-  assert.match(shellSource, /Wrong network/);
-  assert.match(shellSource, /Disconnect wallet/);
+  assert.match(walletSource, /Connect wallet/);
+  assert.match(walletSource, /Wrong wallet network/);
+  assert.match(walletSource, /Disconnect wallet/);
+  assert.match(walletSource, /CKB Pudge Testnet/);
+  assert.match(walletSource, /formatCkbBalance/);
+  assert.match(walletSource, /ckbTestnetAddressUrl/);
   assert.match(shellSource, /<NotificationCenter \/>/);
 });
 

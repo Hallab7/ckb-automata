@@ -61,6 +61,10 @@ test("connector runtime stays inside the dedicated client boundary", async () =>
   assert.match(provider, /name: AUTOMATA_CCC_IDENTITY\.name/);
   assert.match(provider, /const signer = ccc\.useSigner\(\)/);
   assert.match(provider, /class FixtureSigner extends ccc\.Signer/);
+  assert.match(provider, /Automata Zero Balance/);
+  assert.match(provider, /Automata Rejected Request/);
+  assert.match(provider, /Automata Missing Extension/);
+  assert.match(provider, /Automata Wrong Network/);
 
   const session = await readFile(new URL("./session.tsx", import.meta.url), "utf8");
   assert.match(session, /if \(session\.status === "wrong_network"\)/);

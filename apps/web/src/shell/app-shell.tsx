@@ -1,25 +1,14 @@
 "use client";
 
-import {
-  Activity,
-  Beaker,
-  Bot,
-  FlaskConical,
-  LogOut,
-  Menu,
-  Network,
-  Plus,
-  Settings,
-  ShieldAlert,
-  WalletCards,
-} from "lucide-react";
+import { Activity, Beaker, Bot, FlaskConical, Menu, Network, Plus, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType, ReactNode } from "react";
 
-import { Button, Drawer, IconButton, OverlayClose } from "@ckb-automata/ui";
+import { Drawer, IconButton, OverlayClose } from "@ckb-automata/ui";
 
-import { WalletNetworkNotice, useWalletSession } from "../ccc/session.tsx";
+import { WalletNetworkNotice } from "../ccc/session.tsx";
+import { WalletControl } from "../ccc/wallet-control.tsx";
 import { NotificationCenter } from "./notification-center.tsx";
 
 interface NavigationItem {
@@ -101,74 +90,6 @@ function NetworkBadge() {
   );
 }
 
-function WalletSummary() {
-  const session = useWalletSession();
-  if (session.status === "disconnected") {
-    return (
-      <div className="app-wallet-summary app-wallet-summary--action">
-        <Button
-          icon={<WalletCards aria-hidden="true" size={17} />}
-          onClick={session.open}
-          tone="secondary"
-        >
-          Connect wallet
-        </Button>
-      </div>
-    );
-  }
-
-  if (session.status === "wrong_network") {
-    return (
-      <div className="app-wallet-summary app-wallet-summary--warning">
-        <ShieldAlert aria-hidden="true" size={18} />
-        <div>
-          <span className="app-wallet-summary__label">Wallet network</span>
-          <strong>Wrong network</strong>
-        </div>
-        <IconButton
-          icon={<WalletCards aria-hidden="true" size={17} />}
-          label="Review wallet network"
-          onClick={session.open}
-          tone="secondary"
-        />
-      </div>
-    );
-  }
-
-  if (session.status === "unsupported_wallet") {
-    return (
-      <div className="app-wallet-summary app-wallet-summary--warning">
-        <ShieldAlert aria-hidden="true" size={18} />
-        <div>
-          <span className="app-wallet-summary__label">Wallet compatibility</span>
-          <strong>Unsupported wallet</strong>
-        </div>
-        <IconButton
-          icon={<LogOut aria-hidden="true" size={17} />}
-          label="Disconnect unsupported wallet"
-          onClick={session.disconnect}
-          tone="secondary"
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="app-wallet-summary">
-      <WalletCards aria-hidden="true" size={18} />
-      <div>
-        <span className="app-wallet-summary__label">Wallet</span>
-        <strong>{session.walletName ?? "Connected"}</strong>
-      </div>
-      <IconButton
-        icon={<LogOut aria-hidden="true" size={17} />}
-        label="Disconnect wallet"
-        onClick={session.disconnect}
-      />
-    </div>
-  );
-}
-
 function MobileNavigation() {
   return (
     <Drawer
@@ -187,7 +108,7 @@ function MobileNavigation() {
       <div className="app-mobile-nav">
         <NetworkBadge />
         <NavigationLinks closeOnSelect />
-        <WalletSummary />
+        <WalletControl />
       </div>
     </Drawer>
   );
@@ -203,7 +124,7 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
         <ProductMark />
         <NetworkBadge />
         <NavigationLinks />
-        <WalletSummary />
+        <WalletControl />
       </aside>
       <div className="app-shell__workspace">
         <header className="app-mobile-header">

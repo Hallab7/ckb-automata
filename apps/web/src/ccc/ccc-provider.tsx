@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 
 import { ccc } from "@ckb-ccc/connector-react";
@@ -71,9 +71,16 @@ class AutomataSignersController extends ccc.SignersController {
   }
 }
 
-const FIXTURE_CONNECTED_KEY = "automata-wallet-provider-fixture-connected";
-
 class FixtureSigner extends ccc.Signer {
+  readonly #balance: bigint;
+  readonly #storageKey: string;
+
+  constructor(client: ccc.Client, storageKey: string, balance: bigint = ccc.Zero) {
+    super(client);
+    this.#balance = balance;
+    this.#storageKey = storageKey;
+  }
+
   get type(): ccc.SignerType {
     return ccc.SignerType.CKB;
   }
@@ -83,15 +90,15 @@ class FixtureSigner extends ccc.Signer {
   }
 
   async connect(): Promise<void> {
-    window.localStorage.setItem(FIXTURE_CONNECTED_KEY, "true");
+    window.localStorage.setItem(this.#storageKey, "true");
   }
 
   override async disconnect(): Promise<void> {
-    window.localStorage.removeItem(FIXTURE_CONNECTED_KEY);
+    window.localStorage.removeItem(this.#storageKey);
   }
 
   async isConnected(): Promise<boolean> {
-    return window.localStorage.getItem(FIXTURE_CONNECTED_KEY) === "true";
+    return window.localStorage.getItem(this.#storageKey) === "true";
   }
 
   async getInternalAddress(): Promise<string> {
@@ -107,18 +114,48 @@ class FixtureSigner extends ccc.Signer {
   }
 
   override async getBalance(): Promise<ccc.Num> {
-    return ccc.Zero;
+    return this.#balance;
+  }
+}
+
+class RejectedFixtureSigner extends FixtureSigner {
+  override async connect(): Promise<void> {
+    throw new Error("The wallet rejected the connection request.");
   }
 }
 
 class FixtureSignersController extends AutomataSignersController {
   override async addRealSigners(context: ccc.SignersControllerRefreshContext): Promise<void> {
-    await this.addSigner(
-      "Automata Fixture Wallet",
-      AUTOMATA_CCC_IDENTITY.icon,
-      new ccc.SignerInfo("CKB fixture", new FixtureSigner(context.client)),
-      context,
-    );
+    const fixtures = [
+      {
+        name: "Automata Zero Balance",
+        signer: new FixtureSigner(context.client, "automata-wallet-zero-balance"),
+      },
+      {
+        name: "Automata Rejected Request",
+        signer: new RejectedFixtureSigner(context.client, "automata-wallet-rejected"),
+      },
+      {
+        name: "Automata Missing Extension",
+        signer: new ccc.SignerAlwaysError(
+          context.client,
+          ccc.SignerType.CKB,
+          "Install or unlock the fixture wallet extension, then retry.",
+        ),
+      },
+      {
+        name: "Automata Wrong Network",
+        signer: new FixtureSigner(new ccc.ClientPublicMainnet(), "automata-wallet-wrong-network"),
+      },
+    ] as const;
+    for (const fixture of fixtures) {
+      await this.addSigner(
+        fixture.name,
+        AUTOMATA_CCC_IDENTITY.icon,
+        new ccc.SignerInfo("CKB fixture", fixture.signer),
+        context,
+      );
+    }
   }
 
   override async addDummySigners(): Promise<void> {}
@@ -127,23 +164,59 @@ class FixtureSignersController extends AutomataSignersController {
 function WalletSessionBridge({ children }: Readonly<{ children: ReactNode }>) {
   const connector = ccc.useCcc();
   const signer = ccc.useSigner();
-  const value = useMemo<WalletSession>(() => {
-    const status = deriveWalletReadiness(
-      connector.client.addressPrefix,
-      signer?.client.addressPrefix,
-      signer !== undefined,
-      signer?.type,
+  const status = deriveWalletReadiness(
+    connector.client.addressPrefix,
+    signer?.client.addressPrefix,
+    signer !== undefined,
+    signer?.type,
+  );
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [details, setDetails] = useState<{
+    readonly address?: string;
+    readonly balanceShannons?: bigint;
+    readonly signer?: ccc.Signer;
+    readonly status: WalletSession["detailsStatus"];
+  }>({ status: "idle" });
+
+  useEffect(() => {
+    if (signer === undefined || status !== "ready") return;
+    let active = true;
+    setDetails({ signer, status: "loading" });
+    void Promise.allSettled([signer.getRecommendedAddress(), signer.getBalance()]).then(
+      ([addressResult, balanceResult]) => {
+        if (!active) return;
+        setDetails({
+          ...(addressResult.status === "fulfilled" ? { address: addressResult.value } : {}),
+          ...(balanceResult.status === "fulfilled" ? { balanceShannons: balanceResult.value } : {}),
+          signer,
+          status:
+            addressResult.status === "fulfilled" && balanceResult.status === "fulfilled"
+              ? "ready"
+              : "error",
+        });
+      },
     );
+    return () => {
+      active = false;
+    };
+  }, [refreshKey, signer, status]);
+
+  const currentDetails = details.signer === signer ? details : { status: "loading" as const };
+  const value = useMemo<WalletSession>(() => {
     return {
+      address: status === "ready" ? currentDetails.address : undefined,
+      balanceShannons: status === "ready" ? currentDetails.balanceShannons : undefined,
       close: () => connector.close(),
+      detailsStatus: status === "ready" ? currentDetails.status : "idle",
       disconnect: () => connector.disconnect(),
       isConnectorOpen: connector.isOpen,
       open: () => connector.open(),
+      refreshDetails: () => setRefreshKey((current) => current + 1),
       signer,
       status,
       walletName: connector.wallet?.name,
     };
-  }, [connector, signer]);
+  }, [connector, currentDetails, signer, status]);
   return <WalletSessionContext.Provider value={value}>{children}</WalletSessionContext.Provider>;
 }
 
