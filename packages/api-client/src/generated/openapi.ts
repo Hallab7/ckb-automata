@@ -1017,6 +1017,18 @@ export interface operations {
                                 /** Format: uuid */
                                 readonly id: string;
                                 readonly operation: string;
+                                readonly receipt: {
+                                    /** Format: date-time */
+                                    readonly createdAt: string;
+                                    readonly executorLockHash: string;
+                                    /** Format: uuid */
+                                    readonly id: string;
+                                    readonly keyId: string;
+                                    readonly payload: {
+                                        readonly [key: string]: unknown;
+                                    };
+                                    readonly signature: string;
+                                } | null;
                                 readonly state: string;
                                 readonly transactionHash: string | null;
                             } | null;

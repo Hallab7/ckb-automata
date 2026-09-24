@@ -1,8 +1,8 @@
-import { ScaffoldPage } from "../../../../src/scaffold/scaffold-page.tsx";
+import { AutomationDetail } from "../../../../src/detail/job-detail.tsx";
 
 export default async function AutomationPage({
   params,
 }: Readonly<{ params: Promise<{ jobId: string }> }>) {
   const { jobId } = await params;
-  return <ScaffoldPage detail={jobId} title="Automation" />;
+  return <AutomationDetail jobId={jobId} />;
 }

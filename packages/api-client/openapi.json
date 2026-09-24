@@ -769,6 +769,29 @@
                               },
                               "id": { "format": "uuid", "type": "string" },
                               "operation": { "type": "string" },
+                              "receipt": {
+                                "nullable": true,
+                                "properties": {
+                                  "createdAt": { "format": "date-time", "type": "string" },
+                                  "executorLockHash": {
+                                    "pattern": "^0x[0-9a-f]{64}$",
+                                    "type": "string"
+                                  },
+                                  "id": { "format": "uuid", "type": "string" },
+                                  "keyId": { "type": "string" },
+                                  "payload": { "additionalProperties": true, "type": "object" },
+                                  "signature": { "pattern": "^0x[0-9a-f]{128}$", "type": "string" }
+                                },
+                                "required": [
+                                  "id",
+                                  "executorLockHash",
+                                  "keyId",
+                                  "signature",
+                                  "payload",
+                                  "createdAt"
+                                ],
+                                "type": "object"
+                              },
                               "state": { "type": "string" },
                               "transactionHash": {
                                 "nullable": true,
@@ -781,7 +804,8 @@
                               "operation",
                               "state",
                               "transactionHash",
-                              "committedBlockNumber"
+                              "committedBlockNumber",
+                              "receipt"
                             ],
                             "type": "object"
                           },

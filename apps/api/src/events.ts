@@ -36,6 +36,7 @@ import {
   jobEvents,
   jobs,
   networks,
+  executorReceipts,
   transactionAttempts,
 } from "./database/schema.ts";
 
@@ -91,6 +92,16 @@ interface AttemptReference {
   readonly state: string;
   readonly transactionHash: string | null;
   readonly committedBlockNumber: string | null;
+  readonly receipt: ReceiptReference | null;
+}
+
+interface ReceiptReference {
+  readonly id: string;
+  readonly executorLockHash: string;
+  readonly keyId: string;
+  readonly signature: string;
+  readonly payload: Readonly<Record<string, unknown>>;
+  readonly createdAt: string;
 }
 
 interface ReplacementReference {
@@ -125,6 +136,7 @@ export interface JobEventTimeline {
 
 type EventRow = typeof jobEvents.$inferSelect;
 type AttemptRow = typeof transactionAttempts.$inferSelect;
+type ReceiptRow = typeof executorReceipts.$inferSelect;
 type Checkpoint = JobEventTimeline["indexCheckpoint"];
 
 function invalid(message: string): BadRequestException {
@@ -300,7 +312,22 @@ function confidence(
     : "committed";
 }
 
-function attemptReference(row: AttemptRow | undefined): AttemptReference | null {
+function receiptReference(row: ReceiptRow | undefined): ReceiptReference | null {
+  if (row === undefined) return null;
+  return Object.freeze({
+    id: row.id,
+    executorLockHash: row.executorLockHash,
+    keyId: row.keyId,
+    signature: row.signature,
+    payload: details(row.payload),
+    createdAt: row.createdAt.toISOString(),
+  });
+}
+
+function attemptReference(
+  row: AttemptRow | undefined,
+  receipt: ReceiptRow | undefined,
+): AttemptReference | null {
   if (row === undefined) return null;
   return Object.freeze({
     id: row.id,
@@ -308,6 +335,7 @@ function attemptReference(row: AttemptRow | undefined): AttemptReference | null 
     state: row.state,
     transactionHash: row.txHash,
     committedBlockNumber: row.committedBlockNumber,
+    receipt: receiptReference(receipt),
   });
 }
 
@@ -455,8 +483,17 @@ export class JobEventsService {
                     or(...attemptClauses),
                   ),
                 );
+        const attemptIds = attempts.map(({ id }) => id);
+        const receipts =
+          attemptIds.length === 0
+            ? []
+            : await tx
+                .select()
+                .from(executorReceipts)
+                .where(inArray(executorReceipts.attemptId, attemptIds));
         return {
           attempts,
+          receipts,
           checkpoint,
           confirmationDepth: network.confirmationDepth,
           pageRows,
@@ -473,6 +510,9 @@ export class JobEventsService {
         attempt.txHash === null ? [] : ([[attempt.txHash, attempt]] as const),
       ),
     );
+    const receiptsByAttemptId = new Map(
+      result.receipts.map((receipt) => [receipt.attemptId, receipt]),
+    );
     const items = result.pageRows.map((row) => {
       const replacement = result.replacementCandidates.find(
         (candidate) => candidate.eventType === row.eventType && candidate.id > row.id,
@@ -488,7 +528,10 @@ export class JobEventsService {
         source: row.source as EventSource,
         confidence: confidence(row, result.checkpoint, result.confirmationDepth),
         block: blockReference(row),
-        attempt: attemptReference(relatedAttempt),
+        attempt: attemptReference(
+          relatedAttempt,
+          relatedAttempt === undefined ? undefined : receiptsByAttemptId.get(relatedAttempt.id),
+        ),
         replacement: replacementReference(replacement),
         details: details(row.payload),
         occurredAt: row.occurredAt.toISOString(),
@@ -660,13 +703,26 @@ const blockSchema = {
 };
 const attemptSchema = {
   type: "object",
-  required: ["id", "operation", "state", "transactionHash", "committedBlockNumber"],
+  required: ["id", "operation", "state", "transactionHash", "committedBlockNumber", "receipt"],
   properties: {
     id: { type: "string", format: "uuid" },
     operation: { type: "string" },
     state: { type: "string" },
     transactionHash: { ...hashSchema, nullable: true },
     committedBlockNumber: { ...decimalSchema, nullable: true },
+    receipt: {
+      type: "object",
+      nullable: true,
+      required: ["id", "executorLockHash", "keyId", "signature", "payload", "createdAt"],
+      properties: {
+        id: { type: "string", format: "uuid" },
+        executorLockHash: hashSchema,
+        keyId: { type: "string" },
+        signature: { type: "string", pattern: "^0x[0-9a-f]{128}$" },
+        payload: { type: "object", additionalProperties: true },
+        createdAt: { type: "string", format: "date-time" },
+      },
+    },
   },
 };
 const replacementSchema = {

@@ -50,6 +50,18 @@ test("event route publishes explicit timeline, provenance, and reference schemas
     const confidence = items.items.properties?.["confidence"];
     assert.ok(confidence && !("$ref" in confidence));
     assert.deepEqual(confidence.enum, ["observed", "committed", "confirmed", "reorged"]);
+    const attempt = items.items.properties?.["attempt"];
+    assert.ok(attempt && !("$ref" in attempt));
+    const receipt = attempt.properties?.["receipt"];
+    assert.ok(receipt && !("$ref" in receipt));
+    assert.deepEqual(receipt.required, [
+      "id",
+      "executorLockHash",
+      "keyId",
+      "signature",
+      "payload",
+      "createdAt",
+    ]);
 
     const stream = document.paths["/v1/events/stream"]?.get;
     assert.ok(stream);

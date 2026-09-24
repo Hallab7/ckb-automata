@@ -2,6 +2,7 @@
 @import "@ckb-automata/ui/styles.css";
 @import "../src/shell/app-shell.css";
 @import "../src/dashboard/dashboard.css";
+@import "../src/detail/job-detail.css";
 @import "../src/templates/template-gallery.css";
 @import "../src/setup/setup-stepper.css";
 @source "../../../packages/ui/src";

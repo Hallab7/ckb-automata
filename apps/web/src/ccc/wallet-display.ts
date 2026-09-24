@@ -24,3 +24,10 @@ export function ckbTestnetTransactionUrl(transactionHash: string): string {
   }
   return new URL(`/transaction/${transactionHash}`, CKB_TESTNET_EXPLORER_ORIGIN).toString();
 }
+
+export function ckbTestnetBlockUrl(blockNumber: string): string {
+  if (!/^(?:0|[1-9][0-9]*)$/.test(blockNumber)) {
+    throw new TypeError("blockNumber must be canonical decimal");
+  }
+  return new URL(`/block/${blockNumber}`, CKB_TESTNET_EXPLORER_ORIGIN).toString();
+}
