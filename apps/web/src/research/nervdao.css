@@ -1,0 +1,322 @@
+.nervdao-research {
+  gap: var(--ui-space-8);
+}
+
+.nervdao-hero {
+  border-bottom: 1px solid var(--ui-color-border);
+  padding-bottom: var(--ui-space-6);
+}
+
+.nervdao-hero .app-page-header__copy {
+  max-width: 48rem;
+}
+
+.nervdao-kicker {
+  align-items: center;
+  color: var(--ui-color-warning);
+  display: flex;
+  font-size: 0.75rem;
+  font-weight: 750;
+  gap: var(--ui-space-2);
+  margin-bottom: var(--ui-space-2);
+  text-transform: uppercase;
+}
+
+.nervdao-section-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: var(--ui-space-3);
+}
+
+.nervdao-section-heading--wide {
+  max-width: 48rem;
+}
+
+.nervdao-section-heading h2,
+.nervdao-section-heading p {
+  margin: 0;
+}
+
+.nervdao-section-heading h2 {
+  font-size: 1.125rem;
+  line-height: 1.35;
+}
+
+.nervdao-section-heading p {
+  color: var(--ui-color-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  margin-top: var(--ui-space-1);
+}
+
+.nervdao-section-icon {
+  align-items: center;
+  background: var(--ui-color-info-bg);
+  border-radius: var(--ui-radius-md);
+  color: var(--ui-color-info);
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 2.5rem;
+  justify-content: center;
+  width: 2.5rem;
+}
+
+.nervdao-section-icon--warning {
+  background: var(--ui-color-warning-bg);
+  color: var(--ui-color-warning);
+}
+
+.nervdao-concepts,
+.nervdao-prerequisites,
+.nervdao-sources {
+  display: grid;
+  gap: var(--ui-space-5);
+}
+
+.nervdao-concepts__grid {
+  display: grid;
+  gap: var(--ui-space-4);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.nervdao-concept {
+  background: var(--ui-color-surface);
+  border: 1px solid var(--ui-color-border);
+  border-radius: var(--ui-radius-lg);
+  display: grid;
+  gap: var(--ui-space-4);
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: var(--ui-space-5);
+}
+
+.nervdao-concept > svg {
+  color: var(--ui-color-info);
+}
+
+.nervdao-concept > div {
+  display: grid;
+  gap: var(--ui-space-3);
+}
+
+.nervdao-concept__title {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-3);
+  justify-content: space-between;
+}
+
+.nervdao-concept h3,
+.nervdao-concept p {
+  margin: 0;
+}
+
+.nervdao-concept h3 {
+  font-size: 1rem;
+}
+
+.nervdao-concept p,
+.nervdao-concept span {
+  color: var(--ui-color-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.nervdao-concept strong {
+  border-top: 1px solid var(--ui-color-border);
+  font-size: 0.75rem;
+  padding-top: var(--ui-space-3);
+  text-transform: uppercase;
+}
+
+.nervdao-calculator {
+  background: var(--ui-color-surface);
+  border: 1px solid var(--ui-color-border);
+  border-radius: var(--ui-radius-lg);
+  display: grid;
+  gap: var(--ui-space-5);
+  padding: var(--ui-space-6);
+}
+
+.nervdao-calculator__fields {
+  display: grid;
+  gap: var(--ui-space-4);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.nervdao-calculator__output {
+  border-block: 1px solid var(--ui-color-border);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.nervdao-calculator__output > div {
+  display: grid;
+  gap: var(--ui-space-1);
+  min-width: 0;
+  padding: var(--ui-space-4);
+}
+
+.nervdao-calculator__output > div + div {
+  border-left: 1px solid var(--ui-color-border);
+}
+
+.nervdao-calculator__output span,
+.nervdao-calculator__output small {
+  color: var(--ui-color-text-muted);
+  font-size: 0.75rem;
+}
+
+.nervdao-calculator__output strong {
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.nervdao-time,
+.nervdao-calculator__caveat {
+  align-items: flex-start;
+  display: flex;
+  gap: var(--ui-space-2);
+}
+
+.nervdao-time svg,
+.nervdao-calculator__caveat svg {
+  flex: 0 0 auto;
+}
+
+.nervdao-calculator__caveat {
+  color: var(--ui-color-text-muted);
+}
+
+.nervdao-calculator__caveat p {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.nervdao-return-warning {
+  background: var(--ui-color-warning-bg);
+  border-block: 1px solid var(--ui-color-warning);
+  display: grid;
+  gap: var(--ui-space-4);
+  padding: var(--ui-space-5);
+}
+
+.nervdao-return-warning__body {
+  display: grid;
+  gap: var(--ui-space-3);
+  max-width: 56rem;
+  padding-left: calc(2.5rem + var(--ui-space-3));
+}
+
+.nervdao-return-warning__body p {
+  font-size: 0.875rem;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.nervdao-prerequisites ul {
+  display: grid;
+  gap: var(--ui-space-3);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.nervdao-prerequisites li {
+  align-items: flex-start;
+  border-top: 1px solid var(--ui-color-border);
+  display: grid;
+  font-size: 0.875rem;
+  gap: var(--ui-space-3);
+  grid-template-columns: auto minmax(0, 1fr);
+  line-height: 1.5;
+  padding-top: var(--ui-space-3);
+}
+
+.nervdao-prerequisites li svg {
+  color: var(--ui-color-success);
+  margin-top: 0.1rem;
+}
+
+.nervdao-sources__list {
+  border-block: 1px solid var(--ui-color-border);
+  display: grid;
+}
+
+.nervdao-sources__list a {
+  align-items: center;
+  color: var(--ui-color-text);
+  display: flex;
+  gap: var(--ui-space-4);
+  justify-content: space-between;
+  padding: var(--ui-space-4) 0;
+  text-decoration: none;
+}
+
+.nervdao-sources__list a + a {
+  border-top: 1px solid var(--ui-color-border);
+}
+
+.nervdao-sources__list a:hover strong {
+  color: var(--ui-color-accent);
+  text-decoration: underline;
+}
+
+.nervdao-sources__list a > span {
+  display: grid;
+  gap: var(--ui-space-1);
+  min-width: 0;
+}
+
+.nervdao-sources__list small {
+  color: var(--ui-color-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.nervdao-sources__list svg {
+  color: var(--ui-color-text-muted);
+  flex: 0 0 auto;
+}
+
+@media (max-width: 52rem) {
+  .nervdao-concepts__grid,
+  .nervdao-prerequisites ul {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 40rem) {
+  .nervdao-calculator {
+    padding: var(--ui-space-4);
+  }
+
+  .nervdao-calculator__fields,
+  .nervdao-calculator__output {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .nervdao-calculator__output > div + div {
+    border-left: 0;
+    border-top: 1px solid var(--ui-color-border);
+  }
+
+  .nervdao-return-warning__body {
+    padding-left: 0;
+  }
+}
+
+@media (max-width: 30rem) {
+  .nervdao-concept {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--ui-space-4);
+  }
+
+  .nervdao-concept__title {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

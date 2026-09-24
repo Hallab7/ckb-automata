@@ -1,5 +1,11 @@
-import { ScaffoldPage } from "../../../../src/scaffold/scaffold-page.tsx";
+import type { Metadata } from "next";
+
+import { NervDaoResearchPreview } from "../../../../src/research/nervdao-preview.tsx";
+
+export const metadata: Metadata = {
+  title: "NervDAO research",
+};
 
 export default function NervDaoResearchPage() {
-  return <ScaffoldPage title="NervDAO research" />;
+  return <NervDaoResearchPreview />;
 }
