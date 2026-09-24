@@ -3,6 +3,8 @@ node_modules/
 **/dist/
 **/*.tsbuildinfo
 target/
+playwright-report/
+test-results/
 fuzz/artifacts/
 fuzz/corpus/
 .env

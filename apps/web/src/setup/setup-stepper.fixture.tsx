@@ -13,14 +13,16 @@ function validateFixture(step: SetupStepId, draft: Readonly<Record<string, strin
     : {};
 }
 
-function FixtureStep({ draft, errors, setField, step }: SetupStepRenderContext) {
+function FixtureStep({ draft, errors, setField, step, template }: SetupStepRenderContext) {
+  const fieldLabel =
+    template === "deadline" ? "Deadline automation name" : "Recurring automation name";
   if (step === "details") {
     return (
       <div className="setup-step__group">
         <h2>Details</h2>
         <TextField
           {...(errors["fixtureName"] === undefined ? {} : { error: errors["fixtureName"] })}
-          label="Fixture name"
+          label={fieldLabel}
           name="fixtureName"
           onChange={(event) => setField("fixtureName", event.target.value)}
           value={draft["fixtureName"] ?? ""}
@@ -36,13 +38,15 @@ function FixtureStep({ draft, errors, setField, step }: SetupStepRenderContext) 
   );
 }
 
-export function SetupStepperFixture() {
+export function SetupStepperFixture({
+  template = "deadline",
+}: Readonly<{ template?: "deadline" | "recurring" }>) {
   return (
     <SetupStepper
       initialDraft={INITIAL_DRAFT}
       renderStep={(context) => <FixtureStep {...context} />}
       storageId="fixture"
-      template="deadline"
+      template={template}
       validateStep={validateFixture}
     />
   );
