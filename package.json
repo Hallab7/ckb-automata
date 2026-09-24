@@ -59,12 +59,14 @@
     "recovery:verify:local": "node scripts/verify-recovery-cli-local.mjs",
     "secrets:check": "node scripts/check-secrets.mjs",
     "test": "node --test scripts/*.test.mjs && pnpm -r --if-present test",
+    "test:a11y": "playwright test apps/web/e2e/accessibility.spec.ts",
     "test:e2e": "playwright test",
     "typecheck": "pnpm -r --if-present typecheck",
     "verify": "pnpm check:versions && pnpm check:workspace && pnpm schema:review && pnpm schema:check && pnpm openapi:check && pnpm secrets:check && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm contracts:build && pnpm contracts:test",
     "verify:workspace": "pnpm check:versions && pnpm check:workspace && pnpm typecheck"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.63.0",
     "@types/node": "24.11.1",
