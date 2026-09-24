@@ -1,19 +1,14 @@
 import type { Metadata } from "next";
 
 import { createDemoDataProvider } from "../../../src/data-provider.ts";
-import { ScaffoldPage } from "../../../src/scaffold/scaffold-page.tsx";
+import { DEMO_SCENARIOS } from "../../../src/demo/demo-data.ts";
+import { DemoExperience } from "../../../src/demo/demo.tsx";
 
 export const metadata: Metadata = {
   title: "Demo",
 };
 
 export default function DemoPage() {
-  const provider = createDemoDataProvider(null);
-  return (
-    <ScaffoldPage
-      description="Fixture-backed walkthrough with no wallet or testnet requests."
-      detail={provider.label}
-      title="Demo"
-    />
-  );
+  const provider = createDemoDataProvider(DEMO_SCENARIOS);
+  return <DemoExperience dataLabel={provider.label} scenarios={provider.load()} />;
 }

@@ -116,3 +116,27 @@ test("filters activity and exercises private settings controls", async ({ page }
   await expect(deleteButton).toBeEnabled();
   await expectNoHorizontalOverflow(page);
 });
+
+test("keeps demo evidence labeled while scenarios change and reset", async ({ page }) => {
+  await page.goto("/demo");
+  const boundary = page.locator(".demo-boundary");
+  await expect(boundary.getByText("Demo data", { exact: true })).toBeVisible();
+  await expect(page.locator(".app-network-badge:visible")).toContainText("Demo data");
+  await expect(page.getByText("Connect wallet", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Simulated records.", { exact: false })).toBeVisible();
+
+  await page.getByRole("button", { name: "Owner recovery", exact: false }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "Owner recovery" })).toBeVisible();
+  await page.getByRole("button", { name: "Next review" }).click();
+  await expect(
+    page.getByRole("heading", { level: 3, name: "Review owner authentication" }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Reset demo" }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "Scheduled payout" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 3, name: "Review immutable intent" }),
+  ).toBeVisible();
+  await expect(boundary.getByText("Demo data", { exact: true })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});

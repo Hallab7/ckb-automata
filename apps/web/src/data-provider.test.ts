@@ -21,11 +21,11 @@ test("demo fixtures and live reads use separate providers with explicit labels",
   assert.deepEqual(
     { demo: [demo.kind, demo.label], live: [live.kind, live.label] },
     {
-      demo: ["demo", "Demo only"],
+      demo: ["demo", "Demo data"],
       live: ["live", "Live testnet data"],
     },
   );
-  assert.equal(DEMO_DATA_LABEL, "Demo only");
+  assert.equal(DEMO_DATA_LABEL, "Demo data");
   assert.equal(LIVE_DATA_LABEL, "Live testnet data");
   assert.equal(demo.load(), fixture);
   assert.equal(liveReads, 0, "loading demo data must not access the live provider");

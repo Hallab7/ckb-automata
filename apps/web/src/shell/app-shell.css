@@ -81,6 +81,16 @@
   width: 0.45rem;
 }
 
+.app-network-badge[data-mode="demo"] {
+  background: var(--ui-color-info-bg);
+  border-color: var(--ui-color-info);
+  color: var(--ui-color-info);
+}
+
+.app-network-badge[data-mode="demo"] .app-network-badge__dot {
+  background: var(--ui-color-info);
+}
+
 .app-nav,
 .app-nav__group {
   display: grid;
@@ -189,6 +199,11 @@
 
 .app-wallet-control--warning {
   color: var(--ui-color-warning);
+}
+
+.app-wallet-control--demo {
+  background: var(--ui-color-info-bg);
+  border-color: var(--ui-color-info);
 }
 
 .app-wallet-control--disconnected > .ui-button,

@@ -79,15 +79,41 @@ function ProductMark() {
 }
 
 function NetworkBadge() {
+  const demo = usePathname() === "/demo";
   return (
-    <span className="app-network-badge">
+    <span className="app-network-badge" data-mode={demo ? "demo" : "live"}>
       <span aria-hidden="true" className="app-network-badge__dot" />
-      <span>
-        <span className="app-network-badge__prefix">CKB </span>
-        Testnet
-      </span>
+      {demo ? (
+        <span>Demo data</span>
+      ) : (
+        <span>
+          <span className="app-network-badge__prefix">CKB </span>
+          Testnet
+        </span>
+      )}
     </span>
   );
+}
+
+function WalletArea() {
+  const demo = usePathname() === "/demo";
+  if (!demo) return <WalletControl />;
+  return (
+    <div className="app-wallet-control app-wallet-control--demo">
+      <div className="app-wallet-control__heading">
+        <div>
+          <span className="app-wallet-control__label">Demo boundary</span>
+          <strong>Wallet disabled</strong>
+        </div>
+        <Beaker aria-hidden="true" size={18} />
+      </div>
+      <p>Demo mode cannot request signatures or submit transactions.</p>
+    </div>
+  );
+}
+
+function NetworkNotice() {
+  return usePathname() === "/demo" ? null : <WalletNetworkNotice />;
 }
 
 function MobileNavigation() {
@@ -108,7 +134,7 @@ function MobileNavigation() {
       <div className="app-mobile-nav">
         <NetworkBadge />
         <NavigationLinks closeOnSelect />
-        <WalletControl />
+        <WalletArea />
       </div>
     </Drawer>
   );
@@ -124,7 +150,7 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
         <ProductMark />
         <NetworkBadge />
         <NavigationLinks />
-        <WalletControl />
+        <WalletArea />
       </aside>
       <div className="app-shell__workspace">
         <header className="app-mobile-header">
@@ -135,7 +161,7 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
           </div>
         </header>
         <main className="app-main" id="main-content" tabIndex={-1}>
-          <WalletNetworkNotice />
+          <NetworkNotice />
           {children}
         </main>
       </div>
