@@ -54,12 +54,15 @@ test("auth contract is settings-only and transaction construction remains unauth
     const challenge = document.paths["/v1/auth/challenge"]?.post;
     const verify = document.paths["/v1/auth/verify"]?.post;
     const session = document.paths["/v1/auth/session"]?.get;
+    const revoke = document.paths["/v1/auth/session"]?.delete;
     const bearer = document.components?.securitySchemes?.["bearer"];
     assert.ok(bearer && !("$ref" in bearer));
     assert.equal(bearer.type, "http");
     assert.ok(challenge?.requestBody && "content" in challenge.requestBody);
     assert.ok(verify?.requestBody && "content" in verify.requestBody);
     assert.ok(session?.security?.some((requirement) => "bearer" in requirement));
+    assert.ok(revoke?.security?.some((requirement) => "bearer" in requirement));
+    assert.ok(revoke?.responses?.["200"]);
     for (const path of [
       "/v1/transactions/create-deadline-job",
       "/v1/transactions/create-recurring-job",
@@ -85,6 +88,12 @@ test("auth contract is settings-only and transaction construction remains unauth
     });
     assert.equal(malformed.statusCode, 400);
     assert.equal((malformed.json() as { code: string }).code, "INVALID_AUTH_REQUEST");
+    const unauthorizedRevoke = await fastify.inject({
+      method: "DELETE",
+      url: "/v1/auth/session",
+      payload: undefined,
+    });
+    assert.equal(unauthorizedRevoke.statusCode, 401);
   } finally {
     await result.app.close();
   }

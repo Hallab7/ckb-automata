@@ -371,6 +371,27 @@ function WalletSessionBridge({ children }: Readonly<{ children: ReactNode }>) {
         );
       },
       signer,
+      signSettingsMessage: async (message) => {
+        const currentSigner = requireSigner();
+        const address = await currentSigner.getRecommendedAddressObj();
+        const ownerLock = reviewedScript(address.script);
+        const ownerLockHash = ccc.hashCkb(address.script.toBytes());
+        if (ownerLockHash !== currentDetails.ownerLockHash) {
+          throw new Error("The connected wallet address changed. Reconnect before signing in.");
+        }
+        const signature = await currentSigner.signMessage(message);
+        if (signature.signType !== ccc.SignerSignType.CkbSecp256k1) {
+          throw new Error("This wallet cannot sign CKB settings authentication messages.");
+        }
+        return Object.freeze({
+          ownerLock,
+          signature: Object.freeze({
+            identity: signature.identity,
+            signature: signature.signature,
+            signType: ccc.SignerSignType.CkbSecp256k1,
+          }),
+        });
+      },
       signReviewedTransaction: async (transaction, expectedHash, snapshot) => {
         const currentSigner = requireSigner();
         const tip = await currentSigner.client.getTipHeader();

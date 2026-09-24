@@ -38,6 +38,14 @@ export interface WalletSession {
     readonly txHash: string;
   }>;
   readonly signer: Signer | undefined;
+  readonly signSettingsMessage: (message: string) => Promise<{
+    readonly ownerLock: ScriptIdentity;
+    readonly signature: {
+      readonly identity: string;
+      readonly signature: string;
+      readonly signType: "CkbSecp256k1";
+    };
+  }>;
   readonly signReviewedTransaction: (
     transaction: UnsignedDeadlineTransaction,
     expectedHash: string,

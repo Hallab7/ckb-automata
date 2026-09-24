@@ -70,6 +70,27 @@ test("serializes generated transaction request bodies", async () => {
   assert.deepEqual(await request?.json(), body);
 });
 
+test("revokes settings sessions with bearer authentication", async () => {
+  const requests: Array<{ headers: Headers; method: string; url: string }> = [];
+  const client = createApiClient({
+    baseUrl: "https://api.example.test/",
+    fetch: async (input, init) => {
+      requests.push({
+        headers: new Headers(init?.headers),
+        method: init?.method ?? "GET",
+        url: String(input),
+      });
+      return Response.json({ revokedAt: "2026-09-24T12:00:00.000Z" });
+    },
+  });
+
+  await client.revokeAuthSession("session-token");
+
+  assert.equal(requests[0]?.url, "https://api.example.test/v1/auth/session");
+  assert.equal(requests[0]?.method, "DELETE");
+  assert.equal(requests[0]?.headers.get("authorization"), "Bearer session-token");
+});
+
 test("exposes structured API failures", async () => {
   const client = createApiClient({
     baseUrl: "https://api.example.test/",
@@ -115,12 +136,12 @@ test("sends opaque sessions only in the authorization header", async () => {
   assert.equal(new URL(request?.url ?? "https://invalid.test").search, "");
 });
 
-test("updates preferences with generated request types and session scope", async () => {
-  let request: Request | undefined;
+test("updates and resets preferences with generated request types and session scope", async () => {
+  const requests: Request[] = [];
   const client = createApiClient({
     baseUrl: "https://api.example.test/",
     fetch: async (input, init) => {
-      request = new Request(input, init);
+      requests.push(new Request(input, init));
       return new Response(
         JSON.stringify({
           channels: {
@@ -140,10 +161,13 @@ test("updates preferences with generated request types and session scope", async
   } as const;
 
   await client.updateNotificationPreferences("B".repeat(43), body);
+  await client.resetNotificationPreferences("B".repeat(43));
 
-  assert.equal(request?.method, "PUT");
-  assert.equal(request?.headers.get("authorization"), `Bearer ${"B".repeat(43)}`);
-  assert.deepEqual(await request?.json(), body);
+  assert.equal(requests[0]?.method, "PUT");
+  assert.equal(requests[0]?.headers.get("authorization"), `Bearer ${"B".repeat(43)}`);
+  assert.deepEqual(await requests[0]?.json(), body);
+  assert.equal(requests[1]?.method, "DELETE");
+  assert.equal(requests[1]?.headers.get("authorization"), `Bearer ${"B".repeat(43)}`);
 });
 
 test("registers, updates, and replays webhooks with owner sessions", async () => {

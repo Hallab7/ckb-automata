@@ -1,6 +1,15 @@
 import { randomBytes, randomUUID } from "node:crypto";
 
-import { BadRequestException, Body, Controller, Get, Headers, Inject, Put } from "@nestjs/common";
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Headers,
+  Inject,
+  Put,
+} from "@nestjs/common";
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -16,7 +25,7 @@ import type { AutomataEnvironment } from "@ckb-automata/config";
 
 import { AuthService } from "./auth.ts";
 import type { AutomataDatabase } from "./database/client.ts";
-import { notificationPreferences } from "./database/schema.ts";
+import { notificationPreferences, notificationSubscriptions } from "./database/schema.ts";
 import { decodeEncryptionKey, decryptSecret, encryptSecret } from "./secret-box.ts";
 
 export const NOTIFICATION_EVENT_TYPES = [
@@ -287,6 +296,29 @@ export class NotificationPreferencesService {
     return this.#response(session.ownerLockHash, rows);
   }
 
+  async reset(authorization: string | undefined): Promise<NotificationPreferencesResponse> {
+    const session = await this.#auth.authenticate(authorization);
+    await this.#database.transaction(async (transaction) => {
+      await transaction
+        .delete(notificationSubscriptions)
+        .where(
+          and(
+            eq(notificationSubscriptions.networkId, this.#network),
+            eq(notificationSubscriptions.ownerLockHash, session.ownerLockHash),
+          ),
+        );
+      await transaction
+        .delete(notificationPreferences)
+        .where(
+          and(
+            eq(notificationPreferences.networkId, this.#network),
+            eq(notificationPreferences.ownerLockHash, session.ownerLockHash),
+          ),
+        );
+    });
+    return this.#response(session.ownerLockHash, []);
+  }
+
   #response(
     ownerLockHash: string,
     rows: readonly PreferenceRow[],
@@ -337,6 +369,10 @@ export class NotificationPreferencesController {
     body: unknown,
   ): Promise<NotificationPreferencesResponse> {
     return this.#preferences.update(authorization, body);
+  }
+
+  reset(authorization: string | undefined): Promise<NotificationPreferencesResponse> {
+    return this.#preferences.reset(authorization);
   }
 }
 
@@ -408,8 +444,14 @@ Put()(
 );
 Headers("authorization")(NotificationPreferencesController.prototype, "update", 0);
 Body()(NotificationPreferencesController.prototype, "update", 1);
+Delete()(
+  NotificationPreferencesController.prototype,
+  "reset",
+  Object.getOwnPropertyDescriptor(NotificationPreferencesController.prototype, "reset")!,
+);
+Headers("authorization")(NotificationPreferencesController.prototype, "reset", 0);
 
-for (const method of ["get", "update"] as const) {
+for (const method of ["get", "update", "reset"] as const) {
   ApiBearerAuth()(
     NotificationPreferencesController.prototype,
     method,
@@ -435,6 +477,11 @@ ApiOperation({ summary: "Replace owner-scoped browser and email notification pre
   NotificationPreferencesController.prototype,
   "update",
   Object.getOwnPropertyDescriptor(NotificationPreferencesController.prototype, "update")!,
+);
+ApiOperation({ summary: "Delete the current owner's notification preferences and webhooks" })(
+  NotificationPreferencesController.prototype,
+  "reset",
+  Object.getOwnPropertyDescriptor(NotificationPreferencesController.prototype, "reset")!,
 );
 ApiBody({ schema: inputSchema })(
   NotificationPreferencesController.prototype,

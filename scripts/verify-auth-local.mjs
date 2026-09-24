@@ -145,15 +145,23 @@ try {
     SELECT nonce_hash, consumed_at FROM auth_challenges WHERE id = ${challenge.challengeId}
   `;
   const [storedSession] = await inspect`
-    SELECT token_hash, scope FROM auth_sessions WHERE id = ${authenticated.id}
+    SELECT token_hash, scope, revoked_at FROM auth_sessions WHERE id = ${authenticated.id}
   `;
   assert.notEqual(storedChallenge.nonce_hash, challenge.nonce);
   assert.ok(storedChallenge.consumed_at);
   assert.notEqual(storedSession.token_hash, session.sessionToken);
   assert.equal(storedSession.scope, "off_chain_settings");
+  assert.equal(storedSession.revoked_at, null);
+
+  const revoked = await auth.revoke(`Bearer ${session.sessionToken}`);
+  assert.ok(Number.isFinite(Date.parse(revoked.revokedAt)));
+  await rejectedCode(
+    () => auth.authenticate(`Bearer ${session.sessionToken}`),
+    "AUTH_SESSION_INVALID",
+  );
 
   console.log(
-    "Auth verified: CCC signature, owner binding, separation, expiry, replay, and hashed session",
+    "Auth verified: CCC signature, owner binding, separation, expiry, replay, revocation, and hashed session",
   );
 } finally {
   await databaseClient?.close();

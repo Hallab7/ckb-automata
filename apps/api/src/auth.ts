@@ -4,6 +4,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   Inject,
@@ -400,6 +401,18 @@ export class AuthService {
       scope: AUTH_SESSION_SCOPE,
     });
   }
+
+  async revoke(authorization: string | undefined): Promise<{ readonly revokedAt: string }> {
+    const session = await this.authenticate(authorization);
+    const revokedAt = this.#now();
+    const [revoked] = await this.#database
+      .update(authSessions)
+      .set({ revokedAt })
+      .where(and(eq(authSessions.id, session.id), isNull(authSessions.revokedAt)))
+      .returning({ id: authSessions.id });
+    if (revoked === undefined) throw unauthorized("AUTH_SESSION_INVALID");
+    return Object.freeze({ revokedAt: revokedAt.toISOString() });
+  }
 }
 
 export class AuthController {
@@ -427,6 +440,10 @@ export class AuthController {
       ownerLockHash: session.ownerLockHash,
       scope: [AUTH_SESSION_SCOPE],
     };
+  }
+
+  revoke(authorization: string | undefined): Promise<{ readonly revokedAt: string }> {
+    return this.#auth.revoke(authorization);
   }
 }
 
@@ -570,6 +587,35 @@ ApiOkResponse({
   Object.getOwnPropertyDescriptor(AuthController.prototype, "current")!,
 );
 
+Delete("session")(
+  AuthController.prototype,
+  "revoke",
+  Object.getOwnPropertyDescriptor(AuthController.prototype, "revoke")!,
+);
+Headers("authorization")(AuthController.prototype, "revoke", 0);
+ApiBearerAuth()(
+  AuthController.prototype,
+  "revoke",
+  Object.getOwnPropertyDescriptor(AuthController.prototype, "revoke")!,
+);
+ApiOperation({ summary: "Revoke the current off-chain settings session" })(
+  AuthController.prototype,
+  "revoke",
+  Object.getOwnPropertyDescriptor(AuthController.prototype, "revoke")!,
+);
+ApiOkResponse({
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["revokedAt"],
+    properties: { revokedAt: { type: "string", format: "date-time" } },
+  },
+})(
+  AuthController.prototype,
+  "revoke",
+  Object.getOwnPropertyDescriptor(AuthController.prototype, "revoke")!,
+);
+
 for (const method of ["issue", "verify"] as const) {
   ApiBadRequestResponse({ description: "Malformed authentication request" })(
     AuthController.prototype,
@@ -577,7 +623,7 @@ for (const method of ["issue", "verify"] as const) {
     Object.getOwnPropertyDescriptor(AuthController.prototype, method)!,
   );
 }
-for (const method of ["verify", "current"] as const) {
+for (const method of ["verify", "current", "revoke"] as const) {
   ApiUnauthorizedResponse({
     description: "Invalid, expired, or already-used authentication proof",
   })(

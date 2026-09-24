@@ -465,6 +465,29 @@
       }
     },
     "/v1/auth/session": {
+      "delete": {
+        "operationId": "AuthController_revoke",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": { "revokedAt": { "format": "date-time", "type": "string" } },
+                  "required": ["revokedAt"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": { "description": "Invalid, expired, or already-used authentication proof" }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Revoke the current off-chain settings session",
+        "tags": ["authentication"]
+      },
       "get": {
         "operationId": "AuthController_current",
         "parameters": [],
@@ -1357,6 +1380,92 @@
       }
     },
     "/v1/preferences": {
+      "delete": {
+        "operationId": "NotificationPreferencesController_reset",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "channels": {
+                      "properties": {
+                        "browser": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "enabled": { "type": "boolean" },
+                            "eventTypes": {
+                              "items": {
+                                "enum": [
+                                  "ready",
+                                  "submitted",
+                                  "confirmed",
+                                  "failed",
+                                  "budget_low",
+                                  "cancelled",
+                                  "recovery_required"
+                                ],
+                                "type": "string"
+                              },
+                              "maxItems": 7,
+                              "type": "array",
+                              "uniqueItems": true
+                            }
+                          },
+                          "required": ["enabled", "eventTypes"],
+                          "type": "object"
+                        },
+                        "email": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "address": {
+                              "description": "Masked email address",
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "enabled": { "type": "boolean" },
+                            "eventTypes": {
+                              "items": {
+                                "enum": [
+                                  "ready",
+                                  "submitted",
+                                  "confirmed",
+                                  "failed",
+                                  "budget_low",
+                                  "cancelled",
+                                  "recovery_required"
+                                ],
+                                "type": "string"
+                              },
+                              "maxItems": 7,
+                              "type": "array",
+                              "uniqueItems": true
+                            }
+                          },
+                          "required": ["enabled", "eventTypes", "address"],
+                          "type": "object"
+                        }
+                      },
+                      "required": ["browser", "email"],
+                      "type": "object"
+                    },
+                    "network": { "enum": ["ckb_dev", "ckb_testnet"], "type": "string" },
+                    "ownerLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+                  },
+                  "required": ["channels", "network", "ownerLockHash"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": { "description": "A valid off-chain settings session is required" }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Delete the current owner's notification preferences and webhooks",
+        "tags": ["notification preferences"]
+      },
       "get": {
         "operationId": "NotificationPreferencesController_get",
         "parameters": [],

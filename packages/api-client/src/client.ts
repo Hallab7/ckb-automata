@@ -110,6 +110,13 @@ export class AutomataApiClient {
     });
   }
 
+  revokeAuthSession(sessionToken: string): Promise<ApiSuccess<"AuthController_revoke">> {
+    return this.#request("v1/auth/session", {
+      headers: { authorization: `Bearer ${sessionToken}` },
+      method: "DELETE",
+    });
+  }
+
   getNotificationPreferences(sessionToken: string): Promise<ApiNotificationPreferences> {
     return this.#request("v1/preferences", {
       headers: { authorization: `Bearer ${sessionToken}` },
@@ -124,6 +131,15 @@ export class AutomataApiClient {
       body,
       headers: { authorization: `Bearer ${sessionToken}` },
       method: "PUT",
+    });
+  }
+
+  resetNotificationPreferences(
+    sessionToken: string,
+  ): Promise<ApiSuccess<"NotificationPreferencesController_reset">> {
+    return this.#request("v1/preferences", {
+      headers: { authorization: `Bearer ${sessionToken}` },
+      method: "DELETE",
     });
   }
 
@@ -275,7 +291,7 @@ export class AutomataApiClient {
     options: {
       readonly body?: unknown;
       readonly headers?: Readonly<Record<string, string>>;
-      readonly method?: "PATCH" | "POST" | "PUT";
+      readonly method?: "DELETE" | "PATCH" | "POST" | "PUT";
       readonly query?: unknown;
     } = {},
   ): Promise<Result> {

@@ -157,8 +157,37 @@ try {
     (error) => error?.getResponse?.().code === "INVALID_NOTIFICATION_PREFERENCES",
   );
 
+  await preferences.update(otherOwner.authorization, {
+    browser: { enabled: false, eventTypes: [] },
+    email: { enabled: false, eventTypes: [] },
+  });
+  await inspect`
+    INSERT INTO notification_subscriptions (
+      id, network_id, owner_lock_hash, channel, destination_ciphertext, event_types, enabled
+    ) VALUES
+      ('11111111-1111-4111-8111-111111111111', 'ckb_dev', ${owner.ownerLockHash}, 'webhook', 'v1.owner', '["ready"]'::jsonb, true),
+      ('22222222-2222-4222-8222-222222222222', 'ckb_dev', ${otherOwner.ownerLockHash}, 'webhook', 'v1.other', '["ready"]'::jsonb, true)
+  `;
+  const reset = await preferences.reset(owner.authorization);
+  assert.equal(reset.ownerLockHash, owner.ownerLockHash);
+  assert.equal(reset.channels.browser.enabled, false);
+  assert.equal(reset.channels.email.address, null);
+  const [resetCounts] = await inspect`
+    SELECT
+      (SELECT count(*)::integer FROM notification_preferences WHERE owner_lock_hash = ${owner.ownerLockHash}) AS owner_preferences,
+      (SELECT count(*)::integer FROM notification_subscriptions WHERE owner_lock_hash = ${owner.ownerLockHash}) AS owner_webhooks,
+      (SELECT count(*)::integer FROM notification_preferences WHERE owner_lock_hash = ${otherOwner.ownerLockHash}) AS other_preferences,
+      (SELECT count(*)::integer FROM notification_subscriptions WHERE owner_lock_hash = ${otherOwner.ownerLockHash}) AS other_webhooks
+  `;
+  assert.deepEqual(resetCounts, {
+    owner_preferences: 0,
+    owner_webhooks: 0,
+    other_preferences: 2,
+    other_webhooks: 1,
+  });
+
   console.log(
-    "Preferences verified: authorization, explicit opt-in, opt-out, isolation, encryption, and retention",
+    "Preferences verified: authorization, explicit opt-in, opt-out, isolation, encryption, retention, and owner-only reset",
   );
 } finally {
   await databaseClient?.close();

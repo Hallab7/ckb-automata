@@ -46,8 +46,11 @@ test("preference routes require settings sessions and publish the closed event v
     const document = createOpenApiDocument(result.app);
     const read = document.paths["/v1/preferences"]?.get;
     const update = document.paths["/v1/preferences"]?.put;
+    const reset = document.paths["/v1/preferences"]?.delete;
     assert.ok(read?.security?.some((requirement) => "bearer" in requirement));
     assert.ok(update?.security?.some((requirement) => "bearer" in requirement));
+    assert.ok(reset?.security?.some((requirement) => "bearer" in requirement));
+    assert.ok(reset?.responses?.["200"]);
     assert.ok(update?.requestBody && "content" in update.requestBody);
     const schema = update.requestBody.content["application/json"]?.schema;
     assert.ok(schema && !("$ref" in schema));
@@ -62,6 +65,8 @@ test("preference routes require settings sessions and publish the closed event v
     };
     const unauthorized = await fastify.inject({ method: "GET", url: "/v1/preferences" });
     assert.equal(unauthorized.statusCode, 401);
+    const unauthorizedReset = await fastify.inject({ method: "DELETE", url: "/v1/preferences" });
+    assert.equal(unauthorizedReset.statusCode, 401);
   } finally {
     await result.app.close();
   }

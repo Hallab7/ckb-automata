@@ -66,7 +66,8 @@ export type paths = {
         readonly get: operations["AuthController_current"];
         readonly put?: never;
         readonly post?: never;
-        readonly delete?: never;
+        /** Revoke the current off-chain settings session */
+        readonly delete: operations["AuthController_revoke"];
         readonly options?: never;
         readonly head?: never;
         readonly patch?: never;
@@ -251,7 +252,8 @@ export type paths = {
         /** Replace owner-scoped browser and email notification preferences */
         readonly put: operations["NotificationPreferencesController_update"];
         readonly post?: never;
-        readonly delete?: never;
+        /** Delete the current owner's notification preferences and webhooks */
+        readonly delete: operations["NotificationPreferencesController_reset"];
         readonly options?: never;
         readonly head?: never;
         readonly patch?: never;
@@ -777,6 +779,35 @@ export interface operations {
                         readonly network: "ckb_dev" | "ckb_testnet";
                         readonly ownerLockHash: string;
                         readonly scope: readonly "off_chain_settings"[];
+                    };
+                };
+            };
+            /** @description Invalid, expired, or already-used authentication proof */
+            readonly 401: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly AuthController_revoke: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        /** Format: date-time */
+                        readonly revokedAt: string;
                     };
                 };
             };
@@ -1469,6 +1500,48 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description A valid off-chain settings session is required */
+            readonly 401: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly NotificationPreferencesController_reset: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        readonly channels: {
+                            readonly browser: {
+                                readonly enabled: boolean;
+                                readonly eventTypes: readonly ("ready" | "submitted" | "confirmed" | "failed" | "budget_low" | "cancelled" | "recovery_required")[];
+                            };
+                            readonly email: {
+                                /** @description Masked email address */
+                                readonly address: string | null;
+                                readonly enabled: boolean;
+                                readonly eventTypes: readonly ("ready" | "submitted" | "confirmed" | "failed" | "budget_low" | "cancelled" | "recovery_required")[];
+                            };
+                        };
+                        /** @enum {string} */
+                        readonly network: "ckb_dev" | "ckb_testnet";
+                        readonly ownerLockHash: string;
+                    };
+                };
             };
             /** @description A valid off-chain settings session is required */
             readonly 401: {
