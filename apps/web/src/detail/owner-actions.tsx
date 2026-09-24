@@ -12,7 +12,7 @@ import {
 import { Button, Dialog, InlineNotice, SelectField, TextField } from "@ckb-automata/ui";
 
 import { useWalletSession } from "../ccc/session.tsx";
-import { parseWebEnvironment } from "../environment.ts";
+import { browserWebEnvironment } from "../environment.ts";
 import { ckbToShannons, shannonsToCkb } from "../setup/ckb-amount.ts";
 import { TransactionProgressTracker } from "../setup/transaction-progress.tsx";
 import {
@@ -68,10 +68,7 @@ const definitions: Readonly<Record<OwnerAction, ActionDefinition>> = {
 };
 
 function browserApiClient() {
-  const environment = parseWebEnvironment({
-    NEXT_PUBLIC_AUTOMATA_API_URL: process.env["NEXT_PUBLIC_AUTOMATA_API_URL"],
-    NEXT_PUBLIC_CKB_NETWORK: process.env["NEXT_PUBLIC_CKB_NETWORK"],
-  });
+  const environment = browserWebEnvironment();
   return createApiClient({ baseUrl: environment.apiUrl });
 }
 

@@ -12,7 +12,7 @@ import { deploymentRegistry, type UnsignedDeadlineTransaction } from "@ckb-autom
 import { Button, InlineNotice } from "@ckb-automata/ui";
 
 import { useWalletSession } from "../ccc/session.tsx";
-import { parseWebEnvironment } from "../environment.ts";
+import { browserWebEnvironment } from "../environment.ts";
 import {
   creationReviewKey,
   type CreationReviewResult,
@@ -34,10 +34,7 @@ export type CreationSubmissionState =
   | { readonly key: string; readonly outcome: SubmissionOutcome; readonly status: "submitted" };
 
 function browserApiClient() {
-  const environment = parseWebEnvironment({
-    NEXT_PUBLIC_AUTOMATA_API_URL: process.env["NEXT_PUBLIC_AUTOMATA_API_URL"],
-    NEXT_PUBLIC_CKB_NETWORK: process.env["NEXT_PUBLIC_CKB_NETWORK"],
-  });
+  const environment = browserWebEnvironment();
   return createApiClient({ baseUrl: environment.apiUrl });
 }
 

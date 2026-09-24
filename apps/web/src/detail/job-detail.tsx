@@ -9,7 +9,7 @@ import {
   type AutomataApiClient,
 } from "@ckb-automata/api-client";
 
-import { parseWebEnvironment } from "../environment.ts";
+import { browserWebEnvironment } from "../environment.ts";
 import { detailRequestError } from "../request-errors.ts";
 import { decodeDetailStreamEvent } from "../stream-reducers.ts";
 import { JobDetailView, type JobDetailLoadState } from "./job-detail-view.tsx";
@@ -18,13 +18,6 @@ import { OwnerActions } from "./owner-actions.tsx";
 
 const EVENT_PAGE_SIZE = 50;
 const EVENT_POLL_MS = 5_000;
-
-function browserEnvironment() {
-  return parseWebEnvironment({
-    NEXT_PUBLIC_AUTOMATA_API_URL: process.env["NEXT_PUBLIC_AUTOMATA_API_URL"],
-    NEXT_PUBLIC_CKB_NETWORK: process.env["NEXT_PUBLIC_CKB_NETWORK"],
-  });
-}
 
 function streamUrl(baseUrl: string, jobId: string): string {
   const url = new URL("v1/events/stream", baseUrl);
@@ -35,16 +28,16 @@ function streamUrl(baseUrl: string, jobId: string): string {
 export function AutomationDetail({ jobId }: Readonly<{ jobId: string }>) {
   const apiResult = useMemo(() => {
     try {
-      const environment = browserEnvironment();
+      const environment = browserWebEnvironment();
       return {
         api: createApiClient({ baseUrl: environment.apiUrl }),
-        apiUrl: environment.apiUrl,
+        sseUrl: environment.sseUrl,
         error: undefined,
       } as const;
     } catch {
       return {
         api: undefined,
-        apiUrl: undefined,
+        sseUrl: undefined,
         error: "The public testnet API is not configured.",
       } as const;
     }
@@ -95,7 +88,7 @@ export function AutomationDetail({ jobId }: Readonly<{ jobId: string }>) {
   }, [apiResult, load, refreshKey]);
 
   useEffect(() => {
-    if (loadState !== "ready" || apiResult.api === undefined || apiResult.apiUrl === undefined) {
+    if (loadState !== "ready" || apiResult.api === undefined || apiResult.sseUrl === undefined) {
       return;
     }
     let stopped = false;
@@ -126,7 +119,7 @@ export function AutomationDetail({ jobId }: Readonly<{ jobId: string }>) {
       };
     }
 
-    const source = new EventSource(streamUrl(apiResult.apiUrl, jobId));
+    const source = new EventSource(streamUrl(apiResult.sseUrl, jobId));
     const receive = (event: Event) => {
       const decoded = decodeDetailStreamEvent((event as MessageEvent<string>).data, jobId);
       if (decoded.kind === "invalid") {

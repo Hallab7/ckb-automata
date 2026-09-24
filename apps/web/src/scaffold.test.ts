@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 
+import { TESTNET_DEPLOYMENT_MANIFEST_SHA256, TESTNET_GENESIS_HASH } from "@ckb-automata/core";
+
 import { parseWebEnvironment } from "./environment.ts";
 import { createServerApiClient } from "./server-api.ts";
 
@@ -36,6 +38,7 @@ test("App Router exposes every planned product route", async () => {
     "/automations/new/deadline",
     "/automations/new/recurring",
     "/demo",
+    "/limitations",
     "/research/nervdao",
     "/settings",
   ]);
@@ -74,11 +77,17 @@ test("Server Components do not import wallet code", async () => {
 test("typed environment configures the generated API client and rejects unsafe values", () => {
   const input = {
     NEXT_PUBLIC_AUTOMATA_API_URL: "https://api.example.test/",
+    NEXT_PUBLIC_AUTOMATA_SSE_URL: "https://api.example.test/",
     NEXT_PUBLIC_CKB_NETWORK: "testnet",
+    NEXT_PUBLIC_CKB_GENESIS_HASH: TESTNET_GENESIS_HASH,
+    NEXT_PUBLIC_DEPLOYMENT_MANIFEST_SHA256: TESTNET_DEPLOYMENT_MANIFEST_SHA256,
   };
   assert.deepEqual(parseWebEnvironment(input), {
     apiUrl: "https://api.example.test/",
+    genesisHash: TESTNET_GENESIS_HASH,
+    manifestSha256: TESTNET_DEPLOYMENT_MANIFEST_SHA256,
     network: "testnet",
+    sseUrl: "https://api.example.test/",
   });
   assert.ok(createServerApiClient(input));
   assert.throws(
@@ -92,5 +101,21 @@ test("typed environment configures the generated API client and rejects unsafe v
         NEXT_PUBLIC_AUTOMATA_API_URL: "https://user:secret@api.example.test/",
       }),
     /HTTP\(S\) origin/,
+  );
+  assert.throws(
+    () =>
+      parseWebEnvironment({
+        ...input,
+        NEXT_PUBLIC_AUTOMATA_SSE_URL: "https://stream.example.test/",
+      }),
+    /origins must match/,
+  );
+  assert.throws(
+    () =>
+      parseWebEnvironment({
+        ...input,
+        NEXT_PUBLIC_CKB_GENESIS_HASH: `0x${"0".repeat(64)}`,
+      }),
+    /Pudge testnet/,
   );
 });

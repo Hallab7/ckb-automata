@@ -1,6 +1,16 @@
 "use client";
 
-import { Activity, Beaker, Bot, FlaskConical, Menu, Network, Plus, Settings } from "lucide-react";
+import {
+  Activity,
+  Beaker,
+  Bot,
+  FlaskConical,
+  Menu,
+  Network,
+  Plus,
+  Settings,
+  ShieldCheck,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType, ReactNode } from "react";
@@ -28,6 +38,7 @@ const secondaryNavigation: readonly NavigationItem[] = [
   { href: "/demo", icon: Beaker, label: "Demo" },
   { href: "/research/nervdao", icon: FlaskConical, label: "NervDAO research" },
   { href: "/settings", icon: Settings, label: "Settings" },
+  { href: "/limitations", icon: ShieldCheck, label: "Privacy & limitations" },
 ];
 
 function isActive(pathname: string, item: NavigationItem): boolean {

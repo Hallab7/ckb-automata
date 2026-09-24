@@ -9,4 +9,5 @@
 @import "../src/detail/job-detail.css";
 @import "../src/templates/template-gallery.css";
 @import "../src/setup/setup-stepper.css";
+@import "../src/privacy/privacy.css";
 @source "../../../packages/ui/src";

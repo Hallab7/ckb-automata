@@ -18,7 +18,7 @@ import { createApiClient, type ApiTransactionProgress } from "@ckb-automata/api-
 import { InlineNotice } from "@ckb-automata/ui";
 
 import { ckbTestnetTransactionUrl } from "../ccc/wallet-display.ts";
-import { parseWebEnvironment } from "../environment.ts";
+import { browserWebEnvironment } from "../environment.ts";
 import { reduceTransactionProgress, reduceTransactionProgressStream } from "../stream-reducers.ts";
 import {
   initialTransactionProgress,
@@ -39,13 +39,6 @@ const orderedStates: readonly TransactionProgressState[] = [
   "confirmed",
 ];
 
-function browserEnvironment() {
-  return parseWebEnvironment({
-    NEXT_PUBLIC_AUTOMATA_API_URL: process.env["NEXT_PUBLIC_AUTOMATA_API_URL"],
-    NEXT_PUBLIC_CKB_NETWORK: process.env["NEXT_PUBLIC_CKB_NETWORK"],
-  });
-}
-
 export interface TransactionTrackingRecord {
   readonly persistedAt: string;
   readonly transactionHash: string;
@@ -54,7 +47,7 @@ export interface TransactionTrackingRecord {
 function streamUrl(record: TransactionTrackingRecord, previous: ApiTransactionProgress): string {
   const url = new URL(
     `v1/transactions/${encodeURIComponent(record.transactionHash)}/progress/stream`,
-    browserEnvironment().apiUrl,
+    browserWebEnvironment().sseUrl,
   );
   const query = progressQuery(record.persistedAt, previous);
   for (const [name, value] of Object.entries(query)) url.searchParams.set(name, value);
@@ -168,7 +161,7 @@ export function TransactionProgressTracker({
   useEffect(() => {
     let stopped = false;
     let pollTimer: ReturnType<typeof setInterval> | undefined;
-    const environment = browserEnvironment();
+    const environment = browserWebEnvironment();
     const api = createApiClient({ baseUrl: environment.apiUrl });
     const restored = readTransactionProgress(window.localStorage, record.transactionHash);
     const baseline = restored ?? progress;

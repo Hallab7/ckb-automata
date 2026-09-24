@@ -56,6 +56,8 @@ test("connector runtime stays inside the dedicated client boundary", async () =>
   assert.match(provider, /new ccc\.ClientPublicTestnet\(\)/);
   assert.match(provider, /usePathname\(\) === "\/fixtures\/wallet-provider"/);
   assert.match(provider, /signersController=\{signersController\}/);
+  assert.match(provider, /icon=\{AUTOMATA_CCC_IDENTITY\.icon\}/);
+  assert.match(provider, /name=\{AUTOMATA_CCC_IDENTITY\.name\}/);
   assert.match(provider, /installConnectorClientGuard\(\)/);
   assert.match(provider, /if \(client === undefined\) return/);
   assert.match(provider, /name: AUTOMATA_CCC_IDENTITY\.name/);

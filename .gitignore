@@ -5,6 +5,7 @@ node_modules/
 target/
 playwright-report/
 test-results/
+.vercel/
 fuzz/artifacts/
 fuzz/corpus/
 .env

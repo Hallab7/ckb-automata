@@ -455,6 +455,8 @@ export function CccProvider({ children }: Readonly<{ children: ReactNode }>) {
     <ccc.Provider
       connectorProps={{ "aria-label": "CKB wallet connector" }}
       defaultClient={client}
+      icon={AUTOMATA_CCC_IDENTITY.icon}
+      name={AUTOMATA_CCC_IDENTITY.name}
       signersController={signersController}
     >
       <WalletSessionBridge>{children}</WalletSessionBridge>

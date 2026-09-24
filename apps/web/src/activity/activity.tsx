@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { createApiClient, type ApiActivity, type ApiQuery } from "@ckb-automata/api-client";
 
-import { parseWebEnvironment } from "../environment.ts";
+import { browserWebEnvironment } from "../environment.ts";
 import { requestErrorMessage } from "../request-errors.ts";
 import { mergeActivity, type ActivityOutcomeFilter } from "./activity-model.ts";
 import {
@@ -16,10 +16,7 @@ import {
 const PAGE_SIZE = 30;
 
 function browserApiClient() {
-  const environment = parseWebEnvironment({
-    NEXT_PUBLIC_AUTOMATA_API_URL: process.env["NEXT_PUBLIC_AUTOMATA_API_URL"],
-    NEXT_PUBLIC_CKB_NETWORK: process.env["NEXT_PUBLIC_CKB_NETWORK"],
-  });
+  const environment = browserWebEnvironment();
   return createApiClient({ baseUrl: environment.apiUrl });
 }
 
