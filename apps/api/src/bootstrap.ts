@@ -95,7 +95,7 @@ export function parseApiBootstrapConfig(
     environment,
     corsOrigins: parseOrigins(environment.PUBLIC_APP_ORIGIN, input["API_CORS_ORIGINS"]),
     host: parseHost(input["API_HOST"]),
-    port: parsePort(input["API_PORT"]),
+    port: parsePort(input["API_PORT"] ?? input["PORT"]),
     trustedProxies: parseTrustedProxies(input["API_TRUSTED_PROXIES"]),
   });
 }

@@ -138,6 +138,15 @@ test("bootstrap rejects wildcard origins and malformed trusted proxies", () => {
   );
 });
 
+test("platform port is accepted without overriding an explicit API port", () => {
+  assert.equal(parseApiBootstrapConfig({ ...environment(), PORT: "10000" }).port, 10_000);
+  assert.equal(
+    parseApiBootstrapConfig({ ...environment(), API_PORT: "4301", PORT: "10000" }).port,
+    4301,
+  );
+  assert.throws(() => parseApiBootstrapConfig({ ...environment(), PORT: "invalid" }));
+});
+
 test("start listens only after successful configuration", async () => {
   const fixture = fakeApplication();
   const result = await startApi(environment(), {

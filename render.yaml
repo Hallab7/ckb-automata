@@ -1,0 +1,48 @@
+services:
+  - type: keyvalue
+    name: ckb-automata-redis
+    plan: free
+    region: oregon
+    ipAllowList: []
+    maxmemoryPolicy: noeviction
+    persistenceMode: off
+
+  - type: web
+    name: ckb-automata-api
+    runtime: node
+    repo: https://github.com/Hallab7/ckb-automata
+    branch: main
+    plan: free
+    region: oregon
+    autoDeployTrigger: off
+    buildCommand: corepack enable && corepack prepare pnpm@12.5.1 --activate && pnpm install --frozen-lockfile && pnpm --filter @ckb-automata/api build
+    startCommand: pnpm --filter @ckb-automata/api start
+    healthCheckPath: /v1/health/live
+    envVars:
+      - key: NODE_VERSION
+        value: 24.11.1
+      - key: AUTOMATA_PROFILE
+        value: testnet-public
+      - key: CKB_NETWORK
+        value: ckb_testnet
+      - key: CKB_GENESIS_HASH
+        value: 0x10639e0895502b5688a6be8cf69460d76541bfa4821629d86d62ba0aae3f9606
+      - key: CKB_RPC_URL
+        value: https://testnet.ckbapp.dev/
+      - key: CKB_INDEXER_URL
+        value: https://testnet.ckbapp.dev/
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: ckb-automata-redis
+          property: connectionString
+      - key: PUBLIC_APP_ORIGIN
+        value: https://ckb-automata.vercel.app
+      - key: WEBHOOK_ENCRYPTION_KEY
+        generateValue: true
+      - key: RELEASE_VERSION
+        value: testnet-showcase
+      - key: RELEASE_REVISION
+        sync: false
