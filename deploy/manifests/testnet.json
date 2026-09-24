@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "network": "ckb_testnet",
+  "rpcUrl": "https://testnet.ckbapp.dev/",
+  "genesisHash": "0x10639e0895502b5688a6be8cf69460d76541bfa4821629d86d62ba0aae3f9606",
+  "consensus": {
+    "hardfork": "ckb2023",
+    "activationEpoch": 9690
+  },
+  "nodeVersion": "0.210.0 (2592ddf 2026-09-17)",
+  "fixtureWallet": {
+    "lockArg": "0x16fce372776cf8632243f05e97a7e6e71ee51195",
+    "warning": "Public deployment account identifier only; no credential is published"
+  },
+  "artifacts": {
+    "sourceRevision": "ad26b82431fc4eaf3a03c85f5bb3608863d5723f",
+    "schemaSha256": "466ee9a672969544715ec6c12e14a2a0b2dfdb3907b53d7ce5ac9fbd8c8b6f3d",
+    "builder": {
+      "baseImage": "rust:1.93.1-bookworm@sha256:7c4ae649a84014c467d79319bbf17ce2632ae8b8be123ac2fb2ea5be46823f31",
+      "dockerfileSha256": "6528426d04c00b9d22294c14184b34c3097d75031c44e8f2f95756b5096cb16b",
+      "rust": "1.93.1",
+      "target": "riscv64imac-unknown-none-elf",
+      "profile": "release",
+      "sourceDateEpoch": 0
+    }
+  },
+  "secp256k1Blake160": {
+    "codeHash": "0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8",
+    "hashType": "type",
+    "cellDep": {
+      "outPoint": {
+        "txHash": "0xf8de3bb47d055cdf460d93a2a6e1b05f7432f9777c8c474abf4eec1d4aee5d37",
+        "index": "0x0"
+      },
+      "depType": "depGroup"
+    }
+  },
+  "deployment": {
+    "transactionHash": "0xef471574d2f58c38d3e9d9380d98f853c9bcf5388730a767ac6f1ff35ab8cc64",
+    "blockHash": "0xad1ef7544eec0c1701cf917a0f92acfb1393eff6b5d5f178c10272c00182c365"
+  },
+  "contracts": {
+    "job-lock": {
+      "codeHash": "0x49bac0e6cbf5030c72212a745872cd2ba3e1ca97597bdb73fae3efb706da3165",
+      "hashType": "data1",
+      "cellDep": {
+        "outPoint": {
+          "txHash": "0xef471574d2f58c38d3e9d9380d98f853c9bcf5388730a767ac6f1ff35ab8cc64",
+          "index": "0x0"
+        },
+        "depType": "code"
+      },
+      "binarySha256": "a54481bb4af6e028d2a52f1c72b61a958b8314ddc460419faac9bf1f4ddf6549",
+      "sizeBytes": 25792
+    },
+    "deadline-policy": {
+      "codeHash": "0x12268b4339b2d62693b936d98cdee071a0e9172e864115d1b2f0993b19cc5a2c",
+      "hashType": "data1",
+      "cellDep": {
+        "outPoint": {
+          "txHash": "0xef471574d2f58c38d3e9d9380d98f853c9bcf5388730a767ac6f1ff35ab8cc64",
+          "index": "0x1"
+        },
+        "depType": "code"
+      },
+      "binarySha256": "2587080e421a4a92614c2aff8fadee8e3f4b0c61856c2e040a3f2c512354b43b",
+      "sizeBytes": 32224
+    },
+    "recurring-policy": {
+      "codeHash": "0x06e34dc2cf6a3fc869c6fb2133d6eec0caec64e5bf7583c78c7b1eeb3e725439",
+      "hashType": "data1",
+      "cellDep": {
+        "outPoint": {
+          "txHash": "0xef471574d2f58c38d3e9d9380d98f853c9bcf5388730a767ac6f1ff35ab8cc64",
+          "index": "0x2"
+        },
+        "depType": "code"
+      },
+      "binarySha256": "7bf510fcdbd68311e9272e24f55468c24f40f6c29bbb77740d3225a6f83b2c8a",
+      "sizeBytes": 35976
+    },
+    "demo-campaign-type": {
+      "codeHash": "0x3fbd29a852f1776b63267c46343a27bba39827fbd91bc8da2b637f43f854d04e",
+      "hashType": "data1",
+      "cellDep": {
+        "outPoint": {
+          "txHash": "0xef471574d2f58c38d3e9d9380d98f853c9bcf5388730a767ac6f1ff35ab8cc64",
+          "index": "0x3"
+        },
+        "depType": "code"
+      },
+      "binarySha256": "8820aa9a2aa2904176028ec171b88615bf52f66fa838f45a4b0dca0765554a8e",
+      "sizeBytes": 31944
+    },
+    "campaign-lock": {
+      "codeHash": "0xbb3d6a52abbb77449eff9e19e71a4caf68643927d032e3e039c7500e36513874",
+      "hashType": "data1",
+      "cellDep": {
+        "outPoint": {
+          "txHash": "0xef471574d2f58c38d3e9d9380d98f853c9bcf5388730a767ac6f1ff35ab8cc64",
+          "index": "0x4"
+        },
+        "depType": "code"
+      },
+      "binarySha256": "e78e94b16f98d9bff706ec705e5744e709fee9457ce2b2e21130ed374dec31ec",
+      "sizeBytes": 8128
+    }
+  },
+  "verification": {
+    "kind": "resolved-code-deps-and-ckb-vm-fixtures",
+    "transactionHash": "0xef471574d2f58c38d3e9d9380d98f853c9bcf5388730a767ac6f1ff35ab8cc64",
+    "blockHash": "0xad1ef7544eec0c1701cf917a0f92acfb1393eff6b5d5f178c10272c00182c365",
+    "contract": "job-lock",
+    "status": "committed"
+  }
+}

@@ -184,27 +184,37 @@ copy and off-chain ranges are in [`error-codes.md`](error-codes.md) and
 
 ## Deployment Manifest
 
-`deploy/manifests/local.json` is the concrete local SDK target. Consumers must
-reject an unsupported `schemaVersion`, wrong `genesisHash`, unknown `hashType`,
-binary hash mismatch, missing contract, or malformed outpoint.
+`deploy/manifests/local.json` and `deploy/manifests/testnet.json` are the
+published SDK targets. Consumers select one only by the connected chain's exact
+genesis hash and must reject an unsupported `schemaVersion`, wrong
+`genesisHash`, unknown `hashType`, binary hash mismatch, missing contract, or
+malformed outpoint.
 
-| Path                                      | Requirement                                                      |
-| ----------------------------------------- | ---------------------------------------------------------------- |
-| `network`, `rpcUrl`, `genesisHash`        | Network label, development RPC default, and exact chain identity |
-| `consensus`                               | Active hardfork name and activation epoch                        |
-| `nodeVersion`                             | Node build that accepted the deployment                          |
-| `artifacts.sourceRevision`                | Git revision used for the reproducible contract binaries         |
-| `artifacts.schemaSha256`                  | Aggregate hash of the three canonical Molecule schemas           |
-| `secp256k1Blake160`                       | Local signing lock code hash, hash type, and dependency group    |
-| `contracts.<name>.codeHash`               | CKB BLAKE2b-256 data hash of the deployed binary                 |
-| `contracts.<name>.hashType`               | `data1` for every V1 contract                                    |
-| `contracts.<name>.cellDep`                | Deployment transaction outpoint and `code` dependency type       |
-| `contracts.<name>.binarySha256/sizeBytes` | Independent artifact integrity and size metadata                 |
-| `deployment`                              | Committed deployment transaction and block                       |
-| `verification`                            | Committed raw transaction that executed one deployed contract    |
+| Path                                      | Requirement                                                    |
+| ----------------------------------------- | -------------------------------------------------------------- |
+| `network`, `rpcUrl`, `genesisHash`        | Network label, published RPC default, and exact chain identity |
+| `consensus`                               | Active hardfork name and activation epoch                      |
+| `nodeVersion`                             | Node build that accepted the deployment                        |
+| `artifacts.sourceRevision`                | Git revision used for the reproducible contract binaries       |
+| `artifacts.schemaSha256`                  | Aggregate hash of the three canonical Molecule schemas         |
+| `secp256k1Blake160`                       | Local signing lock code hash, hash type, and dependency group  |
+| `contracts.<name>.codeHash`               | CKB BLAKE2b-256 data hash of the deployed binary               |
+| `contracts.<name>.hashType`               | `data1` for every V1 contract                                  |
+| `contracts.<name>.cellDep`                | Deployment transaction outpoint and `code` dependency type     |
+| `contracts.<name>.binarySha256/sizeBytes` | Independent artifact integrity and size metadata               |
+| `deployment`                              | Committed deployment transaction and block                     |
+| `verification`                            | Committed deployment or execution evidence plus verifier kind  |
 
-The public fixture wallet warning is metadata, not an SDK credential. Never fund
-that key on another chain.
+The wallet warning is metadata, not an SDK credential. It publishes only a lock
+argument used to identify the deployment account.
+
+The public Pudge deployment is transaction
+`0xef471574d2f58c38d3e9d9380d98f853c9bcf5388730a767ac6f1ff35ab8cc64`
+in block
+`0xad1ef7544eec0c1701cf917a0f92acfb1393eff6b5d5f178c10272c00182c365`.
+Run `pnpm contracts:verify:testnet` to resolve every published cell and system
+dependency, verify the on-chain bytes and hashes, and execute one CKB-VM fixture
+for each script.
 
 The deployed `campaign-lock` is intentionally permissionless and has empty
 args. It is used only on a cell whose `demo-campaign-type` script independently

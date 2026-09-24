@@ -1,0 +1,31 @@
+[[cells]]
+name = "job-lock"
+enable_type_id = false
+location = { file = "target/contract-artifacts/bin/job-lock" }
+
+[[cells]]
+name = "deadline-policy"
+enable_type_id = false
+location = { file = "target/contract-artifacts/bin/deadline-policy" }
+
+[[cells]]
+name = "recurring-policy"
+enable_type_id = false
+location = { file = "target/contract-artifacts/bin/recurring-policy" }
+
+[[cells]]
+name = "demo-campaign-type"
+enable_type_id = false
+location = { file = "target/contract-artifacts/bin/demo-campaign-type" }
+
+[[cells]]
+name = "campaign-lock"
+enable_type_id = false
+location = { file = "target/contract-artifacts/bin/campaign-lock" }
+
+# Public deployments are immutable. The CLI requires --zero-lock whenever this
+# lock is used, making an accidental mutable deployment fail closed.
+[lock]
+code_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+args = "0x"
+hash_type = "data1"

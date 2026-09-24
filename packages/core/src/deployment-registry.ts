@@ -1,4 +1,5 @@
 import localManifest from "../../../deploy/manifests/local.json" with { type: "json" };
+import testnetManifest from "../../../deploy/manifests/testnet.json" with { type: "json" };
 
 import {
   DEPLOYED_CONTRACT_NAMES,
@@ -165,7 +166,7 @@ export function createDeploymentRegistry(
     byGenesis.set(genesisHash, Object.freeze({ ...entry, genesisHash }));
   }
 
-  const genesisHashes = Object.freeze([...byGenesis.keys()].toSorted());
+  const genesisHashes = Object.freeze([...byGenesis.keys()]);
   return Object.freeze({
     genesisHashes,
     async load(genesisHashValue: string): Promise<DeploymentRegistryLoadResult> {
@@ -203,6 +204,8 @@ export function createDeploymentRegistry(
 
 export const LOCAL_DEPLOYMENT_MANIFEST_SHA256 =
   "2904b44ffa3c1f292404540f2bc6c14dc96789f888e28aa7fc2527566110e1d1" as const;
+export const TESTNET_DEPLOYMENT_MANIFEST_SHA256 =
+  "8902af74e77e28fc10c4d73eae37a6343e788ede98cd90c7a2add2170525bf38" as const;
 
 export const deploymentRegistry = createDeploymentRegistry([
   {
@@ -210,5 +213,11 @@ export const deploymentRegistry = createDeploymentRegistry([
     manifestSha256: LOCAL_DEPLOYMENT_MANIFEST_SHA256,
     manifest: localManifest,
     confirmationDepth: 1,
+  },
+  {
+    genesisHash: testnetManifest.genesisHash,
+    manifestSha256: TESTNET_DEPLOYMENT_MANIFEST_SHA256,
+    manifest: testnetManifest,
+    confirmationDepth: 24,
   },
 ]);

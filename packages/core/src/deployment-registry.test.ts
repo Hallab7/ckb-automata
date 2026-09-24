@@ -4,12 +4,14 @@ import test from "node:test";
 
 import {
   LOCAL_DEPLOYMENT_MANIFEST_SHA256,
+  TESTNET_DEPLOYMENT_MANIFEST_SHA256,
   createDeploymentRegistry,
   deploymentRegistry,
   hashDeploymentManifest,
 } from "./deployment-registry.ts";
 
 const manifestUrl = new URL("../../../deploy/manifests/local.json", import.meta.url);
+const testnetManifestUrl = new URL("../../../deploy/manifests/testnet.json", import.meta.url);
 
 async function loadManifest(): Promise<Record<string, unknown>> {
   return JSON.parse(await readFile(manifestUrl, "utf8")) as Record<string, unknown>;
@@ -22,6 +24,20 @@ test("the pinned local manifest hash is canonical and order-independent", async 
     await hashDeploymentManifest(Object.fromEntries(Object.entries(manifest).toReversed())),
     LOCAL_DEPLOYMENT_MANIFEST_SHA256,
   );
+});
+
+test("the pinned public manifest is canonical and selected by testnet genesis", async () => {
+  const manifest = JSON.parse(await readFile(testnetManifestUrl, "utf8")) as Record<
+    string,
+    unknown
+  >;
+  assert.equal(await hashDeploymentManifest(manifest), TESTNET_DEPLOYMENT_MANIFEST_SHA256);
+  const result = await deploymentRegistry.load(manifest["genesisHash"] as string);
+  assert.equal(result.status, "ok");
+  if (result.status !== "ok") return;
+  assert.equal(result.deployment.network, "ckb_testnet");
+  assert.equal(result.deployment.manifestSha256, TESTNET_DEPLOYMENT_MANIFEST_SHA256);
+  assert.equal(result.deployment.confirmation.requiredDepth, 24);
 });
 
 test("genesis lookup exposes only validated script, dep, and confirmation metadata", async () => {

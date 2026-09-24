@@ -38,3 +38,17 @@ transactions are committed.
 Set `CKB_RPC_URL` and `CKB_RPC_PORT` together when changing the host port. If
 the entrypoint reports an incompatible genesis, remove only the
 `ckb-automata-ckb-data-v1` Docker volume and start the local services again.
+
+## Public CKB testnet deployment
+
+The immutable Pudge code cells are published in
+`deploy/manifests/testnet.json`. Application processes configured with
+`testnet-preview` or `testnet-public` resolve that manifest by the live genesis
+hash; no contract hash is copied into an application-specific configuration.
+
+`deploy/testnet/contracts.toml` is the reproducible `ckb-cli` deployment input.
+Its zero lock makes every code cell permanently immutable. Verify the committed
+transaction, every code dependency, and one raw CKB-VM fixture per script with
+`pnpm contracts:verify:testnet`. Set `CKB_TESTNET_RPC_URL` only to use a
+different Pudge RPC endpoint for that read-only verification. The verifier and
+runtime registry both require at least 24 confirmations.

@@ -84,19 +84,23 @@ test("witness modes and every script error are documented from Rust sources", as
 });
 
 test("deployment schema and reproduction vectors point to checked artifacts", async () => {
-  const manifest = JSON.parse(await readFile(new URL("deploy/manifests/local.json", root), "utf8"));
-  assert.equal(manifest.schemaVersion, 1);
-  assert.match(manifest.genesisHash, /^0x[0-9a-f]{64}$/);
-  assert.equal(manifest.verification.status, "committed");
-  for (const name of [
-    "job-lock",
-    "deadline-policy",
-    "recurring-policy",
-    "demo-campaign-type",
-    "campaign-lock",
-  ]) {
-    assert.equal(manifest.contracts[name].hashType, "data1");
-    assert.ok(spec.includes(`\`${name}\``));
+  for (const filename of ["local.json", "testnet.json"]) {
+    const manifest = JSON.parse(
+      await readFile(new URL(`deploy/manifests/${filename}`, root), "utf8"),
+    );
+    assert.equal(manifest.schemaVersion, 1);
+    assert.match(manifest.genesisHash, /^0x[0-9a-f]{64}$/);
+    assert.equal(manifest.verification.status, "committed");
+    for (const name of [
+      "job-lock",
+      "deadline-policy",
+      "recurring-policy",
+      "demo-campaign-type",
+      "campaign-lock",
+    ]) {
+      assert.equal(manifest.contracts[name].hashType, "data1");
+      assert.ok(spec.includes(`\`${name}\``));
+    }
   }
 
   const vectors = await readFile(new URL("contracts/tests/src/campaign_creation.rs", root), "utf8");

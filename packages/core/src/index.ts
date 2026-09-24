@@ -131,6 +131,7 @@ export {
 
 export {
   LOCAL_DEPLOYMENT_MANIFEST_SHA256,
+  TESTNET_DEPLOYMENT_MANIFEST_SHA256,
   createDeploymentRegistry,
   deploymentRegistry,
   hashDeploymentManifest,
