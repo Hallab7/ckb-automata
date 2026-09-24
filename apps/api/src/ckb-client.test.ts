@@ -99,6 +99,7 @@ test("CCC wrapper reads chain and indexer responses", async (context) => {
     respond(response, request, result);
   });
   const indexer = await openServer((request, response) => {
+    assert.equal(request.method, "get_indexer_tip");
     respond(response, request, { block_number: "0x29", block_hash: PARENT_HASH });
   });
   context.after(async () => Promise.all([chain.close(), indexer.close()]));

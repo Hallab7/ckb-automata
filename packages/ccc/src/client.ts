@@ -208,9 +208,9 @@ export class CkbClient implements CkbReadClient {
   }
 
   async getIndexerTip(): Promise<CkbIndexerTip> {
-    return this.#safeRead("INDEXER_READ_FAILED", "indexer", "get_tip", async () => {
+    return this.#safeRead("INDEXER_READ_FAILED", "indexer", "get_indexer_tip", async () => {
       const result = record(
-        await this.#indexerOwner.value.requestor.request("get_tip", []),
+        await this.#indexerOwner.value.requestor.request("get_indexer_tip", []),
         "indexer tip",
       );
       if (typeof result["block_number"] !== "string" || typeof result["block_hash"] !== "string") {
