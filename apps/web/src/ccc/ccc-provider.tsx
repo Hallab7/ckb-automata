@@ -264,7 +264,9 @@ function WalletSessionBridge({ children }: Readonly<{ children: ReactNode }>) {
         ...(addressResult.status === "fulfilled" ? { address: addressResult.value } : {}),
         ...(balanceResult.status === "fulfilled" ? { balanceShannons: balanceResult.value } : {}),
         ...(addressObjectResult.status === "fulfilled"
-          ? { ownerLockHash: ccc.hashCkb(addressObjectResult.value.script.toBytes()) }
+          ? {
+              ownerLockHash: ccc.hashCkb(addressObjectResult.value.script.toBytes()),
+            }
           : {}),
         signer,
         status:
@@ -312,6 +314,16 @@ function WalletSessionBridge({ children }: Readonly<{ children: ReactNode }>) {
             ccc.hashCkb(address.script.toBytes()),
           ),
         ),
+      getOwnerLock: async (expectedLockHash) => {
+        const addresses = await requireSigner().getAddressObjs();
+        const owner = addresses.find(
+          (address) => ccc.hashCkb(address.script.toBytes()) === expectedLockHash,
+        );
+        if (owner === undefined) {
+          throw new Error("The connected wallet is not the owner of this automation.");
+        }
+        return reviewedScript(owner.script);
+      },
       isConnectorOpen: connector.isOpen,
       open: () => connector.open(),
       ownerLockHash: status === "ready" ? currentDetails.ownerLockHash : undefined,

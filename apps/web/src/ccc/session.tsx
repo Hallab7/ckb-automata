@@ -20,6 +20,7 @@ export interface WalletSession {
   readonly disconnect: () => void;
   readonly getSignerGenesisHash: () => Promise<string>;
   readonly getSignerLockHashes: () => Promise<ReadonlySet<string>>;
+  readonly getOwnerLock: (expectedLockHash: string) => Promise<ScriptIdentity>;
   readonly isConnectorOpen: boolean;
   readonly open: () => void;
   readonly ownerLockHash: string | undefined;

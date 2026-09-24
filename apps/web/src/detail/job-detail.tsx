@@ -13,6 +13,7 @@ import {
 import { parseWebEnvironment } from "../environment.ts";
 import { JobDetailView, type JobDetailLoadState } from "./job-detail-view.tsx";
 import { mergeTimeline, type DetailEvent } from "./job-detail-model.ts";
+import { OwnerActions } from "./owner-actions.tsx";
 
 const EVENT_PAGE_SIZE = 50;
 const EVENT_POLL_MS = 5_000;
@@ -210,6 +211,11 @@ export function AutomationDetail({ jobId }: Readonly<{ jobId: string }>) {
       loadingNextPage={loadingNextPage}
       onLoadNext={loadNextPage}
       onRetry={() => setRefreshKey((current) => current + 1)}
+      {...(job === undefined
+        ? {}
+        : {
+            ownerActions: <OwnerActions job={job} />,
+          })}
     />
   );
 }

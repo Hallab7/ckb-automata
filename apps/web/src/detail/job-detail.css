@@ -124,6 +124,94 @@
   font-weight: 720;
 }
 
+.owner-actions {
+  align-items: center;
+  border-block: 1px solid var(--ui-color-border);
+  display: flex;
+  gap: var(--ui-space-5);
+  justify-content: space-between;
+  padding-block: var(--ui-space-4);
+}
+
+.owner-actions:has(.owner-actions__progress) {
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.owner-actions__progress {
+  flex-basis: 100%;
+}
+
+.owner-actions > div:first-child {
+  display: grid;
+  gap: var(--ui-space-1);
+}
+
+.owner-actions h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.owner-actions p {
+  color: var(--ui-color-text-muted);
+  margin: 0;
+}
+
+.owner-actions__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+  justify-content: flex-end;
+}
+
+.owner-action__dialog,
+.owner-action__amounts {
+  display: grid;
+  gap: var(--ui-space-4);
+}
+
+.owner-action__facts {
+  border-top: 1px solid var(--ui-color-border);
+  display: grid;
+  margin: 0;
+}
+
+.owner-action__facts > div {
+  border-bottom: 1px solid var(--ui-color-border);
+  display: grid;
+  gap: var(--ui-space-3);
+  grid-template-columns: minmax(7rem, 0.7fr) minmax(0, 1.3fr);
+  padding: var(--ui-space-3) 0;
+}
+
+.owner-action__facts dt {
+  color: var(--ui-color-text-muted);
+  font-size: 0.75rem;
+}
+
+.owner-action__facts dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.owner-action__facts code {
+  font-family: var(--ui-font-mono);
+  font-size: 0.6875rem;
+}
+
+.owner-action__loading {
+  align-items: center;
+  color: var(--ui-color-text-muted);
+  display: flex;
+  gap: var(--ui-space-2);
+}
+
+.owner-action__loading svg {
+  animation: app-loading-spin 1.1s linear infinite;
+}
+
 .job-detail__columns {
   display: grid;
   gap: var(--ui-space-8);
@@ -370,6 +458,21 @@
 }
 
 @media (max-width: 42rem) {
+  .owner-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .owner-actions__controls {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .owner-actions__controls .ui-button {
+    min-width: 0;
+    width: 100%;
+  }
+
   .job-detail__title-row {
     align-items: flex-start;
     flex-direction: column;
@@ -400,8 +503,14 @@
   }
 
   .job-detail__facts dd,
-  .job-detail__technical dd {
+  .job-detail__technical dd,
+  .owner-action__facts dd {
     text-align: left;
+  }
+
+  .owner-action__facts > div {
+    gap: var(--ui-space-1);
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -431,10 +540,18 @@
   .job-event__body {
     padding: var(--ui-space-3);
   }
+
+  .owner-actions__controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .job-detail-loading > svg {
+    animation: none;
+  }
+
+  .owner-action__loading svg {
     animation: none;
   }
 }

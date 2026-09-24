@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { Ban, CirclePlus, LifeBuoy } from "lucide-react";
 
 import type { ApiJob, ApiJobEvents } from "@ckb-automata/api-client";
+import { Button, Dialog, InlineNotice, SelectField, TextField } from "@ckb-automata/ui";
 
 import { JobDetailView } from "./job-detail-view.tsx";
 
@@ -124,6 +126,97 @@ const states: readonly FixtureState[] = [
   "unsupported",
 ];
 
+function FixtureDialog({ action }: Readonly<{ action: "cancel" | "recover" | "top_up" }>) {
+  const topUp = action === "top_up";
+  const recover = action === "recover";
+  const label = topUp ? "Top up" : recover ? "Recover" : "Cancel";
+  const icon = topUp ? (
+    <CirclePlus aria-hidden="true" size={16} />
+  ) : recover ? (
+    <LifeBuoy aria-hidden="true" size={16} />
+  ) : (
+    <Ban aria-hidden="true" size={16} />
+  );
+  return (
+    <Dialog
+      description={
+        topUp
+          ? "Increase committed capacity or budget while preserving the existing policy."
+          : recover
+            ? "Recover a live job without relying on an executor."
+            : "Return the remaining live funds and stop future execution."
+      }
+      footer={<Button tone={topUp ? "primary" : "danger"}>Approve {label.toLowerCase()}</Button>}
+      title={`Review owner ${label.toLowerCase()}`}
+      trigger={
+        <Button icon={icon} tone={topUp ? "primary" : "secondary"}>
+          {label}
+        </Button>
+      }
+    >
+      <div className="owner-action__dialog">
+        {topUp ? (
+          <div className="owner-action__amounts">
+            <TextField defaultValue="100" label="Budget increase (CKB)" />
+            <TextField defaultValue="0" label="Reward increase (CKB)" />
+            <TextField defaultValue="161" label="Capacity increase (CKB)" />
+          </div>
+        ) : recover ? (
+          <SelectField defaultValue="terminal_operational_failure" label="Recovery reason">
+            <option value="terminal_operational_failure">Terminal operational failure</option>
+            <option value="invalid_application_state">Invalid application state</option>
+            <option value="unsupported_metadata">Unsupported metadata</option>
+          </SelectField>
+        ) : null}
+        <InlineNotice title="Race protection" tone="warning">
+          <p>
+            The live job outpoint and chain tip are checked again immediately before the wallet
+            opens.
+          </p>
+        </InlineNotice>
+        <dl className="owner-action__facts">
+          <div>
+            <dt>Transaction hash</dt>
+            <dd>
+              <code>{HASH_A}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>Live job outpoint</dt>
+            <dd>
+              <code>{HASH_B}:0</code>
+            </dd>
+          </div>
+          <div>
+            <dt>Snapshot</dt>
+            <dd>Block #15,842,900</dd>
+          </div>
+          <div>
+            <dt>Maximum fee</dt>
+            <dd>0.000016 CKB</dd>
+          </div>
+        </dl>
+      </div>
+    </Dialog>
+  );
+}
+
+function FixtureOwnerActions() {
+  return (
+    <section className="owner-actions" aria-labelledby="owner-actions-heading">
+      <div>
+        <h2 id="owner-actions-heading">Owner actions</h2>
+        <p>Each action has a separate exact-transaction review.</p>
+      </div>
+      <div className="owner-actions__controls">
+        <FixtureDialog action="top_up" />
+        <FixtureDialog action="cancel" />
+        <FixtureDialog action="recover" />
+      </div>
+    </section>
+  );
+}
+
 export function JobDetailFixture() {
   const [state, setState] = useState<FixtureState>("conflicted");
   return (
@@ -140,7 +233,12 @@ export function JobDetailFixture() {
           </button>
         ))}
       </div>
-      <JobDetailView events={fixtureEvents(state)} job={fixtureJob(state)} loadState="ready" />
+      <JobDetailView
+        events={fixtureEvents(state)}
+        job={fixtureJob(state)}
+        loadState="ready"
+        ownerActions={<FixtureOwnerActions />}
+      />
     </div>
   );
 }

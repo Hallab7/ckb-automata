@@ -20,6 +20,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import type { ApiJob, ApiJobEvents } from "@ckb-automata/api-client";
 import { CANONICAL_TRANSACTION_STATES, type CanonicalTransactionState } from "@ckb-automata/core";
@@ -222,6 +223,7 @@ export interface JobDetailViewProperties {
   readonly loadingNextPage?: boolean;
   readonly onLoadNext?: () => void;
   readonly onRetry?: () => void;
+  readonly ownerActions?: ReactNode;
 }
 
 export function JobDetailView({
@@ -233,6 +235,7 @@ export function JobDetailView({
   loadingNextPage = false,
   onLoadNext,
   onRetry,
+  ownerActions,
 }: JobDetailViewProperties) {
   if (loadState === "loading") return <LoadingDetail />;
   if (loadState === "not_found") {
@@ -301,6 +304,8 @@ export function JobDetailView({
           <dd>{presentation.nextExecution}</dd>
         </div>
       </dl>
+
+      {ownerActions}
 
       <div className="job-detail__columns">
         <section className="job-detail__section" aria-labelledby="policy-heading">

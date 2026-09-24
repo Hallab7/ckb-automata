@@ -19,7 +19,6 @@ import { InlineNotice } from "@ckb-automata/ui";
 
 import { ckbTestnetTransactionUrl } from "../ccc/wallet-display.ts";
 import { parseWebEnvironment } from "../environment.ts";
-import type { SubmissionRecord } from "./submission-model.ts";
 import {
   initialTransactionProgress,
   parseTransactionProgress,
@@ -78,7 +77,12 @@ function browserEnvironment() {
   });
 }
 
-function streamUrl(record: SubmissionRecord, previous: ApiTransactionProgress): string {
+export interface TransactionTrackingRecord {
+  readonly persistedAt: string;
+  readonly transactionHash: string;
+}
+
+function streamUrl(record: TransactionTrackingRecord, previous: ApiTransactionProgress): string {
   const url = new URL(
     `v1/transactions/${encodeURIComponent(record.transactionHash)}/progress/stream`,
     browserEnvironment().apiUrl,
@@ -194,7 +198,7 @@ export function TransactionProgressPanel({
 export function TransactionProgressTracker({
   persisted = true,
   record,
-}: Readonly<{ persisted?: boolean; record: SubmissionRecord }>) {
+}: Readonly<{ persisted?: boolean; record: TransactionTrackingRecord }>) {
   const [progress, setProgress] = useState<ApiTransactionProgress>(() =>
     initialTransactionProgress(record.transactionHash, record.persistedAt),
   );
