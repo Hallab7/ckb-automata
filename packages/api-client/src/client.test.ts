@@ -18,13 +18,14 @@ test("encodes path and query parameters", async () => {
   });
 
   await client.listJobEvents("job/value", { cursor: "next value", limit: 20, source: "indexed" });
+  await client.listActivity({ jobId: "job/value", limit: 10, source: "operational" });
   await client.getTransactionProgress("tx/value", {
     submittedAt: "2026-09-24T10:00:00.000Z",
     previousBlockNumber: "100",
     previousBlockHash: `0x${"12".repeat(32)}`,
   });
 
-  assert.equal(requests.length, 2);
+  assert.equal(requests.length, 3);
   assert.equal(
     requests[0]?.url,
     "https://api.example.test/root/v1/jobs/job%2Fvalue/events?cursor=next+value&limit=20&source=indexed",
@@ -32,9 +33,14 @@ test("encodes path and query parameters", async () => {
   assert.equal(requests[0]?.method, "GET");
   assert.equal(
     requests[1]?.url,
-    `https://api.example.test/root/v1/transactions/tx%2Fvalue/progress?submittedAt=2026-09-24T10%3A00%3A00.000Z&previousBlockNumber=100&previousBlockHash=0x${"12".repeat(32)}`,
+    "https://api.example.test/root/v1/activity?jobId=job%2Fvalue&limit=10&source=operational",
   );
   assert.equal(requests[1]?.method, "GET");
+  assert.equal(
+    requests[2]?.url,
+    `https://api.example.test/root/v1/transactions/tx%2Fvalue/progress?submittedAt=2026-09-24T10%3A00%3A00.000Z&previousBlockNumber=100&previousBlockHash=0x${"12".repeat(32)}`,
+  );
+  assert.equal(requests[2]?.method, "GET");
 });
 
 test("serializes generated transaction request bodies", async () => {

@@ -7,6 +7,7 @@ import { CkbClient, createCkbClient } from "./ckb-client.ts";
 import { AuthController, AuthService } from "./auth.ts";
 import { DatabaseClient, createDatabaseClient } from "./database/client.ts";
 import {
+  ActivityController,
   JobEventStreamController,
   JobEventStreamService,
   JobEventsController,
@@ -53,6 +54,7 @@ Module({
     JobsController,
     AccountJobsController,
     TemplatesController,
+    ActivityController,
     JobEventsController,
     JobEventStreamController,
     JobQuoteController,

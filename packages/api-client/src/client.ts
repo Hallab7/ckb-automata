@@ -34,6 +34,7 @@ export type ApiSuccess<Name extends OperationName> =
 export type ApiJobList = ApiSuccess<"JobsController_list">;
 export type ApiJob = ApiSuccess<"JobsController_detail">;
 export type ApiJobEvents = ApiSuccess<"JobEventsController_list">;
+export type ApiActivity = ApiSuccess<"ActivityController_list">;
 export type ApiJobQuote = ApiSuccess<"JobQuoteController_get">;
 export type ApiTemplates = ApiSuccess<"TemplatesController_list">;
 export type ApiTransactionBuild = ApiSuccess<"TransactionController_createDeadline">;
@@ -210,6 +211,10 @@ export class AutomataApiClient {
     query?: ApiQuery<"JobEventsController_list">,
   ): Promise<ApiJobEvents> {
     return this.#request(`v1/jobs/${encodeURIComponent(jobId)}/events`, { query });
+  }
+
+  listActivity(query?: ApiQuery<"ActivityController_list">): Promise<ApiActivity> {
+    return this.#request("v1/activity", { query });
   }
 
   getJobQuote(jobId: string): Promise<ApiJobQuote> {

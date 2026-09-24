@@ -27,7 +27,7 @@ import {
   ApiQuery,
   ApiTags,
 } from "@nestjs/swagger";
-import { and, asc, eq, gt, inArray, lte, or, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, lt, lte, or, type SQL } from "drizzle-orm";
 import { Observable } from "rxjs";
 
 import type { AutomataDatabase } from "./database/client.ts";
@@ -60,6 +60,10 @@ interface EventQuery {
   readonly cursor?: string;
   readonly limit: number;
   readonly source?: EventSource;
+}
+
+interface ActivityQuery extends EventQuery {
+  readonly jobId?: string;
 }
 
 interface EventCursor {
@@ -134,6 +138,12 @@ export interface JobEventTimeline {
   readonly indexCheckpoint: { readonly blockNumber: string; readonly blockHash: string } | null;
 }
 
+export interface ActivityTimeline {
+  readonly items: readonly JobEventReadModel[];
+  readonly page: { readonly limit: number; readonly nextCursor: string | null };
+  readonly indexCheckpoint: { readonly blockNumber: string; readonly blockHash: string } | null;
+}
+
 type EventRow = typeof jobEvents.$inferSelect;
 type AttemptRow = typeof transactionAttempts.$inferSelect;
 type ReceiptRow = typeof executorReceipts.$inferSelect;
@@ -184,6 +194,20 @@ function parseQuery(input: Readonly<Record<string, unknown>>): EventQuery {
     ...(cursor === undefined ? {} : { cursor }),
     limit,
     ...(source === undefined ? {} : { source: source as EventSource }),
+  };
+}
+
+function parseActivityQuery(input: Readonly<Record<string, unknown>>): ActivityQuery {
+  const allowed = new Set(["cursor", "jobId", "limit", "source"]);
+  const unknown = Object.keys(input).filter((key) => !allowed.has(key));
+  if (unknown.length > 0) throw invalid(`unsupported query parameter: ${unknown[0]}`);
+  const jobId = one(input["jobId"], "jobId");
+  const base = parseQuery(
+    Object.fromEntries(Object.entries(input).filter(([key]) => key !== "jobId")),
+  );
+  return {
+    ...base,
+    ...(jobId === undefined ? {} : { jobId: parseHash(jobId) }),
   };
 }
 
@@ -556,6 +580,178 @@ export class JobEventsService {
       indexCheckpoint: result.checkpoint,
     });
   }
+
+  async activity(input: Readonly<Record<string, unknown>>): Promise<ActivityTimeline> {
+    const query = parseActivityQuery(input);
+    const filterFingerprint = fingerprint(this.#network, query.jobId ?? "*", query.source);
+    const cursor = query.cursor === undefined ? undefined : decodeCursor(query.cursor);
+    if (cursor !== undefined && cursor.f !== filterFingerprint) {
+      throw invalid("cursor does not match the requested activity filters");
+    }
+
+    const result = await this.#database.transaction(
+      async (tx) => {
+        const [network] = await tx
+          .select({ confirmationDepth: networks.confirmationDepth })
+          .from(networks)
+          .where(eq(networks.id, this.#network))
+          .limit(1);
+        if (network === undefined) throw new Error("configured network is not initialized");
+
+        const [checkpointRow] = await tx
+          .select({
+            blockNumber: indexerCheckpoints.blockNumber,
+            blockHash: indexerCheckpoints.blockHash,
+          })
+          .from(indexerCheckpoints)
+          .where(eq(indexerCheckpoints.networkId, this.#network))
+          .limit(1);
+        const checkpoint = checkpointRow ?? null;
+        if (cursor !== undefined && cursor.c !== checkpointKey(checkpoint)) {
+          throw new ConflictException({
+            status: "conflict",
+            code: "STALE_ACTIVITY_CURSOR",
+            message: "the index checkpoint changed; restart activity pagination",
+          });
+        }
+
+        const visibleCanonical =
+          checkpoint === null
+            ? eq(jobEvents.canonical, false)
+            : or(
+                eq(jobEvents.canonical, false),
+                lte(jobEvents.blockNumber, checkpoint.blockNumber),
+              )!;
+        const clauses: SQL[] = [
+          eq(jobEvents.networkId, this.#network),
+          or(eq(jobEvents.source, "operational"), visibleCanonical)!,
+        ];
+        if (query.jobId !== undefined) clauses.push(eq(jobEvents.jobId, query.jobId));
+        if (query.source !== undefined) clauses.push(eq(jobEvents.source, query.source));
+        if (cursor !== undefined) clauses.push(lt(jobEvents.id, BigInt(cursor.i)));
+
+        const rows = await tx
+          .select()
+          .from(jobEvents)
+          .where(and(...clauses))
+          .orderBy(desc(jobEvents.id))
+          .limit(query.limit + 1);
+        const pageRows = rows.slice(0, query.limit);
+        const orphanedRows = pageRows.filter((row) => row.source === "indexed" && !row.canonical);
+        const replacementCandidates =
+          orphanedRows.length === 0 || checkpoint === null
+            ? []
+            : await tx
+                .select()
+                .from(jobEvents)
+                .where(
+                  and(
+                    eq(jobEvents.networkId, this.#network),
+                    eq(jobEvents.source, "indexed"),
+                    eq(jobEvents.canonical, true),
+                    lte(jobEvents.blockNumber, checkpoint.blockNumber),
+                    inArray(jobEvents.jobId, [...new Set(orphanedRows.map(({ jobId }) => jobId))]),
+                    inArray(jobEvents.eventType, [
+                      ...new Set(orphanedRows.map(({ eventType }) => eventType)),
+                    ]),
+                  ),
+                )
+                .orderBy(asc(jobEvents.id));
+
+        const ids = pageRows.flatMap((row) => {
+          const id = attemptId(row.payload);
+          return id === undefined ? [] : [id];
+        });
+        const hashes = pageRows.flatMap((row) => (row.txHash === null ? [] : [row.txHash]));
+        const attemptClauses: SQL[] = [];
+        if (ids.length > 0) attemptClauses.push(inArray(transactionAttempts.id, [...new Set(ids)]));
+        if (hashes.length > 0) {
+          attemptClauses.push(inArray(transactionAttempts.txHash, [...new Set(hashes)]));
+        }
+        const attempts =
+          attemptClauses.length === 0
+            ? []
+            : await tx
+                .select()
+                .from(transactionAttempts)
+                .where(
+                  and(eq(transactionAttempts.networkId, this.#network), or(...attemptClauses)),
+                );
+        const attemptIds = attempts.map(({ id }) => id);
+        const receipts =
+          attemptIds.length === 0
+            ? []
+            : await tx
+                .select()
+                .from(executorReceipts)
+                .where(inArray(executorReceipts.attemptId, attemptIds));
+        return {
+          attempts,
+          checkpoint,
+          confirmationDepth: network.confirmationDepth,
+          hasNext: rows.length > query.limit,
+          pageRows,
+          receipts,
+          replacementCandidates,
+        };
+      },
+      { accessMode: "read only", isolationLevel: "repeatable read" },
+    );
+
+    const attemptsById = new Map(result.attempts.map((attempt) => [attempt.id, attempt]));
+    const attemptsByHash = new Map(
+      result.attempts.flatMap((attempt) =>
+        attempt.txHash === null ? [] : ([[attempt.txHash, attempt]] as const),
+      ),
+    );
+    const receiptsByAttemptId = new Map(
+      result.receipts.map((receipt) => [receipt.attemptId, receipt]),
+    );
+    const items = result.pageRows.map((row) => {
+      const replacement = result.replacementCandidates.find(
+        (candidate) =>
+          candidate.jobId === row.jobId &&
+          candidate.eventType === row.eventType &&
+          candidate.id > row.id,
+      );
+      const relatedAttempt =
+        attemptsById.get(attemptId(row.payload) ?? "") ??
+        (row.txHash === null ? undefined : attemptsByHash.get(row.txHash));
+      return Object.freeze({
+        eventId: row.id.toString(),
+        jobId: row.jobId,
+        eventType: row.eventType,
+        category: category(row),
+        source: row.source as EventSource,
+        confidence: confidence(row, result.checkpoint, result.confirmationDepth),
+        block: blockReference(row),
+        attempt: attemptReference(
+          relatedAttempt,
+          relatedAttempt === undefined ? undefined : receiptsByAttemptId.get(relatedAttempt.id),
+        ),
+        replacement: replacementReference(replacement),
+        details: details(row.payload),
+        occurredAt: row.occurredAt.toISOString(),
+        recordedAt: row.createdAt.toISOString(),
+        orphanedAt: row.orphanedAt?.toISOString() ?? null,
+      });
+    });
+    const last = result.pageRows.at(-1);
+    const nextCursor =
+      result.hasNext && last !== undefined
+        ? encodeCursor({
+            v: CURSOR_VERSION,
+            f: filterFingerprint,
+            c: checkpointKey(result.checkpoint),
+            i: last.id.toString(),
+          })
+        : null;
+    return Object.freeze({
+      items: Object.freeze(items),
+      page: Object.freeze({ limit: query.limit, nextCursor }),
+      indexCheckpoint: result.checkpoint,
+    });
+  }
 }
 
 interface EventTimelineReader {
@@ -689,6 +885,18 @@ export class JobEventsController {
   }
 }
 
+export class ActivityController {
+  readonly #events: JobEventsService;
+
+  constructor(events: JobEventsService) {
+    this.#events = events;
+  }
+
+  list(query: Readonly<Record<string, unknown>>): Promise<ActivityTimeline> {
+    return this.#events.activity(query);
+  }
+}
+
 const hashSchema = { type: "string", pattern: "^0x[0-9a-f]{64}$" };
 const decimalSchema = { type: "string", pattern: "^(0|[1-9][0-9]*)$" };
 const blockSchema = {
@@ -774,10 +982,13 @@ const eventSchema = {
 
 Injectable()(JobEventsService);
 Inject(JobEventsService)(JobEventsController, undefined, 0);
+Inject(JobEventsService)(ActivityController, undefined, 0);
 Inject(JobEventStreamService)(JobEventStreamController, undefined, 0);
 Controller("jobs")(JobEventsController);
+Controller("activity")(ActivityController);
 Controller("events")(JobEventStreamController);
 ApiTags("job events")(JobEventsController);
+ApiTags("activity")(ActivityController);
 ApiTags("job events")(JobEventStreamController);
 Get(":jobId/events")(
   JobEventsController.prototype,
@@ -858,6 +1069,80 @@ ApiNotFoundResponse({ description: "Job not found" })(
   JobEventsController.prototype,
   "list",
   Object.getOwnPropertyDescriptor(JobEventsController.prototype, "list")!,
+);
+
+Get()(
+  ActivityController.prototype,
+  "list",
+  Object.getOwnPropertyDescriptor(ActivityController.prototype, "list")!,
+);
+Query()(ActivityController.prototype, "list", 0);
+ApiOperation({ summary: "Read recent public activity across jobs" })(
+  ActivityController.prototype,
+  "list",
+  Object.getOwnPropertyDescriptor(ActivityController.prototype, "list")!,
+);
+ApiQuery({ name: "cursor", required: false, type: String })(
+  ActivityController.prototype,
+  "list",
+  Object.getOwnPropertyDescriptor(ActivityController.prototype, "list")!,
+);
+ApiQuery({ name: "jobId", required: false, schema: hashSchema })(
+  ActivityController.prototype,
+  "list",
+  Object.getOwnPropertyDescriptor(ActivityController.prototype, "list")!,
+);
+ApiQuery({
+  name: "limit",
+  required: false,
+  type: Number,
+  schema: { minimum: 1, maximum: MAX_PAGE_SIZE, default: DEFAULT_PAGE_SIZE },
+})(
+  ActivityController.prototype,
+  "list",
+  Object.getOwnPropertyDescriptor(ActivityController.prototype, "list")!,
+);
+ApiQuery({ name: "source", required: false, enum: EVENT_SOURCES })(
+  ActivityController.prototype,
+  "list",
+  Object.getOwnPropertyDescriptor(ActivityController.prototype, "list")!,
+);
+ApiOkResponse({
+  schema: {
+    type: "object",
+    required: ["items", "page", "indexCheckpoint"],
+    properties: {
+      items: { type: "array", items: eventSchema },
+      page: {
+        type: "object",
+        required: ["limit", "nextCursor"],
+        properties: {
+          limit: { type: "integer", minimum: 1, maximum: MAX_PAGE_SIZE },
+          nextCursor: { type: "string", nullable: true },
+        },
+      },
+      indexCheckpoint: {
+        type: "object",
+        nullable: true,
+        required: ["blockNumber", "blockHash"],
+        properties: { blockNumber: decimalSchema, blockHash: hashSchema },
+      },
+    },
+  },
+})(
+  ActivityController.prototype,
+  "list",
+  Object.getOwnPropertyDescriptor(ActivityController.prototype, "list")!,
+);
+ApiBadRequestResponse({ description: "Malformed activity filter or cursor" })(
+  ActivityController.prototype,
+  "list",
+  Object.getOwnPropertyDescriptor(ActivityController.prototype, "list")!,
+);
+ApiConflictResponse({ description: "Index checkpoint changed during pagination" })(
+  ActivityController.prototype,
+  "list",
+  Object.getOwnPropertyDescriptor(ActivityController.prototype, "list")!,
 );
 
 Sse("stream")(

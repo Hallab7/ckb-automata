@@ -208,6 +208,217 @@
         "tags": ["jobs"]
       }
     },
+    "/v1/activity": {
+      "get": {
+        "operationId": "ActivityController_list",
+        "parameters": [
+          { "in": "query", "name": "cursor", "required": false, "schema": { "type": "string" } },
+          {
+            "in": "query",
+            "name": "jobId",
+            "required": false,
+            "schema": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": { "default": 50, "maximum": 100, "minimum": 1 }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": { "enum": ["indexed", "operational"], "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "indexCheckpoint": {
+                      "nullable": true,
+                      "properties": {
+                        "blockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                        "blockNumber": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" }
+                      },
+                      "required": ["blockNumber", "blockHash"],
+                      "type": "object"
+                    },
+                    "items": {
+                      "items": {
+                        "properties": {
+                          "attempt": {
+                            "nullable": true,
+                            "properties": {
+                              "committedBlockNumber": {
+                                "nullable": true,
+                                "pattern": "^(0|[1-9][0-9]*)$",
+                                "type": "string"
+                              },
+                              "id": { "format": "uuid", "type": "string" },
+                              "operation": { "type": "string" },
+                              "receipt": {
+                                "nullable": true,
+                                "properties": {
+                                  "createdAt": { "format": "date-time", "type": "string" },
+                                  "executorLockHash": {
+                                    "pattern": "^0x[0-9a-f]{64}$",
+                                    "type": "string"
+                                  },
+                                  "id": { "format": "uuid", "type": "string" },
+                                  "keyId": { "type": "string" },
+                                  "payload": { "additionalProperties": true, "type": "object" },
+                                  "signature": { "pattern": "^0x[0-9a-f]{128}$", "type": "string" }
+                                },
+                                "required": [
+                                  "id",
+                                  "executorLockHash",
+                                  "keyId",
+                                  "signature",
+                                  "payload",
+                                  "createdAt"
+                                ],
+                                "type": "object"
+                              },
+                              "state": { "type": "string" },
+                              "transactionHash": {
+                                "nullable": true,
+                                "pattern": "^0x[0-9a-f]{64}$",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "operation",
+                              "state",
+                              "transactionHash",
+                              "committedBlockNumber",
+                              "receipt"
+                            ],
+                            "type": "object"
+                          },
+                          "block": {
+                            "nullable": true,
+                            "properties": {
+                              "hash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                              "number": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                              "transactionHash": {
+                                "pattern": "^0x[0-9a-f]{64}$",
+                                "type": "string"
+                              },
+                              "transactionIndex": {
+                                "nullable": true,
+                                "pattern": "^(0|[1-9][0-9]*)$",
+                                "type": "string"
+                              }
+                            },
+                            "required": ["number", "hash", "transactionHash", "transactionIndex"],
+                            "type": "object"
+                          },
+                          "category": {
+                            "enum": [
+                              "lifecycle",
+                              "execution",
+                              "transaction",
+                              "notification",
+                              "operation"
+                            ],
+                            "type": "string"
+                          },
+                          "confidence": {
+                            "enum": ["observed", "committed", "confirmed", "reorged"],
+                            "type": "string"
+                          },
+                          "details": { "additionalProperties": true, "type": "object" },
+                          "eventId": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                          "eventType": { "type": "string" },
+                          "jobId": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                          "occurredAt": { "format": "date-time", "type": "string" },
+                          "orphanedAt": {
+                            "format": "date-time",
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "recordedAt": { "format": "date-time", "type": "string" },
+                          "replacement": {
+                            "nullable": true,
+                            "properties": {
+                              "block": {
+                                "properties": {
+                                  "hash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                                  "number": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                                  "transactionHash": {
+                                    "pattern": "^0x[0-9a-f]{64}$",
+                                    "type": "string"
+                                  },
+                                  "transactionIndex": {
+                                    "nullable": true,
+                                    "pattern": "^(0|[1-9][0-9]*)$",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "number",
+                                  "hash",
+                                  "transactionHash",
+                                  "transactionIndex"
+                                ],
+                                "type": "object"
+                              },
+                              "eventId": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                              "eventType": { "type": "string" },
+                              "transactionHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+                            },
+                            "required": ["eventId", "eventType", "transactionHash", "block"],
+                            "type": "object"
+                          },
+                          "source": { "enum": ["indexed", "operational"], "type": "string" }
+                        },
+                        "required": [
+                          "eventId",
+                          "jobId",
+                          "eventType",
+                          "category",
+                          "source",
+                          "confidence",
+                          "block",
+                          "attempt",
+                          "replacement",
+                          "details",
+                          "occurredAt",
+                          "recordedAt",
+                          "orphanedAt"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "page": {
+                      "properties": {
+                        "limit": { "maximum": 100, "minimum": 1, "type": "integer" },
+                        "nextCursor": { "nullable": true, "type": "string" }
+                      },
+                      "required": ["limit", "nextCursor"],
+                      "type": "object"
+                    }
+                  },
+                  "required": ["items", "page", "indexCheckpoint"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": { "description": "Malformed activity filter or cursor" },
+          "409": { "description": "Index checkpoint changed during pagination" }
+        },
+        "summary": "Read recent public activity across jobs",
+        "tags": ["activity"]
+      }
+    },
     "/v1/auth/challenge": {
       "post": {
         "operationId": "AuthController_issue",

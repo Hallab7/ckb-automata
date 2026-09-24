@@ -21,6 +21,23 @@ export type paths = {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/v1/activity": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /** Read recent public activity across jobs */
+        readonly get: operations["ActivityController_list"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/v1/auth/challenge": {
         readonly parameters: {
             readonly query?: never;
@@ -577,6 +594,110 @@ export interface operations {
                 };
             };
             /** @description Malformed filter or cursor */
+            readonly 400: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Index checkpoint changed during pagination */
+            readonly 409: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly ActivityController_list: {
+        readonly parameters: {
+            readonly query?: {
+                readonly cursor?: string;
+                readonly jobId?: string;
+                readonly limit?: unknown;
+                readonly source?: "indexed" | "operational";
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        readonly indexCheckpoint: {
+                            readonly blockHash: string;
+                            readonly blockNumber: string;
+                        } | null;
+                        readonly items: readonly {
+                            readonly attempt: {
+                                readonly committedBlockNumber: string | null;
+                                /** Format: uuid */
+                                readonly id: string;
+                                readonly operation: string;
+                                readonly receipt: {
+                                    /** Format: date-time */
+                                    readonly createdAt: string;
+                                    readonly executorLockHash: string;
+                                    /** Format: uuid */
+                                    readonly id: string;
+                                    readonly keyId: string;
+                                    readonly payload: {
+                                        readonly [key: string]: unknown;
+                                    };
+                                    readonly signature: string;
+                                } | null;
+                                readonly state: string;
+                                readonly transactionHash: string | null;
+                            } | null;
+                            readonly block: {
+                                readonly hash: string;
+                                readonly number: string;
+                                readonly transactionHash: string;
+                                readonly transactionIndex: string | null;
+                            } | null;
+                            /** @enum {string} */
+                            readonly category: "lifecycle" | "execution" | "transaction" | "notification" | "operation";
+                            /** @enum {string} */
+                            readonly confidence: "observed" | "committed" | "confirmed" | "reorged";
+                            readonly details: {
+                                readonly [key: string]: unknown;
+                            };
+                            readonly eventId: string;
+                            readonly eventType: string;
+                            readonly jobId: string;
+                            /** Format: date-time */
+                            readonly occurredAt: string;
+                            /** Format: date-time */
+                            readonly orphanedAt: string | null;
+                            /** Format: date-time */
+                            readonly recordedAt: string;
+                            readonly replacement: {
+                                readonly block: {
+                                    readonly hash: string;
+                                    readonly number: string;
+                                    readonly transactionHash: string;
+                                    readonly transactionIndex: string | null;
+                                };
+                                readonly eventId: string;
+                                readonly eventType: string;
+                                readonly transactionHash: string;
+                            } | null;
+                            /** @enum {string} */
+                            readonly source: "indexed" | "operational";
+                        }[];
+                        readonly page: {
+                            readonly limit: number;
+                            readonly nextCursor: string | null;
+                        };
+                    };
+                };
+            };
+            /** @description Malformed activity filter or cursor */
             readonly 400: {
                 headers: {
                     readonly [name: string]: unknown;

@@ -73,6 +73,18 @@ test("event route publishes explicit timeline, provenance, and reference schemas
     assert.ok(streamResponse && "content" in streamResponse);
     assert.ok(streamResponse.content?.["text/event-stream"]);
 
+    const activity = document.paths["/v1/activity"]?.get;
+    assert.ok(activity);
+    const activityParameters = (activity.parameters ?? []).map((parameter) =>
+      "$ref" in parameter ? parameter.$ref : parameter.name,
+    );
+    assert.deepEqual(activityParameters.toSorted(), ["cursor", "jobId", "limit", "source"]);
+    const activityResponse = activity.responses?.["200"];
+    assert.ok(activityResponse && "content" in activityResponse);
+    const activityTimeline = activityResponse.content?.["application/json"]?.schema;
+    assert.ok(activityTimeline && !("$ref" in activityTimeline));
+    assert.deepEqual(activityTimeline.required, ["items", "page", "indexCheckpoint"]);
+
     const fastify = result.app.getHttpAdapter().getInstance() as {
       inject(input: {
         method: string;

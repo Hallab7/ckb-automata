@@ -4,6 +4,7 @@ export {
   ApiClientError,
   AutomataApiClient,
   createApiClient,
+  type ApiActivity,
   type ApiAuthChallenge,
   type ApiAuthSession,
   type ApiClientOptions,
