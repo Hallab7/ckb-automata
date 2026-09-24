@@ -117,6 +117,26 @@ function withQuote(
   };
 }
 
+function withIntent(
+  source: ApiTransactionBuild,
+  intent: Record<string, unknown>,
+): ApiTransactionBuild {
+  const intentHash = digest({ operation: source.operation, intent });
+  return {
+    ...source,
+    intent,
+    intentHash,
+    policyCriticalHash: digest({
+      operation: source.operation,
+      intentHash,
+      quote: source.quote,
+      chainSnapshot: source.chainSnapshot,
+      quoteExpiry: source.quoteExpiry,
+      transaction: source.transaction,
+    }),
+  };
+}
+
 function completedTransaction(
   transaction: UnsignedDeadlineTransaction,
   owner: ScriptIdentity,
@@ -239,7 +259,7 @@ test("typed recurring transaction produces the complete human-readable review", 
   );
 });
 
-test("review rejects policy, owner input, committed output, and fee mutations", async () => {
+test("review rejects every changed policy field, owner input, output, and fee mutation", async () => {
   const registered = await deployment();
   const owner = ownerScript(registered);
   const ownerLockHash = parseHash32(`0x${"44".repeat(32)}`);
@@ -300,6 +320,27 @@ test("review rejects policy, owner input, committed output, and fee mutations", 
     ),
     /quote maximumLockedTotal/,
   );
+  for (const [field, changed] of [
+    ["ownerLockHash", `0x${"55".repeat(32)}`],
+    ["recipientLockHash", `0x${"66".repeat(32)}`],
+    ["amount", "10000000001"],
+    ["intervalBlocks", "31"],
+    ["firstNotBefore", "161"],
+    ["totalRuns", "3"],
+    ["reward", "6100000001"],
+  ] as const) {
+    await assert.rejects(
+      verifyCreationReview(
+        request,
+        withIntent(apiArtifact, { ...apiArtifact.intent, [field]: changed }),
+        completed,
+        INPUT_HASH,
+        context,
+      ),
+      /recurring intent cannot be reproduced/,
+      field,
+    );
+  }
   await assert.rejects(
     verifyCreationReview(request, apiArtifact, completed, INPUT_HASH, {
       ...context,

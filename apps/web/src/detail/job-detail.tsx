@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
-  ApiClientError,
   createApiClient,
   type ApiJob,
   type ApiJobEvents,
@@ -11,8 +10,10 @@ import {
 } from "@ckb-automata/api-client";
 
 import { parseWebEnvironment } from "../environment.ts";
+import { detailRequestError } from "../request-errors.ts";
+import { decodeDetailStreamEvent } from "../stream-reducers.ts";
 import { JobDetailView, type JobDetailLoadState } from "./job-detail-view.tsx";
-import { mergeTimeline, type DetailEvent } from "./job-detail-model.ts";
+import { mergeTimeline } from "./job-detail-model.ts";
 import { OwnerActions } from "./owner-actions.tsx";
 
 const EVENT_PAGE_SIZE = 50;
@@ -23,36 +24,6 @@ function browserEnvironment() {
     NEXT_PUBLIC_AUTOMATA_API_URL: process.env["NEXT_PUBLIC_AUTOMATA_API_URL"],
     NEXT_PUBLIC_CKB_NETWORK: process.env["NEXT_PUBLIC_CKB_NETWORK"],
   });
-}
-
-function requestError(error: unknown): {
-  readonly message: string;
-  readonly state: JobDetailLoadState;
-} {
-  if (error instanceof ApiClientError) {
-    if (error.status === 404) {
-      return {
-        message: "The automation was not found at the current checkpoint.",
-        state: "not_found",
-      };
-    }
-    if (error.status === 409) {
-      return {
-        message: "The index advanced while the timeline was loading. Refresh and retry.",
-        state: "error",
-      };
-    }
-    if (error.status >= 500) {
-      return { message: "The testnet job index is temporarily unavailable.", state: "error" };
-    }
-  }
-  return {
-    message:
-      error instanceof TypeError
-        ? "The testnet API could not be reached. Check the API connection and retry."
-        : "The automation detail could not be loaded.",
-    state: "error",
-  };
 }
 
 function streamUrl(baseUrl: string, jobId: string): string {
@@ -114,7 +85,7 @@ export function AutomationDetail({ jobId }: Readonly<{ jobId: string }>) {
       })
       .catch((reason: unknown) => {
         if (!active) return;
-        const failure = requestError(reason);
+        const failure = detailRequestError(reason);
         setError(failure.message);
         setLoadState(failure.state);
       });
@@ -157,23 +128,23 @@ export function AutomationDetail({ jobId }: Readonly<{ jobId: string }>) {
 
     const source = new EventSource(streamUrl(apiResult.apiUrl, jobId));
     const receive = (event: Event) => {
-      try {
-        const item = JSON.parse((event as MessageEvent<string>).data) as DetailEvent;
-        if (item.jobId !== jobId || stopped) return;
-        setEvents((current) => mergeTimeline(current, [item]));
-        void apiResult
-          .api!.getJob(jobId)
-          .then((nextJob) => {
-            if (!stopped) setJob(nextJob);
-          })
-          .catch(() => {
-            source.close();
-            startPolling();
-          });
-      } catch {
+      const decoded = decodeDetailStreamEvent((event as MessageEvent<string>).data, jobId);
+      if (decoded.kind === "invalid") {
         source.close();
         startPolling();
+        return;
       }
+      if (decoded.kind === "ignored" || decoded.value === undefined || stopped) return;
+      setEvents((current) => mergeTimeline(current, [decoded.value!]));
+      void apiResult
+        .api!.getJob(jobId)
+        .then((nextJob) => {
+          if (!stopped) setJob(nextJob);
+        })
+        .catch(() => {
+          source.close();
+          startPolling();
+        });
     };
     source.addEventListener("job-event", receive);
     source.addEventListener("transaction-event", receive);
@@ -197,7 +168,7 @@ export function AutomationDetail({ jobId }: Readonly<{ jobId: string }>) {
         setEvents((current) => mergeTimeline(current, timeline.items));
         setNextCursor(timeline.page.nextCursor);
       })
-      .catch((reason: unknown) => setError(requestError(reason).message))
+      .catch((reason: unknown) => setError(detailRequestError(reason).message))
       .finally(() => setLoadingNextPage(false));
   }, [apiResult.api, jobId, loadingNextPage, nextCursor]);
 

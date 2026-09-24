@@ -9,6 +9,7 @@ import {
   progressQuery,
   readTransactionProgress,
   sameTransactionProgress,
+  transactionProgressPresentation,
   transactionProgressStorageKey,
   writeTransactionProgress,
 } from "./transaction-progress-model.ts";
@@ -98,4 +99,23 @@ test("storage failures leave progress tracking operational", () => {
     ),
     undefined,
   );
+});
+
+test("only canonical confirmation uses success copy and styling", () => {
+  assert.deepEqual(transactionProgressPresentation("confirmed"), {
+    title: "Confirmed",
+    detail: "The required canonical confirmation depth has been reached.",
+    tone: "success",
+  });
+  for (const state of [
+    "submitted",
+    "proposed",
+    "committed",
+    "dropped",
+    "conflicted",
+    "reorged",
+  ] as const) {
+    assert.notEqual(transactionProgressPresentation(state).tone, "success", state);
+  }
+  assert.equal(transactionProgressPresentation("committed").title, "Committed");
 });

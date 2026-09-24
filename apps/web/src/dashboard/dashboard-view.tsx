@@ -134,6 +134,7 @@ function AutomationRows({
 
 export interface AutomationDashboardViewProperties {
   readonly checkpointBlock?: string | undefined;
+  readonly dataSourceLabel?: string | undefined;
   readonly error?: string | undefined;
   readonly hasNextPage?: boolean | undefined;
   readonly items: readonly DashboardJob[];
@@ -152,6 +153,7 @@ export interface AutomationDashboardViewProperties {
 
 export function AutomationDashboardView({
   checkpointBlock,
+  dataSourceLabel,
   error,
   hasNextPage = false,
   items,
@@ -177,6 +179,9 @@ export function AutomationDashboardView({
               ? "CKB Pudge Testnet job state"
               : `Indexed through block #${BigInt(checkpointBlock).toLocaleString("en-US")}`}
           </p>
+          {dataSourceLabel === undefined ? null : (
+            <span className="app-page-header__detail">{dataSourceLabel}</span>
+          )}
         </div>
         <div className="app-page-header__actions">
           <Link className="ui-button ui-button--primary" href="/automations/new">
@@ -202,7 +207,7 @@ export function AutomationDashboardView({
             onClick={() => onModeChange("public")}
             type="button"
           >
-            Public demo
+            Public testnet
           </button>
         </div>
         <div className="automation-filters">
@@ -234,8 +239,8 @@ export function AutomationDashboardView({
       {loadState === "owner_required" ? (
         <InlineNotice title="Connect your owner wallet" tone="warning">
           <p>
-            The owner view uses the connected testnet lock hash. The public demo remains available
-            without a wallet.
+            The owner view uses the connected testnet lock hash. Public testnet records remain
+            available without a wallet.
           </p>
           <Button onClick={onConnect} tone="secondary">
             Connect wallet

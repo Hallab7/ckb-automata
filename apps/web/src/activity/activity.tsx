@@ -2,14 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import {
-  ApiClientError,
-  createApiClient,
-  type ApiActivity,
-  type ApiQuery,
-} from "@ckb-automata/api-client";
+import { createApiClient, type ApiActivity, type ApiQuery } from "@ckb-automata/api-client";
 
 import { parseWebEnvironment } from "../environment.ts";
+import { requestErrorMessage } from "../request-errors.ts";
 import { mergeActivity, type ActivityOutcomeFilter } from "./activity-model.ts";
 import {
   ActivityView,
@@ -25,18 +21,6 @@ function browserApiClient() {
     NEXT_PUBLIC_CKB_NETWORK: process.env["NEXT_PUBLIC_CKB_NETWORK"],
   });
   return createApiClient({ baseUrl: environment.apiUrl });
-}
-
-function requestError(error: unknown): string {
-  if (error instanceof ApiClientError) {
-    if (error.status === 409)
-      return "The canonical checkpoint advanced. Refresh the feed before loading more.";
-    if (error.status >= 500) return "The testnet activity index is temporarily unavailable.";
-    return "The API rejected this activity query.";
-  }
-  return error instanceof TypeError
-    ? "The testnet API could not be reached. Check the connection and retry."
-    : "The activity feed could not be loaded.";
 }
 
 export function ActivityFeed() {
@@ -86,7 +70,7 @@ export function ActivityFeed() {
       })
       .catch((reason: unknown) => {
         if (!active) return;
-        setError(requestError(reason));
+        setError(requestErrorMessage("activity", reason));
         setLoadState("error");
       });
     return () => {
@@ -103,7 +87,7 @@ export function ActivityFeed() {
         setItems((current) => mergeActivity(current, response.items));
         setNextCursor(response.page.nextCursor);
       })
-      .catch((reason: unknown) => setError(requestError(reason)))
+      .catch((reason: unknown) => setError(requestErrorMessage("activity", reason)))
       .finally(() => setLoadingNextPage(false));
   }, [apiResult.api, loadingNextPage, nextCursor, query]);
 

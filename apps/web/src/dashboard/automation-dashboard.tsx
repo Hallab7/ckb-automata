@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
-  ApiClientError,
   createApiClient,
   type ApiJobList,
   type ApiQuery,
@@ -11,7 +10,9 @@ import {
 } from "@ckb-automata/api-client";
 
 import { useWalletSession } from "../ccc/session.tsx";
+import { createLiveDataProvider, LIVE_DATA_LABEL } from "../data-provider.ts";
 import { parseWebEnvironment } from "../environment.ts";
+import { requestErrorMessage } from "../request-errors.ts";
 import {
   AutomationDashboardView,
   type DashboardLoadState,
@@ -26,23 +27,12 @@ function browserApiClient(): AutomataApiClient {
   return createApiClient({ baseUrl: environment.apiUrl });
 }
 
-function requestError(error: unknown): string {
-  if (error instanceof ApiClientError) {
-    if (error.status === 409)
-      return "The index advanced during pagination. Refresh the list to continue.";
-    if (error.status >= 500) return "The testnet job index is temporarily unavailable.";
-    return "The API rejected this automation query.";
-  }
-  return error instanceof TypeError
-    ? "The testnet API could not be reached. Check the API connection and retry."
-    : "The automation list could not be loaded.";
-}
-
 export function AutomationDashboard() {
   const session = useWalletSession();
   const apiResult = useMemo(() => {
     try {
-      return { api: browserApiClient(), error: undefined } as const;
+      const provider = createLiveDataProvider(browserApiClient);
+      return { api: provider.load(), error: undefined } as const;
     } catch {
       return { api: undefined, error: "The public testnet API is not configured." } as const;
     }
@@ -117,7 +107,7 @@ export function AutomationDashboard() {
       })
       .catch((reason: unknown) => {
         if (!active) return;
-        setError(requestError(reason));
+        setError(requestErrorMessage("dashboard", reason));
         setLoadState("error");
       });
     return () => {
@@ -149,7 +139,7 @@ export function AutomationDashboard() {
         setNextCursor(response.page.nextCursor);
       })
       .catch((reason: unknown) => {
-        setError(requestError(reason));
+        setError(requestErrorMessage("dashboard", reason));
         setLoadState("error");
       })
       .finally(() => setLoadingNextPage(false));
@@ -158,6 +148,7 @@ export function AutomationDashboard() {
   return (
     <AutomationDashboardView
       checkpointBlock={checkpointBlock}
+      dataSourceLabel={LIVE_DATA_LABEL}
       error={error}
       hasNextPage={nextCursor !== null}
       items={items}

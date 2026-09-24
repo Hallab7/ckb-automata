@@ -37,6 +37,7 @@ test("deadline form converts CKB without floating-point loss", () => {
   assert.equal(ckbToShannons("61"), "6100000000");
   assert.equal(ckbToShannons("61.00000001"), "6100000001");
   assert.equal(ckbToShannons("184467440737.09551615"), "18446744073709551615");
+  assert.equal(ckbToShannons("90071992.54740993"), "9007199254740993");
   assert.throws(() => ckbToShannons("1.000000001"));
   assert.throws(() => ckbToShannons("01"));
 });

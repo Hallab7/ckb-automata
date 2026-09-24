@@ -19,12 +19,14 @@ import { InlineNotice } from "@ckb-automata/ui";
 
 import { ckbTestnetTransactionUrl } from "../ccc/wallet-display.ts";
 import { parseWebEnvironment } from "../environment.ts";
+import { reduceTransactionProgress, reduceTransactionProgressStream } from "../stream-reducers.ts";
 import {
   initialTransactionProgress,
   parseTransactionProgress,
   progressQuery,
   readTransactionProgress,
   sameTransactionProgress,
+  transactionProgressPresentation,
   writeTransactionProgress,
   type TransactionProgressState,
 } from "./transaction-progress-model.ts";
@@ -36,39 +38,6 @@ const orderedStates: readonly TransactionProgressState[] = [
   "committed",
   "confirmed",
 ];
-
-const copy: Readonly<
-  Record<TransactionProgressState, { readonly title: string; readonly detail: string }>
-> = {
-  submitted: {
-    title: "Submitted",
-    detail: "The CKB node accepted the exact reviewed transaction.",
-  },
-  proposed: {
-    title: "Proposed",
-    detail: "The transaction is in the proposal window and is waiting for block inclusion.",
-  },
-  committed: {
-    title: "Committed",
-    detail: "The transaction is included and is accumulating confirmation depth.",
-  },
-  confirmed: {
-    title: "Confirmed",
-    detail: "The required canonical confirmation depth has been reached.",
-  },
-  dropped: {
-    title: "Dropped",
-    detail: "The transaction was not found after the propagation window.",
-  },
-  conflicted: {
-    title: "Conflicted",
-    detail: "The node rejected the transaction, usually because an input was already consumed.",
-  },
-  reorged: {
-    title: "Reorged",
-    detail: "The previously observed inclusion is no longer on the canonical chain.",
-  },
-};
 
 function browserEnvironment() {
   return parseWebEnvironment({
@@ -102,13 +71,6 @@ function stateIcon(state: TransactionProgressState): ReactNode {
   return <RefreshCw aria-hidden="true" size={24} />;
 }
 
-function stateTone(state: TransactionProgressState): "neutral" | "success" | "warning" | "danger" {
-  if (state === "confirmed") return "success";
-  if (state === "dropped" || state === "conflicted") return "danger";
-  if (state === "reorged") return "warning";
-  return "neutral";
-}
-
 export function TransactionProgressPanel({
   persisted,
   progress,
@@ -119,12 +81,11 @@ export function TransactionProgressPanel({
   transportIssue?: string;
 }>) {
   const activeIndex = orderedStates.indexOf(progress.state);
-  const status = copy[progress.state];
-  const tone = stateTone(progress.state);
+  const status = transactionProgressPresentation(progress.state);
   return (
     <section
       aria-live="polite"
-      className={`transaction-progress transaction-progress--${tone}`}
+      className={`transaction-progress transaction-progress--${status.tone}`}
       data-progress-state={progress.state}
     >
       <div className="transaction-progress__heading">
@@ -153,7 +114,7 @@ export function TransactionProgressPanel({
                   <Circle aria-hidden="true" size={14} />
                 )}
               </span>
-              {copy[state].title}
+              {transactionProgressPresentation(state).title}
             </li>
           );
         })}
@@ -216,10 +177,13 @@ export function TransactionProgressTracker({
     }
     const query = progressQuery(record.persistedAt, baseline);
     const apply = (value: unknown) => {
+      if (stopped) return;
       const next = parseTransactionProgress(value);
-      if (next === undefined || next.transactionHash !== record.transactionHash || stopped) return;
+      if (next === undefined || next.transactionHash !== record.transactionHash) return;
       writeTransactionProgress(window.localStorage, next);
-      setProgress((current) => (sameTransactionProgress(current, next) ? current : next));
+      setProgress(
+        (current) => reduceTransactionProgress(current, next, record.transactionHash).value,
+      );
       setTransportIssue(undefined);
     };
     const poll = async () => {
@@ -249,15 +213,20 @@ export function TransactionProgressTracker({
 
     const source = new EventSource(streamUrl(record, baseline));
     source.addEventListener("transaction-progress", (event) => {
-      try {
-        apply(JSON.parse((event as MessageEvent<string>).data));
-      } catch {
+      const reduction = reduceTransactionProgressStream(
+        progress,
+        (event as MessageEvent<string>).data,
+        record.transactionHash,
+      );
+      if (reduction.kind === "invalid") {
         setTransportIssue(
           "A live update was invalid. Polling will verify the current chain state.",
         );
         source.close();
         startPolling();
+        return;
       }
+      if (reduction.kind === "accepted") apply(reduction.value);
     });
     source.addEventListener("error", () => {
       source.close();

@@ -16,6 +16,56 @@ export const TRANSACTION_PROGRESS_STATES = [
 
 export type TransactionProgressState = (typeof TRANSACTION_PROGRESS_STATES)[number];
 
+export interface TransactionProgressPresentation {
+  readonly detail: string;
+  readonly title: string;
+  readonly tone: "danger" | "neutral" | "success" | "warning";
+}
+
+const TRANSACTION_PROGRESS_PRESENTATIONS = {
+  submitted: {
+    title: "Submitted",
+    detail: "The CKB node accepted the exact reviewed transaction.",
+    tone: "neutral",
+  },
+  proposed: {
+    title: "Proposed",
+    detail: "The transaction is in the proposal window and is waiting for block inclusion.",
+    tone: "neutral",
+  },
+  committed: {
+    title: "Committed",
+    detail: "The transaction is included and is accumulating confirmation depth.",
+    tone: "neutral",
+  },
+  confirmed: {
+    title: "Confirmed",
+    detail: "The required canonical confirmation depth has been reached.",
+    tone: "success",
+  },
+  dropped: {
+    title: "Dropped",
+    detail: "The transaction was not found after the propagation window.",
+    tone: "danger",
+  },
+  conflicted: {
+    title: "Conflicted",
+    detail: "The node rejected the transaction, usually because an input was already consumed.",
+    tone: "danger",
+  },
+  reorged: {
+    title: "Reorged",
+    detail: "The previously observed inclusion is no longer on the canonical chain.",
+    tone: "warning",
+  },
+} as const satisfies Record<TransactionProgressState, TransactionProgressPresentation>;
+
+export function transactionProgressPresentation(
+  state: TransactionProgressState,
+): TransactionProgressPresentation {
+  return TRANSACTION_PROGRESS_PRESENTATIONS[state];
+}
+
 export interface StoredTransactionProgress extends ApiTransactionProgress {
   readonly version: typeof STORAGE_VERSION;
 }
