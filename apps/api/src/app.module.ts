@@ -30,6 +30,11 @@ import {
 } from "./preferences.ts";
 import { JobQuoteController, JobQuoteService } from "./quotes.ts";
 import { TransactionBuildService, TransactionController } from "./transactions.ts";
+import {
+  TransactionProgressController,
+  TransactionProgressService,
+  TransactionProgressStreamService,
+} from "./transaction-progress.ts";
 import { ApiTelemetryInterceptor, BackendTelemetry, MetricsController } from "./telemetry.ts";
 import { WebhookController, WebhookService } from "./webhooks.ts";
 
@@ -52,6 +57,7 @@ Module({
     JobEventStreamController,
     JobQuoteController,
     TransactionController,
+    TransactionProgressController,
   ],
 })(AppModule);
 
@@ -193,6 +199,18 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
         inject: [JobQuoteService, CkbClient],
         useFactory: (quotes: JobQuoteService, ckbClient: CkbClient) =>
           new TransactionBuildService(quotes, ckbClient, environment.CKB_GENESIS_HASH),
+      },
+      {
+        provide: TransactionProgressService,
+        inject: [CkbClient],
+        useFactory: (ckbClient: CkbClient) =>
+          new TransactionProgressService(environment, ckbClient),
+      },
+      {
+        provide: TransactionProgressStreamService,
+        inject: [TransactionProgressService],
+        useFactory: (progress: TransactionProgressService) =>
+          new TransactionProgressStreamService(progress),
       },
     ],
   };

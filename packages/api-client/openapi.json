@@ -2958,6 +2958,130 @@
         "tags": ["transactions"]
       }
     },
+    "/v1/transactions/{transactionHash}/progress": {
+      "get": {
+        "operationId": "TransactionProgressController_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transactionHash",
+            "required": true,
+            "schema": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+          },
+          {
+            "in": "query",
+            "name": "submittedAt",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "in": "query",
+            "name": "previousBlockNumber",
+            "required": false,
+            "schema": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" }
+          },
+          {
+            "in": "query",
+            "name": "previousBlockHash",
+            "required": false,
+            "schema": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "block": {
+                      "nullable": true,
+                      "properties": {
+                        "hash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                        "number": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" }
+                      },
+                      "required": ["number", "hash"],
+                      "type": "object"
+                    },
+                    "confirmations": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                    "observedAt": { "format": "date-time", "type": "string" },
+                    "reason": { "nullable": true, "type": "string" },
+                    "requiredConfirmations": { "minimum": 1, "type": "integer" },
+                    "state": {
+                      "enum": [
+                        "submitted",
+                        "proposed",
+                        "committed",
+                        "confirmed",
+                        "dropped",
+                        "conflicted",
+                        "reorged"
+                      ],
+                      "type": "string"
+                    },
+                    "transactionHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+                  },
+                  "required": [
+                    "transactionHash",
+                    "state",
+                    "confirmations",
+                    "requiredConfirmations",
+                    "block",
+                    "observedAt",
+                    "reason"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": { "description": "Malformed transaction hash or progress context" },
+          "503": { "description": "CKB progress read unavailable" }
+        },
+        "summary": "Read current transaction progress from the canonical chain",
+        "tags": ["transactions"]
+      }
+    },
+    "/v1/transactions/{transactionHash}/progress/stream": {
+      "get": {
+        "operationId": "TransactionProgressController_stream",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transactionHash",
+            "required": true,
+            "schema": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+          },
+          {
+            "in": "query",
+            "name": "submittedAt",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "in": "query",
+            "name": "previousBlockNumber",
+            "required": false,
+            "schema": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" }
+          },
+          {
+            "in": "query",
+            "name": "previousBlockHash",
+            "required": false,
+            "schema": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": { "text/event-stream": { "schema": { "type": "string" } } },
+            "description": "Transaction progress and heartbeat frames"
+          },
+          "400": { "description": "Malformed transaction hash or progress context" }
+        },
+        "summary": "Stream current transaction progress with reconnect-safe snapshots",
+        "tags": ["transactions"]
+      }
+    },
     "/v1/webhooks": {
       "get": {
         "operationId": "WebhookController_list",

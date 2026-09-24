@@ -117,7 +117,12 @@ function requestTier(method: string, url: string): RateTier {
 
 export function endpointTimeoutMs(method: string, url: string): number | null {
   const path = url.split("?", 1)[0] ?? url;
-  if (path === "/v1/events/stream") return null;
+  if (
+    path === "/v1/events/stream" ||
+    /^\/v1\/transactions\/0x[0-9a-f]{64}\/progress\/stream$/.test(path)
+  ) {
+    return null;
+  }
   if (path.startsWith("/v1/auth/")) return API_AUTH_HANDLER_TIMEOUT_MS;
   if (path.startsWith("/v1/transactions/") && method === "POST") {
     return API_TRANSACTION_HANDLER_TIMEOUT_MS;

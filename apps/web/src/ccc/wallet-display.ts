@@ -17,3 +17,10 @@ export function ckbTestnetAddressUrl(address: string): string {
   const url = new URL(`/address/${encodeURIComponent(address)}`, CKB_TESTNET_EXPLORER_ORIGIN);
   return url.toString();
 }
+
+export function ckbTestnetTransactionUrl(transactionHash: string): string {
+  if (!/^0x[0-9a-f]{64}$/.test(transactionHash)) {
+    throw new TypeError("transactionHash must be a lowercase 32-byte hash");
+  }
+  return new URL(`/transaction/${transactionHash}`, CKB_TESTNET_EXPLORER_ORIGIN).toString();
+}

@@ -353,7 +353,8 @@
 }
 
 .setup-approval,
-.setup-submission {
+.setup-submission,
+.transaction-progress {
   display: grid;
   gap: var(--ui-space-5);
   max-width: 52rem;
@@ -424,8 +425,161 @@
   font-size: 0.8125rem;
 }
 
-.setup-submission__success {
+.transaction-progress {
+  border-left: 3px solid var(--ui-color-accent);
+  padding-left: var(--ui-space-4);
+}
+
+.transaction-progress--success {
+  border-left-color: var(--ui-color-success);
+}
+
+.transaction-progress--warning {
+  border-left-color: var(--ui-color-warning);
+}
+
+.transaction-progress--danger {
+  border-left-color: var(--ui-color-danger);
+}
+
+.transaction-progress__heading {
+  align-items: start;
+  display: grid;
+  gap: var(--ui-space-3);
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.transaction-progress__heading > div {
+  display: grid;
+  gap: var(--ui-space-2);
+  min-width: 0;
+}
+
+.transaction-progress__state-icon {
+  color: var(--ui-color-accent);
+  display: grid;
+}
+
+.transaction-progress--success .transaction-progress__state-icon {
   color: var(--ui-color-success);
+}
+
+.transaction-progress--warning .transaction-progress__state-icon {
+  color: var(--ui-color-warning);
+}
+
+.transaction-progress--danger .transaction-progress__state-icon {
+  color: var(--ui-color-danger);
+}
+
+.transaction-progress__eyebrow {
+  color: var(--ui-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.transaction-progress__steps {
+  display: grid;
+  gap: var(--ui-space-2);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.transaction-progress__steps li {
+  align-items: center;
+  border-top: 2px solid var(--ui-color-border);
+  color: var(--ui-color-text-muted);
+  display: flex;
+  font-size: 0.75rem;
+  gap: var(--ui-space-1);
+  min-width: 0;
+  padding-top: var(--ui-space-2);
+}
+
+.transaction-progress__steps li > span {
+  display: grid;
+  flex: 0 0 auto;
+}
+
+.transaction-progress__steps li.is-active,
+.transaction-progress__steps li.is-complete {
+  border-top-color: var(--ui-color-accent);
+  color: var(--ui-color-text);
+}
+
+.transaction-progress--success .transaction-progress__steps li.is-active {
+  border-top-color: var(--ui-color-success);
+  color: var(--ui-color-success);
+}
+
+.transaction-progress__facts {
+  border-bottom: 1px solid var(--ui-color-border);
+  border-top: 1px solid var(--ui-color-border);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+  padding: var(--ui-space-3) 0;
+}
+
+.transaction-progress__facts > div {
+  display: grid;
+  gap: var(--ui-space-1);
+}
+
+.transaction-progress__facts dt {
+  color: var(--ui-color-text-muted);
+  font-size: 0.75rem;
+}
+
+.transaction-progress__facts dd {
+  font-weight: 700;
+  margin: 0;
+}
+
+.transaction-progress__hash {
+  align-items: center;
+  display: flex;
+  gap: var(--ui-space-3);
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.transaction-progress__hash code {
+  font-family: var(--ui-font-mono);
+  font-size: 0.75rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.transaction-progress__hash a {
+  align-items: center;
+  color: var(--ui-color-accent);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  gap: var(--ui-space-1);
+}
+
+.transaction-progress__transport {
+  color: var(--ui-color-warning) !important;
+  font-size: 0.8125rem;
+}
+
+.transaction-progress-fixture__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+  min-width: 0;
+}
+
+.transaction-progress-fixture__controls .ui-button {
+  min-height: 2rem;
+  text-transform: capitalize;
 }
 
 @keyframes setup-review-spin {
@@ -499,6 +653,15 @@
 
   .setup-approval > .ui-button {
     justify-self: stretch;
+  }
+
+  .transaction-progress__steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .transaction-progress__hash {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 

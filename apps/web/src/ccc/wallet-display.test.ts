@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   CKB_TESTNET_EXPLORER_ORIGIN,
   ckbTestnetAddressUrl,
+  ckbTestnetTransactionUrl,
   formatCkbBalance,
   shortenCkbAddress,
 } from "./wallet-display.ts";
@@ -27,4 +28,9 @@ test("wallet explorer links cannot leave the public testnet explorer", () => {
   assert.equal(url.origin, CKB_TESTNET_EXPLORER_ORIGIN);
   assert.equal(url.pathname, "/address/ckt1%2Faddress%3Fnetwork%3Dmainnet");
   assert.equal(url.search, "");
+  assert.equal(
+    ckbTestnetTransactionUrl(`0x${"12".repeat(32)}`),
+    `${CKB_TESTNET_EXPLORER_ORIGIN}/transaction/0x${"12".repeat(32)}`,
+  );
+  assert.throws(() => ckbTestnetTransactionUrl("0x01"), /32-byte hash/);
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, RefreshCw, Send, ShieldCheck, WalletCards } from "lucide-react";
+import { RefreshCw, Send, ShieldCheck, WalletCards } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -26,6 +26,7 @@ import {
   writeSubmissionRecord,
   type SubmissionOutcome,
 } from "./submission-model.ts";
+import { TransactionProgressTracker } from "./transaction-progress.tsx";
 
 export type CreationSubmissionState =
   | { readonly key: string; readonly status: "idle" | "submitting" }
@@ -290,19 +291,10 @@ export function CreationApproval({
   }
   if (state.status === "submitted") {
     return (
-      <div className="setup-submission" data-submission-status="submitted">
-        <CheckCircle2 aria-hidden="true" className="setup-submission__success" size={24} />
-        <div>
-          <h2>{state.outcome.recovered ? "Submission recovered" : "Transaction submitted"}</h2>
-          <p>The exact reviewed transaction was accepted by the CKB testnet node.</p>
-          <code>{state.outcome.record.transactionHash}</code>
-          {state.outcome.persisted ? null : (
-            <InlineNotice title="Local recovery unavailable" tone="warning">
-              <p>Keep this transaction hash. Browser storage could not retain it.</p>
-            </InlineNotice>
-          )}
-        </div>
-      </div>
+      <TransactionProgressTracker
+        persisted={state.outcome.persisted}
+        record={state.outcome.record}
+      />
     );
   }
 
@@ -330,14 +322,5 @@ export function CreationSubmissionResult({ template }: Readonly<{ template: Setu
       </InlineNotice>
     );
   }
-  return (
-    <div className="setup-submission" data-submission-status="recovered">
-      <CheckCircle2 aria-hidden="true" className="setup-submission__success" size={24} />
-      <div>
-        <h2>Submission recorded</h2>
-        <p>The transaction hash remains available after navigation or reload.</p>
-        <code>{record.transactionHash}</code>
-      </div>
-    </div>
-  );
+  return <TransactionProgressTracker record={record} />;
 }

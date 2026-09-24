@@ -257,6 +257,40 @@ export type paths = {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/v1/transactions/{transactionHash}/progress": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /** Read current transaction progress from the canonical chain */
+        readonly get: operations["TransactionProgressController_get"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/v1/transactions/{transactionHash}/progress/stream": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /** Stream current transaction progress with reconnect-safe snapshots */
+        readonly get: operations["TransactionProgressController_stream"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/v1/transactions/cancel-job": {
         readonly parameters: {
             readonly query?: never;
@@ -1341,6 +1375,91 @@ export interface operations {
                         }[];
                     };
                 };
+            };
+        };
+    };
+    readonly TransactionProgressController_get: {
+        readonly parameters: {
+            readonly query: {
+                readonly previousBlockHash?: string;
+                readonly previousBlockNumber?: string;
+                readonly submittedAt: string;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly transactionHash: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        readonly block: {
+                            readonly hash: string;
+                            readonly number: string;
+                        } | null;
+                        readonly confirmations: string;
+                        /** Format: date-time */
+                        readonly observedAt: string;
+                        readonly reason: string | null;
+                        readonly requiredConfirmations: number;
+                        /** @enum {string} */
+                        readonly state: "submitted" | "proposed" | "committed" | "confirmed" | "dropped" | "conflicted" | "reorged";
+                        readonly transactionHash: string;
+                    };
+                };
+            };
+            /** @description Malformed transaction hash or progress context */
+            readonly 400: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description CKB progress read unavailable */
+            readonly 503: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly TransactionProgressController_stream: {
+        readonly parameters: {
+            readonly query: {
+                readonly previousBlockHash?: string;
+                readonly previousBlockNumber?: string;
+                readonly submittedAt: string;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly transactionHash: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Transaction progress and heartbeat frames */
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "text/event-stream": string;
+                };
+            };
+            /** @description Malformed transaction hash or progress context */
+            readonly 400: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

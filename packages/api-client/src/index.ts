@@ -17,6 +17,7 @@ export {
   type ApiSuccess,
   type ApiTemplates,
   type ApiTransactionBuild,
+  type ApiTransactionProgress,
   type ApiTransactionValidation,
   type ApiWebhookDelivery,
   type ApiWebhookList,

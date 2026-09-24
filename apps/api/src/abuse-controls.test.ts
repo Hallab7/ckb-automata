@@ -74,6 +74,14 @@ test("handler deadlines separate auth and transaction work and exempt event stre
   );
   assert.equal(endpointTimeoutMs("GET", "/v1/jobs"), API_DEFAULT_HANDLER_TIMEOUT_MS);
   assert.equal(endpointTimeoutMs("GET", "/v1/events/stream?jobId=value"), null);
+  assert.equal(
+    endpointTimeoutMs("GET", `/v1/transactions/0x${"11".repeat(32)}/progress/stream`),
+    null,
+  );
+  assert.equal(
+    endpointTimeoutMs("GET", "/v1/transactions/not-a-hash/progress/stream"),
+    API_DEFAULT_HANDLER_TIMEOUT_MS,
+  );
 });
 
 test("handler deadline emits a stable timeout response", async () => {

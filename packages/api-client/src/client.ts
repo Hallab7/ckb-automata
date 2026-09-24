@@ -38,6 +38,7 @@ export type ApiJobQuote = ApiSuccess<"JobQuoteController_get">;
 export type ApiTemplates = ApiSuccess<"TemplatesController_list">;
 export type ApiTransactionBuild = ApiSuccess<"TransactionController_createDeadline">;
 export type ApiTransactionValidation = ApiSuccess<"TransactionController_validateSigned">;
+export type ApiTransactionProgress = ApiSuccess<"TransactionProgressController_get">;
 export type ApiAuthChallenge = ApiSuccess<"AuthController_issue">;
 export type ApiAuthSession = ApiSuccess<"AuthController_verify">;
 export type ApiNotificationPreferences = ApiSuccess<"NotificationPreferencesController_get">;
@@ -249,6 +250,15 @@ export class AutomataApiClient {
     body: ApiRequestBody<"TransactionController_validateSigned">,
   ): Promise<ApiTransactionValidation> {
     return this.#post("v1/transactions/validate-signed", body);
+  }
+
+  getTransactionProgress(
+    transactionHash: string,
+    query: ApiQuery<"TransactionProgressController_get">,
+  ): Promise<ApiTransactionProgress> {
+    return this.#request(`v1/transactions/${encodeURIComponent(transactionHash)}/progress`, {
+      query,
+    });
   }
 
   #post<Result>(path: string, body: unknown): Promise<Result> {
