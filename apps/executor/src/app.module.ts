@@ -43,6 +43,17 @@ const DEFAULT_ADAPTERS = Object.freeze([
   RECURRING_EXECUTOR_ADAPTER,
 ] satisfies readonly RegisteredExecutorAdapter[]);
 
+function configuredAdapters(
+  environment: AutomataEnvironment,
+): readonly RegisteredExecutorAdapter[] {
+  const supported = new Set(
+    (environment.EXECUTOR_SUPPORTED_POLICIES ?? "deadline,recurring").split(","),
+  );
+  return Object.freeze(
+    DEFAULT_ADAPTERS.filter((adapter) => supported.has(adapter.registration.policy)),
+  );
+}
+
 // Nest uses the class identity as the root dependency-injection module token.
 // oxlint-disable-next-line typescript/no-extraneous-class
 export class ExecutorModule {}
@@ -66,7 +77,7 @@ export function createExecutorModule(
   environment: AutomataEnvironment,
   dependencies: ExecutorModuleDependencies,
 ): DynamicModule {
-  const adapters = Object.freeze([...(dependencies.adapters ?? DEFAULT_ADAPTERS)]);
+  const adapters = Object.freeze([...(dependencies.adapters ?? configuredAdapters(environment))]);
   const registrations = queueRegistrationOptions();
   const imports =
     dependencies.queues === undefined

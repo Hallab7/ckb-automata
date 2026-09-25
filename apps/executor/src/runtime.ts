@@ -11,6 +11,7 @@ export type ExecutorRuntimeState = "starting" | "ready" | "not_ready" | "drainin
 
 export interface ExecutorReadinessReport {
   readonly status: ExecutorRuntimeState;
+  readonly instanceId: string;
   readonly network: string;
   readonly activeWork: number;
   readonly adapters: readonly string[];
@@ -112,6 +113,7 @@ export class ExecutorRuntime implements OnApplicationBootstrap, OnModuleDestroy 
   readiness(): ExecutorReadinessReport {
     return Object.freeze({
       status: this.#state,
+      instanceId: this.#environment.EXECUTOR_INSTANCE_ID ?? "executor-local",
       network: this.#environment.CKB_NETWORK,
       activeWork: this.#activeWork,
       adapters: this.#adapterIds,
@@ -137,6 +139,7 @@ export class ExecutorRuntime implements OnApplicationBootstrap, OnModuleDestroy 
       this.#lifetimeHandle = setInterval(() => undefined, 60_000);
       this.#logger.info("executor.ready", "Executor is ready", {
         adapters: this.#adapterIds,
+        instanceId: this.#environment.EXECUTOR_INSTANCE_ID ?? "executor-local",
         network: this.#environment.CKB_NETWORK,
       });
     } catch (error) {

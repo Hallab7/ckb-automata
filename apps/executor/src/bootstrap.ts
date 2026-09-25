@@ -5,6 +5,7 @@ import { parseEnvironment, type AutomataEnvironment } from "@ckb-automata/config
 import { CorrelatedLogger, type LogWriter } from "@ckb-automata/telemetry";
 
 import { createExecutorModule, type ExecutorModuleDependencies } from "./app.module.ts";
+import { startExecutorHealthServer, type ExecutorHealthServer } from "./health.ts";
 import { ExecutorRuntime, type ExecutorEventLogger } from "./runtime.ts";
 
 const SERVICE_NAME = "ckb-automata-executor";
@@ -91,6 +92,7 @@ export interface ExecutorBootstrapResult {
   readonly app: INestApplicationContext;
   readonly environment: AutomataEnvironment;
   readonly runtime: ExecutorRuntime;
+  readonly healthServer?: ExecutorHealthServer;
 }
 
 export interface ExecutorBootstrapDependencies {
@@ -110,6 +112,12 @@ export interface ExecutorBootstrapDependencies {
   readonly writer?: LogWriter;
 }
 
+export function executorQueuePrefix(environment: AutomataEnvironment): string | undefined {
+  return environment.EXECUTOR_INSTANCE_ID === undefined
+    ? undefined
+    : `ckb-automata:${environment.EXECUTOR_INSTANCE_ID}`;
+}
+
 async function createNestApplicationContext(
   module: EntryNestModule,
   logger: LoggerService,
@@ -127,6 +135,7 @@ export async function createExecutorApplication(
 ): Promise<ExecutorBootstrapResult> {
   const environment = parseEnvironment(input);
   const logger = dependencies.logger ?? new ExecutorLogger(environment, dependencies.writer);
+  const queuePrefix = dependencies.queuePrefix ?? executorQueuePrefix(environment);
   const module = createExecutorModule(environment, {
     logger,
     ...(dependencies.createChainClient === undefined
@@ -147,7 +156,7 @@ export async function createExecutorApplication(
     ...(dependencies.enableSimulationWorkers === undefined
       ? {}
       : { enableSimulationWorkers: dependencies.enableSimulationWorkers }),
-    ...(dependencies.queuePrefix === undefined ? {} : { queuePrefix: dependencies.queuePrefix }),
+    ...(queuePrefix === undefined ? {} : { queuePrefix }),
     ...(dependencies.queues === undefined ? {} : { queues: dependencies.queues }),
   });
   const app = await (dependencies.createApplicationContext ?? createNestApplicationContext)(
@@ -166,10 +175,33 @@ export async function startExecutor(
   input: Readonly<Record<string, string | undefined>> = process.env,
   dependencies: ExecutorBootstrapDependencies = {},
 ): Promise<ExecutorBootstrapResult> {
-  return createExecutorApplication(input, {
+  const result = await createExecutorApplication(input, {
     ...dependencies,
     enableBuildWorkers: dependencies.enableBuildWorkers ?? true,
     enableConfirmationWorkers: dependencies.enableConfirmationWorkers ?? true,
     enableSimulationWorkers: dependencies.enableSimulationWorkers ?? true,
   });
+  const rawPort = input["PORT"];
+  if (rawPort === undefined) return result;
+  if (!/^[1-9][0-9]*$/.test(rawPort) || Number(rawPort) > 65_535) {
+    await result.app.close();
+    throw new Error("PORT must be an integer between 1 and 65535");
+  }
+  if (
+    result.environment.AUTOMATA_PROFILE === "testnet-public" &&
+    result.environment.EXECUTOR_INSTANCE_ID === undefined
+  ) {
+    await result.app.close();
+    throw new Error("public executor instance identity is required");
+  }
+  try {
+    const healthServer = await startExecutorHealthServer(result.runtime, Number(rawPort));
+    for (const signal of ["SIGINT", "SIGTERM"] as const) {
+      process.once(signal, () => void healthServer.close());
+    }
+    return Object.freeze({ ...result, healthServer });
+  } catch (error) {
+    await result.app.close();
+    throw error;
+  }
 }

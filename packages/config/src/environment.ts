@@ -17,6 +17,8 @@ export const AUTOMATA_ENV_KEYS = [
   "EXECUTOR_FEE_PRIVATE_KEY",
   "EXECUTOR_MAX_CYCLES",
   "EXECUTOR_MIN_MARGIN",
+  "EXECUTOR_INSTANCE_ID",
+  "EXECUTOR_SUPPORTED_POLICIES",
   "PUBLIC_APP_ORIGIN",
   "WEBHOOK_ENCRYPTION_KEY",
   "ERROR_TRACKING_DSN",
@@ -80,6 +82,17 @@ const commonFields = {
       .string()
       .regex(/^(0|[1-9][0-9]*)$/, "must be a canonical decimal shannon amount")
       .optional(),
+  ),
+  EXECUTOR_INSTANCE_ID: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9_-]{0,63}$/, "must be a stable lowercase identifier")
+      .optional(),
+  ),
+  EXECUTOR_SUPPORTED_POLICIES: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.enum(["deadline", "recurring", "deadline,recurring", "recurring,deadline"]).optional(),
   ),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.preprocess(
     (value) => (value === "" || value === "local-placeholder-disabled" ? undefined : value),

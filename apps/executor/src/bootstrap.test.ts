@@ -3,7 +3,12 @@ import test from "node:test";
 
 import { parseHash32 } from "@ckb-automata/core";
 
-import { ExecutorLogger, createExecutorApplication, startExecutor } from "./bootstrap.ts";
+import {
+  ExecutorLogger,
+  createExecutorApplication,
+  executorQueuePrefix,
+  startExecutor,
+} from "./bootstrap.ts";
 import { parseEnvironment } from "@ckb-automata/config";
 
 const GENESIS_HASH = parseHash32(`0x${"1".repeat(64)}`);
@@ -82,6 +87,7 @@ test("standalone context reports readiness without creating an HTTP listener", a
     assert.equal("listen" in result.app, false);
     assert.deepEqual(result.runtime.readiness(), {
       status: "ready",
+      instanceId: "executor-local",
       network: "ckb_dev",
       activeWork: 0,
       adapters: ["deadline-v1", "recurring-v1"],
@@ -96,6 +102,46 @@ test("standalone context reports readiness without creating an HTTP listener", a
     await result.app.close();
   }
   assert.equal(chain.closes(), 1);
+});
+
+test("public operators derive isolated durable queue namespaces", () => {
+  assert.equal(
+    executorQueuePrefix(parseEnvironment(environment({ EXECUTOR_INSTANCE_ID: "operator-a" }))),
+    "ckb-automata:operator-a",
+  );
+  assert.equal(executorQueuePrefix(parseEnvironment(environment())), undefined);
+});
+
+test("deployed entrypoint exposes instance-bound health", async () => {
+  const chain = chainFixture();
+  const result = await startExecutor(
+    environment({
+      PORT: "45182",
+      EXECUTOR_INSTANCE_ID: "operator-a",
+      EXECUTOR_LOCK_ARGS: `0x${"12".repeat(20)}`,
+      EXECUTOR_TRANSACTION_FEE: "1000000",
+      EXECUTOR_FEE_PRIVATE_KEY: `0x${"01".repeat(32)}`,
+      EXECUTOR_MAX_CYCLES: "10000000",
+      EXECUTOR_MIN_MARGIN: "1000000",
+    }),
+    {
+      createChainClient: () => chain.client,
+      enableBuildWorkers: false,
+      enableConfirmationWorkers: false,
+      enableEligibilityWorkers: false,
+      enableSimulationWorkers: false,
+      queues: readyQueues,
+      writer: () => undefined,
+    },
+  );
+  try {
+    const response = await fetch("http://127.0.0.1:45182/health/ready");
+    assert.equal(response.status, 200);
+    assert.equal(((await response.json()) as { instanceId: string }).instanceId, "operator-a");
+  } finally {
+    await result.healthServer?.close();
+    await result.app.close();
+  }
 });
 
 test("shutdown rejects new work and waits for active work before closing the chain", async () => {
