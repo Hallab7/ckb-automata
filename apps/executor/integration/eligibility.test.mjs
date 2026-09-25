@@ -16,6 +16,8 @@ import {
 import { AUTOMATA_QUEUES } from "@ckb-automata/telemetry";
 
 import { migrateDatabase } from "../../api/src/database/migrator.ts";
+import { DatabaseClient } from "../../api/src/database/client.ts";
+import { PostgresLockResolutionRecorder } from "../../api/src/lock-resolutions.ts";
 import { PostgresBuildAttemptStore } from "../src/build-store.ts";
 import { PostgresConfirmationStore } from "../src/confirmation-store.ts";
 import { ConfirmationService } from "../src/confirmation.ts";
@@ -241,9 +243,21 @@ test("concurrent build deliveries share one durable operational attempt", async 
   let simulationStore;
   let submissionStore;
   let confirmationStore;
+  let databaseClient;
   try {
     const job = await seedJob(database.url);
     store = new PostgresBuildAttemptStore(database.url, deployment.network);
+    databaseClient = DatabaseClient.open(database.url);
+    const resolvedLock = {
+      codeHash: hash(90),
+      hashType: "type",
+      args: "0xab",
+    };
+    await new PostgresLockResolutionRecorder(databaseClient.database, deployment.network).remember([
+      resolvedLock,
+      resolvedLock,
+    ]);
+    assert.deepEqual(await store.loadResolvedLocks(), [resolvedLock]);
     const payload = {
       ...job,
       adapterId: "recurring-v1",
@@ -407,6 +421,7 @@ test("concurrent build deliveries share one durable operational attempt", async 
       await sql.end({ timeout: 2 });
     }
   } finally {
+    if (databaseClient) await databaseClient.close();
     if (confirmationStore) await confirmationStore.close();
     if (submissionStore) await submissionStore.close();
     if (simulationStore) await simulationStore.close();

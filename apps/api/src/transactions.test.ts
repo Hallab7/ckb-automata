@@ -4,9 +4,13 @@ import test from "node:test";
 
 import type { LoggerService } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import { scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
+
+import { parseHash32, type ScriptIdentity } from "@ckb-automata/core";
 
 import { createApiApplication } from "./bootstrap.ts";
 import { CkbClientError } from "./ckb-client.ts";
+import { LockResolutionStoreError } from "./lock-resolutions.ts";
 import { TransactionBuildService } from "./transactions.ts";
 
 const quietLogger: LoggerService = {
@@ -15,6 +19,33 @@ const quietLogger: LoggerService = {
   error: () => undefined,
   warn: () => undefined,
 };
+
+const OWNER_LOCK: ScriptIdentity = Object.freeze({
+  codeHash: parseHash32(`0x${"a".repeat(64)}`),
+  hashType: "type",
+  args: "0x01",
+});
+const RECIPIENT_LOCK: ScriptIdentity = Object.freeze({
+  codeHash: parseHash32(`0x${"b".repeat(64)}`),
+  hashType: "type",
+  args: "0x02",
+});
+const noOpResolutionRecorder = Object.freeze({
+  remember: async () => undefined,
+});
+
+function recurringCreation(value: Readonly<Record<string, unknown>>) {
+  return {
+    ...value,
+    ownerLockHash: scriptToHash(OWNER_LOCK),
+    recipientLockHash: scriptToHash(RECIPIENT_LOCK),
+    lockResolutions: [OWNER_LOCK, RECIPIENT_LOCK],
+  };
+}
+
+function withUnverifiedResolution(value: Readonly<Record<string, unknown>>) {
+  return { ...value, lockResolutions: [OWNER_LOCK] };
+}
 
 function environment() {
   return {
@@ -155,18 +186,53 @@ test("creation builds remain reviewable for thirty canonical blocks", async () =
       "utf8",
     ),
   ) as RecurringValidationFixture;
+  const remembered: ScriptIdentity[][] = [];
   const service = new TransactionBuildService(
     {} as never,
     {
       getTipHeader: async () => ({ hash: `0x${"a".repeat(64)}`, number: 100n }),
     } as never,
     environment().CKB_GENESIS_HASH,
+    { remember: async (locks) => void remembered.push([...locks]) },
   );
-  const artifact = await service.construct("create_recurring_job", fixture.valid);
+  const artifact = await service.construct(
+    "create_recurring_job",
+    recurringCreation(fixture.valid),
+  );
   assert.deepEqual(artifact.quoteExpiry, {
     afterBlock: "130",
     condition: "canonical_snapshot_window",
   });
+  assert.deepEqual(remembered, []);
+});
+
+test("creation rejects missing, incomplete, and unrelated lock resolutions", async () => {
+  const fixture = JSON.parse(
+    await readFile(
+      new URL("../../../contracts/fixtures/recurring_request_validation_v1.json", import.meta.url),
+      "utf8",
+    ),
+  ) as RecurringValidationFixture;
+  const service = new TransactionBuildService(
+    {} as never,
+    { getTipHeader: async () => ({ hash: `0x${"a".repeat(64)}`, number: 100n }) } as never,
+    environment().CKB_GENESIS_HASH,
+    noOpResolutionRecorder,
+  );
+  const valid = recurringCreation(fixture.valid);
+  for (const request of [
+    { ...valid, lockResolutions: undefined },
+    { ...valid, lockResolutions: [OWNER_LOCK] },
+    {
+      ...valid,
+      lockResolutions: [OWNER_LOCK, RECIPIENT_LOCK, { ...RECIPIENT_LOCK, args: "0x03" }],
+    },
+  ]) {
+    await assert.rejects(service.construct("create_recurring_job", request), (error: unknown) => {
+      assert.equal((error as { getStatus(): number }).getStatus(), 400);
+      return true;
+    });
+  }
 });
 
 test("signed creation validation accepts canonical tip advances and rejects expiry or reorg", async () => {
@@ -179,6 +245,8 @@ test("signed creation validation accepts canonical tip advances and rejects expi
   const reviewedHash = `0x${"a".repeat(64)}`;
   let tip = 100n;
   let canonicalHash = reviewedHash;
+  let resolutionStoreAvailable = true;
+  const remembered: ScriptIdentity[][] = [];
   const service = new TransactionBuildService(
     {} as never,
     {
@@ -190,8 +258,15 @@ test("signed creation validation accepts canonical tip advances and rejects expi
       }),
     } as never,
     environment().CKB_GENESIS_HASH,
+    {
+      remember: async (locks) => {
+        if (!resolutionStoreAvailable) throw new LockResolutionStoreError(new Error("offline"));
+        remembered.push([...locks]);
+      },
+    },
   );
-  const artifact = await service.construct("create_recurring_job", fixture.valid);
+  const recurringRequest = recurringCreation(fixture.valid);
+  const artifact = await service.construct("create_recurring_job", recurringRequest);
   const completed = {
     ...artifact.transaction,
     inputs: [
@@ -205,7 +280,7 @@ test("signed creation validation accepts canonical tip advances and rejects expi
     intentHash: artifact.intentHash,
     operation: artifact.operation,
     policyCriticalHash: artifact.policyCriticalHash,
-    request: fixture.valid,
+    request: recurringRequest,
     reviewContext: {
       chainSnapshot: artifact.chainSnapshot,
       quoteExpiry: artifact.quoteExpiry,
@@ -217,6 +292,7 @@ test("signed creation validation accepts canonical tip advances and rejects expi
   const validation = await service.validate(request);
   assert.equal(validation.policyCriticalHash, artifact.policyCriticalHash);
   assert.equal(validation.dryRunCycles, "123");
+  assert.deepEqual(remembered, [[OWNER_LOCK, RECIPIENT_LOCK]]);
 
   tip = 131n;
   await assert.rejects(service.validate(request), (error: unknown) => {
@@ -230,6 +306,18 @@ test("signed creation validation accepts canonical tip advances and rejects expi
     assert.equal((error as { getStatus(): number }).getStatus(), 409);
     return true;
   });
+
+  canonicalHash = reviewedHash;
+  resolutionStoreAvailable = false;
+  await assert.rejects(service.validate(request), (error: unknown) => {
+    const response = error as {
+      getStatus(): number;
+      getResponse(): { code: string };
+    };
+    assert.equal(response.getStatus(), 503);
+    assert.equal(response.getResponse().code, "LOCK_RESOLUTION_STORE_UNAVAILABLE");
+    return true;
+  });
 });
 
 test("chain read failures remain service outages instead of request errors", async () => {
@@ -241,18 +329,22 @@ test("chain read failures remain service outages instead of request errors", asy
       },
     } as never,
     environment().CKB_GENESIS_HASH,
+    noOpResolutionRecorder,
   );
   await assert.rejects(
-    service.construct("create_recurring_job", {
-      ownerLockHash: `0x${"1".repeat(64)}`,
-      recipientLockHash: `0x${"2".repeat(64)}`,
-      amount: "10000000000",
-      intervalBlocks: "10",
-      firstNotBefore: "500",
-      totalRuns: "2",
-      reward: "10000000000",
-      creatorNonce: "1",
-    }),
+    service.construct(
+      "create_recurring_job",
+      recurringCreation({
+        ownerLockHash: `0x${"1".repeat(64)}`,
+        recipientLockHash: `0x${"2".repeat(64)}`,
+        amount: "10000000000",
+        intervalBlocks: "10",
+        firstNotBefore: "500",
+        totalRuns: "2",
+        reward: "10000000000",
+        creatorNonce: "1",
+      }),
+    ),
     (error: unknown) => {
       assert.equal(
         (error as { getStatus(): number; getResponse(): { code: string } }).getStatus(),
@@ -277,10 +369,14 @@ test("deadline endpoint rejects every shared invalid request fixture", async () 
       },
     } as never,
     environment().CKB_GENESIS_HASH,
+    noOpResolutionRecorder,
   );
   for (const invalid of fixture.invalid) {
     await assert.rejects(
-      service.construct("create_deadline_job", invalidDeadlineRequest(fixture.valid, invalid)),
+      service.construct(
+        "create_deadline_job",
+        withUnverifiedResolution(invalidDeadlineRequest(fixture.valid, invalid)),
+      ),
       (error: unknown) => {
         const response = error as {
           getStatus(): number;
@@ -309,10 +405,14 @@ test("recurring endpoint rejects every shared invalid request fixture", async ()
       },
     } as never,
     environment().CKB_GENESIS_HASH,
+    noOpResolutionRecorder,
   );
   for (const invalid of fixture.invalid) {
     await assert.rejects(
-      service.construct("create_recurring_job", { ...fixture.valid, ...invalid.patch }),
+      service.construct(
+        "create_recurring_job",
+        withUnverifiedResolution({ ...fixture.valid, ...invalid.patch }),
+      ),
       (error: unknown) => {
         const response = error as {
           getStatus(): number;

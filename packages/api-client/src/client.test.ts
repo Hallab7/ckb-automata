@@ -75,6 +75,13 @@ test("serializes generated transaction request bodies", async () => {
     creatorNonce: `0x${"01".repeat(32)}`,
     firstNotBefore: "200",
     intervalBlocks: "10",
+    lockResolutions: [
+      {
+        codeHash: `0x${"04".repeat(32)}`,
+        hashType: "type",
+        args: "0x05",
+      },
+    ],
     ownerLockHash: `0x${"02".repeat(32)}`,
     recipientLockHash: `0x${"03".repeat(32)}`,
     reward: "20",

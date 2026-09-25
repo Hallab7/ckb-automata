@@ -1793,6 +1793,12 @@ export interface operations {
                     readonly cancelLockHash: string;
                     readonly creatorNonce: string;
                     readonly deadlineBlock: string;
+                    readonly lockResolutions: readonly {
+                        readonly args: string;
+                        readonly codeHash: string;
+                        /** @enum {string} */
+                        readonly hashType: "data" | "data1" | "type";
+                    }[];
                     readonly pledges: readonly {
                         readonly amount: string;
                         readonly outPoint: {
@@ -1911,6 +1917,12 @@ export interface operations {
                     readonly creatorNonce: string;
                     readonly firstNotBefore: string;
                     readonly intervalBlocks: string;
+                    readonly lockResolutions: readonly {
+                        readonly args: string;
+                        readonly codeHash: string;
+                        /** @enum {string} */
+                        readonly hashType: "data" | "data1" | "type";
+                    }[];
                     readonly ownerLockHash: string;
                     readonly recipientLockHash: string;
                     readonly reward: string;
@@ -2253,6 +2265,12 @@ export interface operations {
                         readonly cancelLockHash: string;
                         readonly creatorNonce: string;
                         readonly deadlineBlock: string;
+                        readonly lockResolutions: readonly {
+                            readonly args: string;
+                            readonly codeHash: string;
+                            /** @enum {string} */
+                            readonly hashType: "data" | "data1" | "type";
+                        }[];
                         readonly pledges: readonly {
                             readonly amount: string;
                             readonly outPoint: {
@@ -2269,6 +2287,12 @@ export interface operations {
                         readonly creatorNonce: string;
                         readonly firstNotBefore: string;
                         readonly intervalBlocks: string;
+                        readonly lockResolutions: readonly {
+                            readonly args: string;
+                            readonly codeHash: string;
+                            /** @enum {string} */
+                            readonly hashType: "data" | "data1" | "type";
+                        }[];
                         readonly ownerLockHash: string;
                         readonly recipientLockHash: string;
                         readonly reward: string;

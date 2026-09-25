@@ -180,6 +180,10 @@ export function createExecutorModule(
                 hashType: secp.hashType,
                 args: lockArgs as `0x${string}`,
               });
+              const store = new PostgresBuildAttemptStore(
+                configured.DATABASE_URL,
+                configured.CKB_NETWORK,
+              );
               return new BuildCoordinator({
                 runtime,
                 queues,
@@ -192,11 +196,9 @@ export function createExecutorModule(
                   deployment: loaded.deployment,
                   runtime,
                   rewardLock,
+                  resolutions: store,
                 }),
-                store: new PostgresBuildAttemptStore(
-                  configured.DATABASE_URL,
-                  configured.CKB_NETWORK,
-                ),
+                store,
                 redisUrl: configured.REDIS_URL,
                 logger,
                 ...(dependencies.queuePrefix === undefined

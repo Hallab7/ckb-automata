@@ -333,6 +333,13 @@ function WalletSessionBridge({ children }: Readonly<{ children: ReactNode }>) {
       open: () => connector.open(),
       ownerLockHash: status === "ready" ? currentDetails.ownerLockHash : undefined,
       refreshDetails: () => setRefreshKey((current) => current + 1),
+      resolveLock: async (addressValue) => {
+        const address = await ccc.Address.fromString(
+          addressValue.trim(),
+          signer?.client ?? connector.client,
+        );
+        return reviewedScript(address.script);
+      },
       resolveLockHash: async (addressValue) => {
         const address = await ccc.Address.fromString(
           addressValue.trim(),

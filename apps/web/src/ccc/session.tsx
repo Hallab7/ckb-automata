@@ -25,6 +25,7 @@ export interface WalletSession {
   readonly open: () => void;
   readonly ownerLockHash: string | undefined;
   readonly refreshDetails: () => void;
+  readonly resolveLock: (address: string) => Promise<ScriptIdentity>;
   readonly resolveLockHash: (address: string) => Promise<string>;
   readonly resolveReviewInput: (
     input: UnsignedDeadlineTransaction["inputs"][number],

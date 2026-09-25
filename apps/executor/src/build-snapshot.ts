@@ -19,6 +19,10 @@ import type { ExecutorRuntime } from "./runtime.ts";
 const MAX_LINEAGE_DEPTH = 128;
 const MAX_FEE_CELLS = 100;
 
+export interface LockResolutionSource {
+  loadResolvedLocks(): Promise<readonly ScriptIdentity[]>;
+}
+
 type ChainCell = Awaited<ReturnType<ExecutorRuntime["getCellLive"]>>;
 
 export function chainScriptIdentity(value: {
@@ -113,15 +117,18 @@ export class ChainBuildSnapshotSource implements BuildSnapshotSource {
   readonly #deployment: RegisteredDeployment;
   readonly #runtime: ExecutorRuntime;
   readonly #rewardLock: ScriptIdentity;
+  readonly #resolutions: LockResolutionSource;
 
   constructor(options: {
     readonly deployment: RegisteredDeployment;
     readonly runtime: ExecutorRuntime;
     readonly rewardLock: ScriptIdentity;
+    readonly resolutions: LockResolutionSource;
   }) {
     this.#deployment = options.deployment;
     this.#runtime = options.runtime;
     this.#rewardLock = options.rewardLock;
+    this.#resolutions = options.resolutions;
   }
 
   async reload(record: EligibilityJobRecord): Promise<ExecutorSnapshot | undefined> {
@@ -218,6 +225,7 @@ export class ChainBuildSnapshotSource implements BuildSnapshotSource {
       locks.set(stable(normalized), normalized);
     };
     add(this.#rewardLock);
+    for (const lock of await this.#resolutions.loadResolvedLocks()) add(lock);
     for (const response of lineage) {
       for (const output of response.transaction.outputs) add(output.lock);
       for (const input of response.transaction.inputs) {

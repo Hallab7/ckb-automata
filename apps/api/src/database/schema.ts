@@ -45,6 +45,28 @@ export const networks = pgTable(
   ],
 );
 
+export const lockResolutions = pgTable(
+  "lock_resolutions",
+  {
+    networkId: varchar("network_id", { length: 64 })
+      .notNull()
+      .references(() => networks.id, { onDelete: "cascade" }),
+    lockHash: hash("lock_hash").notNull(),
+    codeHash: hash("code_hash").notNull(),
+    hashType: varchar("hash_type", { length: 5 }).notNull(),
+    args: text("args").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.networkId, table.lockHash] }),
+    check("lock_resolutions_lock_hash_ck", sql`${table.lockHash} ~ '^0x[0-9a-f]{64}$'`),
+    check("lock_resolutions_code_hash_ck", sql`${table.codeHash} ~ '^0x[0-9a-f]{64}$'`),
+    check("lock_resolutions_hash_type_ck", sql`${table.hashType} IN ('data', 'type', 'data1')`),
+    check("lock_resolutions_args_ck", sql`${table.args} ~ '^0x(?:[0-9a-f]{2})*$'`),
+  ],
+);
+
 export const scriptDeployments = pgTable(
   "script_deployments",
   {
@@ -608,6 +630,7 @@ export const schema = {
   jobEvents,
   jobVersions,
   jobs,
+  lockResolutions,
   networks,
   notificationPreferences,
   notificationSubscriptions,

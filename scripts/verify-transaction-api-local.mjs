@@ -69,6 +69,7 @@ const live = funding.live;
 const request = {
   ownerLockHash,
   recipientLockHash: ownerLockHash,
+  lockResolutions: [ownerLock],
   amount: "10000000000",
   intervalBlocks: "10",
   firstNotBefore: (BigInt(tip.number) + 20n).toString(),

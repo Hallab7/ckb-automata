@@ -1,6 +1,7 @@
 import postgres from "postgres";
+import { scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
 
-import { parseHash32, parseSequence, type Hash32 } from "@ckb-automata/core";
+import { parseHash32, parseSequence, type Hash32, type ScriptIdentity } from "@ckb-automata/core";
 
 import {
   BUILD_CLAIM_LEASE_MS,
@@ -16,6 +17,13 @@ interface AttemptRow {
   readonly id: string;
   readonly intent_hash: string | null;
   readonly build_claim_expires_at: Date | null;
+}
+
+interface LockResolutionRow {
+  readonly lock_hash: string;
+  readonly code_hash: string;
+  readonly hash_type: string;
+  readonly args: string;
 }
 
 export class PostgresBuildAttemptStore implements BuildAttemptStore {
@@ -124,6 +132,34 @@ export class PostgresBuildAttemptStore implements BuildAttemptStore {
         }),
       });
     });
+  }
+
+  async loadResolvedLocks(): Promise<readonly ScriptIdentity[]> {
+    const rows = await this.#sql<LockResolutionRow[]>`
+      SELECT lock_hash, code_hash, hash_type, args
+      FROM lock_resolutions
+      WHERE network_id = ${this.#network}
+      ORDER BY lock_hash
+    `;
+    return Object.freeze(
+      rows.map((row) => {
+        if (row.hash_type !== "data" && row.hash_type !== "data1" && row.hash_type !== "type") {
+          throw new TypeError("stored lock resolution hash type is unsupported");
+        }
+        if (!/^0x(?:[0-9a-f]{2})*$/.test(row.args)) {
+          throw new TypeError("stored lock resolution args are invalid");
+        }
+        const lock = Object.freeze({
+          codeHash: parseHash32(row.code_hash),
+          hashType: row.hash_type,
+          args: row.args as `0x${string}`,
+        });
+        if (parseHash32(scriptToHash(lock)) !== parseHash32(row.lock_hash)) {
+          throw new Error("stored lock resolution does not match its script hash");
+        }
+        return lock;
+      }),
+    );
   }
 
   async complete(

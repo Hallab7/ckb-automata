@@ -23,6 +23,7 @@ import {
   ApiTags,
   ApiUnprocessableEntityResponse,
 } from "@nestjs/swagger";
+import { scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
 
 import {
   CREATION_REVIEW_EXPIRY_CONDITION,
@@ -53,6 +54,7 @@ import {
 } from "@ckb-automata/core";
 
 import { CkbClientError, type CkbClient } from "./ckb-client.ts";
+import { LockResolutionStoreError, type LockResolutionRecorder } from "./lock-resolutions.ts";
 import { JOB_QUOTE_ASSUMPTIONS, JobQuoteService, type JobQuote } from "./quotes.ts";
 
 const HASH_PATTERN = /^0x[0-9a-f]{64}$/;
@@ -102,6 +104,7 @@ export interface SignedTransactionValidation {
 interface BuiltArtifact {
   readonly response: TransactionBuildResponse;
   readonly assertCompletion: (transaction: UnsignedDeadlineTransaction) => void;
+  readonly lockResolutions?: readonly ScriptIdentity[];
 }
 
 function record(value: unknown, name: string): Record<string, unknown> {
@@ -159,6 +162,49 @@ function script(value: unknown, name: string): ScriptIdentity {
     hashType,
     args: bytes(parsed["args"], `${name}.args`),
   });
+}
+
+function creationInput(
+  value: unknown,
+  name: string,
+): { readonly request: Record<string, unknown>; readonly resolutions: readonly ScriptIdentity[] } {
+  const parsed = record(value, name);
+  const values = parsed["lockResolutions"];
+  if (!Array.isArray(values) || values.length === 0 || values.length > 32) {
+    throw new TypeError(`${name}.lockResolutions must contain between one and 32 scripts`);
+  }
+  return Object.freeze({
+    request: Object.fromEntries(
+      Object.entries(parsed).filter(([key]) => key !== "lockResolutions"),
+    ),
+    resolutions: Object.freeze(
+      values.map((item, index) => script(item, `${name}.lockResolutions[${index}]`)),
+    ),
+  });
+}
+
+function verifiedResolutions(
+  values: readonly ScriptIdentity[],
+  requiredHashes: readonly string[],
+): readonly ScriptIdentity[] {
+  const required = new Set(requiredHashes.map((value) => parseHash32(value)));
+  const resolved = new Map<string, ScriptIdentity>();
+  for (const value of values) {
+    const lockHash = parseHash32(scriptToHash(value));
+    if (!required.has(lockHash)) {
+      throw new TypeError("lockResolutions contains a script that is not used by this automation");
+    }
+    const existing = resolved.get(lockHash);
+    if (existing && JSON.stringify(existing) !== JSON.stringify(value)) {
+      throw new TypeError("lockResolutions contains conflicting scripts for one hash");
+    }
+    resolved.set(lockHash, value);
+  }
+  const missing = [...required].filter((lockHash) => !resolved.has(lockHash));
+  if (missing.length > 0) {
+    throw new TypeError("lockResolutions must resolve every recipient and recovery address");
+  }
+  return Object.freeze([...resolved.values()]);
 }
 
 function parseTransaction(value: unknown): UnsignedDeadlineTransaction {
@@ -432,12 +478,19 @@ export class TransactionBuildService {
   readonly #quotes: JobQuoteService;
   readonly #chain: TransactionChainClient;
   readonly #genesisHash: string;
+  readonly #resolutions: LockResolutionRecorder;
   #deployment: Promise<RegisteredDeployment> | undefined;
 
-  constructor(quotes: JobQuoteService, chain: TransactionChainClient, genesisHash: string) {
+  constructor(
+    quotes: JobQuoteService,
+    chain: TransactionChainClient,
+    genesisHash: string,
+    resolutions: LockResolutionRecorder,
+  ) {
     this.#quotes = quotes;
     this.#chain = chain;
     this.#genesisHash = genesisHash;
+    this.#resolutions = resolutions;
   }
 
   #loadDeployment(): Promise<RegisteredDeployment> {
@@ -558,6 +611,13 @@ export class TransactionBuildService {
         { cause: error },
       );
     }
+    if (artifact.lockResolutions) {
+      try {
+        await this.#resolutions.remember(artifact.lockResolutions);
+      } catch (error) {
+        return this.#mapBuildError(error);
+      }
+    }
     return Object.freeze({
       valid: true,
       operation,
@@ -632,7 +692,13 @@ export class TransactionBuildService {
   }
 
   async #deadline(input: unknown, deployment: RegisteredDeployment): Promise<BuiltArtifact> {
-    const request = parseDeadlineCreationRequest(input);
+    const creation = creationInput(input, "deadline creation request");
+    const request = parseDeadlineCreationRequest(creation.request);
+    const resolutions = verifiedResolutions(creation.resolutions, [
+      request.successLockHash,
+      request.cancelLockHash,
+      ...request.pledges.map(({ refundLockHash }) => refundLockHash),
+    ]);
     const build = buildDeadlineCreation({
       deployment,
       pledges: request.pledges,
@@ -657,13 +723,19 @@ export class TransactionBuildService {
     });
     return Object.freeze({
       response,
+      lockResolutions: resolutions,
       assertCompletion: (transaction: UnsignedDeadlineTransaction) =>
         assertDeadlineCompletion(build, transaction),
     });
   }
 
   async #recurring(input: unknown, deployment: RegisteredDeployment): Promise<BuiltArtifact> {
-    const request = parseRecurringCreationRequest(input);
+    const creation = creationInput(input, "recurring creation request");
+    const request = parseRecurringCreationRequest(creation.request);
+    const resolutions = verifiedResolutions(creation.resolutions, [
+      request.ownerLockHash,
+      request.recipientLockHash,
+    ]);
     const build = buildRecurringCreation({
       deployment,
       ownerLockHash: request.ownerLockHash,
@@ -689,6 +761,7 @@ export class TransactionBuildService {
     });
     return Object.freeze({
       response,
+      lockResolutions: resolutions,
       assertCompletion: (transaction: UnsignedDeadlineTransaction) =>
         assertRecurringCompletion(build, transaction),
     });
@@ -826,6 +899,12 @@ export class TransactionBuildService {
   #mapBuildError(error: unknown): never {
     if (error instanceof HttpException) throw error;
     if (error instanceof CkbClientError) {
+      throw new ServiceUnavailableException(
+        { status: "unavailable", code: error.code },
+        { cause: error },
+      );
+    }
+    if (error instanceof LockResolutionStoreError) {
       throw new ServiceUnavailableException(
         { status: "unavailable", code: error.code },
         { cause: error },
@@ -1053,6 +1132,7 @@ const deadlineBodySchema = {
     "cancelLockHash",
     "reward",
     "creatorNonce",
+    "lockResolutions",
   ],
   additionalProperties: false,
   properties: {
@@ -1080,6 +1160,7 @@ const deadlineBodySchema = {
     cancelLockHash: hashSchema,
     reward: decimalSchema,
     creatorNonce: decimalSchema,
+    lockResolutions: { type: "array", minItems: 1, maxItems: 32, items: scriptSchema },
   },
 };
 const recurringBodySchema = {
@@ -1093,6 +1174,7 @@ const recurringBodySchema = {
     "totalRuns",
     "reward",
     "creatorNonce",
+    "lockResolutions",
   ],
   additionalProperties: false,
   properties: {
@@ -1104,6 +1186,7 @@ const recurringBodySchema = {
     totalRuns: decimalSchema,
     reward: decimalSchema,
     creatorNonce: decimalSchema,
+    lockResolutions: { type: "array", minItems: 1, maxItems: 32, items: scriptSchema },
   },
 };
 const ownerBodySchema = {

@@ -33,6 +33,20 @@ export type CreationRequest =
       readonly value: RecurringCreationRequest;
     };
 
+export type CreationSubmissionRequest =
+  | {
+      readonly operation: "create_deadline_job";
+      readonly value: DeadlineCreationRequest & {
+        readonly lockResolutions: readonly ScriptIdentity[];
+      };
+    }
+  | {
+      readonly operation: "create_recurring_job";
+      readonly value: RecurringCreationRequest & {
+        readonly lockResolutions: readonly ScriptIdentity[];
+      };
+    };
+
 export interface ResolvedReviewInput {
   readonly capacity: bigint;
   readonly lockHash: string;

@@ -52,8 +52,10 @@ const openApiDocument = JSON.parse(
 );
 const COVERED_OPERATIONS = Object.freeze([
   "AccountJobsController_list",
+  "ActivityController_list",
   "AuthController_current",
   "AuthController_issue",
+  "AuthController_revoke",
   "AuthController_verify",
   "HealthController_live",
   "HealthController_ready",
@@ -65,6 +67,7 @@ const COVERED_OPERATIONS = Object.freeze([
   "MetricsController_get",
   "NetworkMetadataController_get",
   "NotificationPreferencesController_get",
+  "NotificationPreferencesController_reset",
   "NotificationPreferencesController_update",
   "TemplatesController_list",
   "TransactionController_cancel",
@@ -73,6 +76,8 @@ const COVERED_OPERATIONS = Object.freeze([
   "TransactionController_recover",
   "TransactionController_topUp",
   "TransactionController_validateSigned",
+  "TransactionProgressController_get",
+  "TransactionProgressController_stream",
   "WebhookController_history",
   "WebhookController_list",
   "WebhookController_register",
@@ -133,8 +138,19 @@ async function openRpcMock({ sourceBlockHash, sourceTransaction, sourceTxHash })
     let result;
     switch (payload.method) {
       case "get_block_hash":
-        result = genesisHash;
+        result =
+          BigInt(payload.params[0]) === 0n ? genesisHash : hash(Number(BigInt(payload.params[0])));
         break;
+      case "get_block_by_number": {
+        const number = Number(BigInt(payload.params[0]));
+        result = {
+          header: rpcHeader(number, hash(number), hash(Math.max(0, number - 1))),
+          proposals: [],
+          transactions: [],
+          uncles: [],
+        };
+        break;
+      }
       case "get_tip_header":
         result = tip;
         break;
@@ -259,6 +275,7 @@ function createRecurringFixture() {
   const requestBody = {
     ownerLockHash,
     recipientLockHash: ownerLockHash,
+    lockResolutions: [ownerLock],
     amount: "10000000000",
     intervalBlocks: "10",
     firstNotBefore: "100",
@@ -430,24 +447,24 @@ async function runComposedSuite(scenario) {
     const replayed = await projector.projectBlock(sourceBlock, deployment);
     assert.equal(replayed.discovery.insertedJobs, 0);
     assert.equal(replayed.checkpoint.status, "unchanged");
-    await assert.rejects(
-      projector.projectBlock(
-        {
-          header: {
-            number: 44n,
-            hash: hash(44),
-            parentHash: hash(99),
-            timestamp: 1_800_000_002_000n,
-          },
-          transactions: [],
+    const recoveredGap = await projector.projectBlock(
+      {
+        header: {
+          number: 44n,
+          hash: hash(44),
+          parentHash: hash(99),
+          timestamp: 1_800_000_002_000n,
         },
-        deployment,
-      ),
+        transactions: [],
+      },
+      deployment,
     );
+    assert.equal(recoveredGap.rollback?.rolledBackBlocks, 0);
+    assert.equal(recoveredGap.checkpoint.checkpoint.blockNumber, 44n);
 
     assert.equal((await request(fastify, "GET", "/v1/health/live")).status, 200);
     const ready = await request(fastify, "GET", "/v1/health/ready");
-    assert.equal(ready.status, 200);
+    assert.equal(ready.status, 200, JSON.stringify(ready.body));
     assert.equal(ready.body.status, "ready");
     const network = await request(fastify, "GET", "/v1/network");
     assert.equal(network.status, 200);
@@ -487,19 +504,21 @@ async function runComposedSuite(scenario) {
     );
     assert.equal(recurringCreated.status, 200);
     assert.equal(recurringCreated.body.protocolIntentHash, recurring.creation.intentHash);
+    const successLock = { ...recurring.ownerLock, args: "0x1234" };
     const deadlineCreated = await request(fastify, "POST", "/v1/transactions/create-deadline-job", {
       payload: {
         pledges: deadlineFixture.pledges.map((pledge) => ({
           outPoint: { txHash: pledge.tx_hash, index: pledge.index },
-          refundLockHash: pledge.refund_lock_hash,
+          refundLockHash: recurring.ownerLockHash,
           amount: pledge.amount,
         })),
         target: deadlineFixture.target,
         deadlineBlock: deadlineFixture.deadline_block,
-        successLockHash: deadlineFixture.success_lock_hash,
-        cancelLockHash: deadlineFixture.cancel_lock_hash,
+        successLockHash: scriptToHash(successLock),
+        cancelLockHash: recurring.ownerLockHash,
         reward: deadlineFixture.reward,
         creatorNonce: deadlineFixture.creator_nonce,
+        lockResolutions: [recurring.ownerLock, successLock],
       },
     });
     assert.equal(deadlineCreated.status, 200);

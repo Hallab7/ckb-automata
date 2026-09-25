@@ -5,6 +5,7 @@ import {
   DEADLINE_EXECUTOR_ADAPTER,
   RECURRING_EXECUTOR_ADAPTER,
   ExecutorAdapterRegistry,
+  PostgresBuildAttemptStore,
   PostgresEligibilityJobSource,
   runExecutorAdapter,
 } from "../apps/executor/src/index.ts";
@@ -36,6 +37,7 @@ const sequence = process.argv[3] ?? "0";
 const network = required("CKB_NETWORK");
 const genesisHash = parseHash32(required("CKB_GENESIS_HASH"));
 const source = new PostgresEligibilityJobSource(required("DATABASE_URL"), network);
+const resolutions = new PostgresBuildAttemptStore(required("DATABASE_URL"), network);
 const client = createCkbClient({
   rpcEndpoints: [required("CKB_RPC_URL")],
   indexerEndpoints: [required("CKB_INDEXER_URL")],
@@ -60,6 +62,7 @@ try {
     deployment: loaded.deployment,
     runtime: client,
     rewardLock,
+    resolutions,
   }).reload(record);
   if (!snapshot) throw new Error("live job snapshot could not be reconstructed");
   try {
@@ -93,5 +96,5 @@ try {
     process.exitCode = 1;
   }
 } finally {
-  await Promise.all([source.close(), client.close()]);
+  await Promise.all([source.close(), resolutions.close(), client.close()]);
 }

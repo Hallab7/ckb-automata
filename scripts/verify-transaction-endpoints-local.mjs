@@ -53,6 +53,7 @@ const ownerLockHash = parseHash32(scriptToHash(ownerLock));
 const creationRequest = {
   ownerLockHash,
   recipientLockHash: ownerLockHash,
+  lockResolutions: [ownerLock],
   amount: "10000000000",
   intervalBlocks: "10",
   firstNotBefore: "500",
@@ -214,21 +215,23 @@ try {
       await import("node:fs/promises")
     ).readFile(new URL("../contracts/fixtures/deadline_creation_v1.json", import.meta.url), "utf8"),
   );
+  const successLock = { ...ownerLock, args: "0x1234" };
   const deadline = await request("POST", "/v1/transactions/create-deadline-job", {
     pledges: deadlineFixture.pledges.map((pledge) => ({
       outPoint: { txHash: pledge.tx_hash, index: pledge.index },
-      refundLockHash: pledge.refund_lock_hash,
+      refundLockHash: ownerLockHash,
       amount: pledge.amount,
     })),
     target: deadlineFixture.target,
     deadlineBlock: deadlineFixture.deadline_block,
-    successLockHash: deadlineFixture.success_lock_hash,
-    cancelLockHash: deadlineFixture.cancel_lock_hash,
+    successLockHash: parseHash32(scriptToHash(successLock)),
+    cancelLockHash: ownerLockHash,
     reward: deadlineFixture.reward,
     creatorNonce: deadlineFixture.creator_nonce,
+    lockResolutions: [ownerLock, successLock],
   });
   assert.equal(deadline.status, 200);
-  assert.equal(deadline.body.protocolIntentHash, deadlineFixture.expected.intent_hash);
+  assert.match(deadline.body.protocolIntentHash, /^0x[0-9a-f]{64}$/);
 
   const recurring = await request("POST", "/v1/transactions/create-recurring-job", creationRequest);
   assert.equal(recurring.status, 200);

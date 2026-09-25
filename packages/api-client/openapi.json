@@ -2001,6 +2001,21 @@
                   "cancelLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
                   "creatorNonce": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
                   "deadlineBlock": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                  "lockResolutions": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "args": { "pattern": "^0x(?:[0-9a-f]{2})*$", "type": "string" },
+                        "codeHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                        "hashType": { "enum": ["data", "data1", "type"], "type": "string" }
+                      },
+                      "required": ["codeHash", "hashType", "args"],
+                      "type": "object"
+                    },
+                    "maxItems": 32,
+                    "minItems": 1,
+                    "type": "array"
+                  },
                   "pledges": {
                     "items": {
                       "additionalProperties": false,
@@ -2033,7 +2048,8 @@
                   "successLockHash",
                   "cancelLockHash",
                   "reward",
-                  "creatorNonce"
+                  "creatorNonce",
+                  "lockResolutions"
                 ],
                 "type": "object"
               }
@@ -2263,6 +2279,21 @@
                   "creatorNonce": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
                   "firstNotBefore": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
                   "intervalBlocks": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                  "lockResolutions": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "args": { "pattern": "^0x(?:[0-9a-f]{2})*$", "type": "string" },
+                        "codeHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                        "hashType": { "enum": ["data", "data1", "type"], "type": "string" }
+                      },
+                      "required": ["codeHash", "hashType", "args"],
+                      "type": "object"
+                    },
+                    "maxItems": 32,
+                    "minItems": 1,
+                    "type": "array"
+                  },
                   "ownerLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
                   "recipientLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
                   "reward": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
@@ -2276,7 +2307,8 @@
                   "firstNotBefore",
                   "totalRuns",
                   "reward",
-                  "creatorNonce"
+                  "creatorNonce",
+                  "lockResolutions"
                 ],
                 "type": "object"
               }
@@ -3016,6 +3048,21 @@
                           "cancelLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
                           "creatorNonce": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
                           "deadlineBlock": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                          "lockResolutions": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "args": { "pattern": "^0x(?:[0-9a-f]{2})*$", "type": "string" },
+                                "codeHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                                "hashType": { "enum": ["data", "data1", "type"], "type": "string" }
+                              },
+                              "required": ["codeHash", "hashType", "args"],
+                              "type": "object"
+                            },
+                            "maxItems": 32,
+                            "minItems": 1,
+                            "type": "array"
+                          },
                           "pledges": {
                             "items": {
                               "additionalProperties": false,
@@ -3051,7 +3098,8 @@
                           "successLockHash",
                           "cancelLockHash",
                           "reward",
-                          "creatorNonce"
+                          "creatorNonce",
+                          "lockResolutions"
                         ],
                         "type": "object"
                       },
@@ -3062,6 +3110,21 @@
                           "creatorNonce": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
                           "firstNotBefore": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
                           "intervalBlocks": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                          "lockResolutions": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "args": { "pattern": "^0x(?:[0-9a-f]{2})*$", "type": "string" },
+                                "codeHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                                "hashType": { "enum": ["data", "data1", "type"], "type": "string" }
+                              },
+                              "required": ["codeHash", "hashType", "args"],
+                              "type": "object"
+                            },
+                            "maxItems": 32,
+                            "minItems": 1,
+                            "type": "array"
+                          },
                           "ownerLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
                           "recipientLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
                           "reward": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
@@ -3075,7 +3138,8 @@
                           "firstNotBefore",
                           "totalRuns",
                           "reward",
-                          "creatorNonce"
+                          "creatorNonce",
+                          "lockResolutions"
                         ],
                         "type": "object"
                       },

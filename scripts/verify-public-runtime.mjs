@@ -2,6 +2,7 @@
 
 import assert from "node:assert/strict";
 import { writeFile } from "node:fs/promises";
+import { setTimeout as wait } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 
 const EXPECTED_GENESIS = "0x10639e0895502b5688a6be8cf69460d76541bfa4821629d86d62ba0aae3f9606";
@@ -22,8 +23,7 @@ function endpoint(value, name, path) {
 async function requestJson(fetchImpl, target, name, options) {
   const attempts = options.attempts ?? DEFAULT_ATTEMPTS;
   const retryDelayMs = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
-  const sleep =
-    options.sleep ?? ((delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)));
+  const sleep = options.sleep ?? wait;
   const startedAt = Date.now();
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {

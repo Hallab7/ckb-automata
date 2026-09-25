@@ -12,6 +12,7 @@ import {
   deploymentRegistry,
   parseDeadlineCreationRequest,
   parseRecurringCreationRequest,
+  type ScriptIdentity,
   type UnsignedDeadlineTransaction,
 } from "@ckb-automata/core";
 import { Button, InlineNotice } from "@ckb-automata/ui";
@@ -22,8 +23,8 @@ import { ckbToShannons } from "./ckb-amount.ts";
 import {
   reviewTechnicalDetailsJson,
   verifyCreationReview,
-  type CreationRequest,
   type CreationReviewModel,
+  type CreationSubmissionRequest,
 } from "./review-model.ts";
 import type { SetupDraft, SetupTemplateId } from "./setup-flow.ts";
 
@@ -31,7 +32,7 @@ export interface CreationReviewResult {
   readonly artifact: ApiTransactionBuild;
   readonly key: string;
   readonly model: CreationReviewModel;
-  readonly request: CreationRequest;
+  readonly request: CreationSubmissionRequest;
   readonly transaction: UnsignedDeadlineTransaction;
 }
 
@@ -116,44 +117,66 @@ async function requestFromDraft(
   template: SetupTemplateId,
   draft: SetupDraft,
   ownerLockHash: string,
-  resolveLockHash: (address: string) => Promise<string>,
+  resolveLock: (address: string) => Promise<ScriptIdentity>,
+  getOwnerLock: (expectedLockHash: string) => Promise<ScriptIdentity>,
+  hashLock: (script: ScriptIdentity) => string,
   selectDeadlinePledge: ReturnType<typeof useWalletSession>["selectDeadlinePledge"],
   creatorNonce: string,
-): Promise<CreationRequest> {
+): Promise<CreationSubmissionRequest> {
   if (template === "recurring") {
+    const ownerLock = await getOwnerLock(ownerLockHash);
+    const recipientLock = await resolveLock(draft["recipientAddress"] ?? "");
+    const value = parseRecurringCreationRequest({
+      ownerLockHash: hashLock(ownerLock),
+      recipientLockHash: hashLock(recipientLock),
+      amount: ckbToShannons(draft["amountCkb"] ?? ""),
+      intervalBlocks: draft["intervalBlocks"] ?? "",
+      firstNotBefore: draft["firstExecutionBlock"] ?? "",
+      totalRuns: draft["runCount"] ?? "",
+      reward: ckbToShannons(draft["rewardCkb"] ?? ""),
+      creatorNonce,
+    });
     return {
       operation: "create_recurring_job",
-      value: parseRecurringCreationRequest({
-        ownerLockHash,
-        recipientLockHash: await resolveLockHash(draft["recipientAddress"] ?? ""),
-        amount: ckbToShannons(draft["amountCkb"] ?? ""),
-        intervalBlocks: draft["intervalBlocks"] ?? "",
-        firstNotBefore: draft["firstExecutionBlock"] ?? "",
-        totalRuns: draft["runCount"] ?? "",
-        reward: ckbToShannons(draft["rewardCkb"] ?? ""),
-        creatorNonce,
-      }),
+      value: {
+        ...value,
+        lockResolutions: uniqueLockResolutions([ownerLock, recipientLock], hashLock),
+      },
     };
   }
   const pledge = await selectDeadlinePledge();
+  const ownerLock = await getOwnerLock(ownerLockHash);
+  const refundLock = await resolveLock(draft["refundAddress"] ?? "");
+  const successLock = await resolveLock(draft["successAddress"] ?? "");
+  const value = parseDeadlineCreationRequest({
+    pledges: [
+      {
+        outPoint: pledge,
+        refundLockHash: hashLock(refundLock),
+        amount: ckbToShannons(draft["pledgeCkb"] ?? ""),
+      },
+    ],
+    target: ckbToShannons(draft["targetCkb"] ?? ""),
+    deadlineBlock: draft["deadlineBlock"] ?? "",
+    successLockHash: hashLock(successLock),
+    cancelLockHash: hashLock(ownerLock),
+    reward: ckbToShannons(draft["rewardCkb"] ?? ""),
+    creatorNonce,
+  });
   return {
     operation: "create_deadline_job",
-    value: parseDeadlineCreationRequest({
-      pledges: [
-        {
-          outPoint: pledge,
-          refundLockHash: await resolveLockHash(draft["refundAddress"] ?? ""),
-          amount: ckbToShannons(draft["pledgeCkb"] ?? ""),
-        },
-      ],
-      target: ckbToShannons(draft["targetCkb"] ?? ""),
-      deadlineBlock: draft["deadlineBlock"] ?? "",
-      successLockHash: await resolveLockHash(draft["successAddress"] ?? ""),
-      cancelLockHash: ownerLockHash,
-      reward: ckbToShannons(draft["rewardCkb"] ?? ""),
-      creatorNonce,
-    }),
+    value: {
+      ...value,
+      lockResolutions: uniqueLockResolutions([ownerLock, refundLock, successLock], hashLock),
+    },
   };
+}
+
+function uniqueLockResolutions(
+  locks: readonly ScriptIdentity[],
+  hashLock: (script: ScriptIdentity) => string,
+): readonly ScriptIdentity[] {
+  return Object.freeze([...new Map(locks.map((lock) => [hashLock(lock), lock])).values()]);
 }
 
 async function loadReview(
@@ -174,7 +197,9 @@ async function loadReview(
     template,
     draft,
     session.ownerLockHash,
-    session.resolveLockHash,
+    session.resolveLock,
+    session.getOwnerLock,
+    session.reviewLockHash,
     session.selectDeadlinePledge,
     creatorNonce,
   );

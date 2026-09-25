@@ -32,6 +32,7 @@ import {
   NotificationPreferencesService,
 } from "./preferences.ts";
 import { JobQuoteController, JobQuoteService } from "./quotes.ts";
+import { PostgresLockResolutionRecorder } from "./lock-resolutions.ts";
 import { TransactionBuildService, TransactionController } from "./transactions.ts";
 import {
   TransactionProgressController,
@@ -217,10 +218,20 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
           new JobQuoteService(databaseClient.database, environment.CKB_NETWORK, ckbClient),
       },
       {
+        provide: PostgresLockResolutionRecorder,
+        inject: [DatabaseClient],
+        useFactory: (databaseClient: DatabaseClient) =>
+          new PostgresLockResolutionRecorder(databaseClient.database, environment.CKB_NETWORK),
+      },
+      {
         provide: TransactionBuildService,
-        inject: [JobQuoteService, CkbClient],
-        useFactory: (quotes: JobQuoteService, ckbClient: CkbClient) =>
-          new TransactionBuildService(quotes, ckbClient, environment.CKB_GENESIS_HASH),
+        inject: [JobQuoteService, CkbClient, PostgresLockResolutionRecorder],
+        useFactory: (
+          quotes: JobQuoteService,
+          ckbClient: CkbClient,
+          resolutions: PostgresLockResolutionRecorder,
+        ) =>
+          new TransactionBuildService(quotes, ckbClient, environment.CKB_GENESIS_HASH, resolutions),
       },
       {
         provide: TransactionProgressService,
