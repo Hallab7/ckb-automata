@@ -26,6 +26,20 @@ interface LockResolutionRow {
   readonly args: string;
 }
 
+function canonicalLock(value: ScriptIdentity): ScriptIdentity {
+  if (value.hashType !== "data" && value.hashType !== "data1" && value.hashType !== "type") {
+    throw new TypeError("stored lock resolution hash type is unsupported");
+  }
+  if (!/^0x(?:[0-9a-f]{2})*$/.test(value.args)) {
+    throw new TypeError("stored lock resolution args are invalid");
+  }
+  return Object.freeze({
+    codeHash: parseHash32(value.codeHash),
+    hashType: value.hashType,
+    args: value.args,
+  });
+}
+
 export class PostgresBuildAttemptStore implements BuildAttemptStore {
   readonly #network: string;
   readonly #sql: postgres.Sql;
@@ -143,15 +157,9 @@ export class PostgresBuildAttemptStore implements BuildAttemptStore {
     `;
     return Object.freeze(
       rows.map((row) => {
-        if (row.hash_type !== "data" && row.hash_type !== "data1" && row.hash_type !== "type") {
-          throw new TypeError("stored lock resolution hash type is unsupported");
-        }
-        if (!/^0x(?:[0-9a-f]{2})*$/.test(row.args)) {
-          throw new TypeError("stored lock resolution args are invalid");
-        }
-        const lock = Object.freeze({
+        const lock = canonicalLock({
           codeHash: parseHash32(row.code_hash),
-          hashType: row.hash_type,
+          hashType: row.hash_type as ScriptIdentity["hashType"],
           args: row.args as `0x${string}`,
         });
         if (parseHash32(scriptToHash(lock)) !== parseHash32(row.lock_hash)) {
@@ -160,6 +168,37 @@ export class PostgresBuildAttemptStore implements BuildAttemptStore {
         return lock;
       }),
     );
+  }
+
+  async rememberResolvedLocks(locks: readonly ScriptIdentity[]): Promise<void> {
+    const resolved = new Map<string, ScriptIdentity>();
+    for (const value of locks) {
+      const lock = canonicalLock(value);
+      resolved.set(parseHash32(scriptToHash(lock)), lock);
+    }
+    await this.#sql.begin(async (sql) => {
+      for (const [lockHash, lock] of resolved) {
+        await sql`
+          INSERT INTO lock_resolutions (network_id, lock_hash, code_hash, hash_type, args)
+          VALUES (${this.#network}, ${lockHash}, ${lock.codeHash}, ${lock.hashType}, ${lock.args})
+          ON CONFLICT (network_id, lock_hash) DO NOTHING
+        `;
+        const [stored] = await sql<LockResolutionRow[]>`
+          SELECT lock_hash, code_hash, hash_type, args
+          FROM lock_resolutions
+          WHERE network_id = ${this.#network} AND lock_hash = ${lockHash}
+          LIMIT 1
+        `;
+        if (
+          !stored ||
+          stored.code_hash !== lock.codeHash ||
+          stored.hash_type !== lock.hashType ||
+          stored.args !== lock.args
+        ) {
+          throw new Error("stored lock resolution does not match its verified script hash");
+        }
+      }
+    });
   }
 
   async complete(

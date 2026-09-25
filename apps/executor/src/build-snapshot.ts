@@ -21,6 +21,7 @@ const MAX_FEE_CELLS = 100;
 
 export interface LockResolutionSource {
   loadResolvedLocks(): Promise<readonly ScriptIdentity[]>;
+  rememberResolvedLocks(locks: readonly ScriptIdentity[]): Promise<void>;
 }
 
 type ChainCell = Awaited<ReturnType<ExecutorRuntime["getCellLive"]>>;
@@ -237,7 +238,9 @@ export class ChainBuildSnapshotSource implements BuildSnapshotSource {
         if (referenced) add(referenced.lock);
       }
     }
-    return Object.freeze([...locks.values()]);
+    const resolved = Object.freeze([...locks.values()]);
+    await this.#resolutions.rememberResolvedLocks(resolved);
+    return resolved;
   }
 
   async #applicationCells(

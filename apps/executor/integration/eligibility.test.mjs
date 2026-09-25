@@ -258,6 +258,12 @@ test("concurrent build deliveries share one durable operational attempt", async 
       resolvedLock,
     ]);
     assert.deepEqual(await store.loadResolvedLocks(), [resolvedLock]);
+    const observedLock = { ...resolvedLock, args: "0xcd" };
+    await store.rememberResolvedLocks([observedLock, observedLock]);
+    assert.deepEqual(
+      new Set((await store.loadResolvedLocks()).map((lock) => JSON.stringify(lock))),
+      new Set([resolvedLock, observedLock].map((lock) => JSON.stringify(lock))),
+    );
     const payload = {
       ...job,
       adapterId: "recurring-v1",
