@@ -26,7 +26,7 @@ if (!databaseUrl || !redisUrl) {
   );
 }
 
-const now = new Date("2026-09-23T16:00:00.000Z");
+const now = new Date(Date.now() + 60_000);
 
 async function createDatabase() {
   const name = `automata_dead_letter_${randomBytes(6).toString("hex")}`;
@@ -120,7 +120,16 @@ test("dead-letter replay is idempotent and fully audited", async () => {
         await sql.end({ timeout: 2 });
       }
     });
-    assert.deepEqual(forwardingErrors, []);
+    assert.equal(forwardingErrors.length, 1);
+    const [{ jobId, ...failure }] = forwardingErrors;
+    assert.match(jobId, /^automata-evaluate-[0-9a-f]{64}$/);
+    assert.deepEqual(failure, {
+      queue: "evaluate",
+      failureCode: "EXECUTOR_BUILD_FAILED",
+      attempts: 1,
+      failureName: "UnrecoverableError",
+      failureMessage: "EXECUTOR_RETRY_EXHAUSTED",
+    });
     await Promise.all([failingWorker.close(), persistenceWorker.close()]);
     failingWorker = undefined;
     persistenceWorker = undefined;
