@@ -102,7 +102,7 @@ export class PostgresDeadLetterStore implements DeadLetterStore {
     this.#sql = postgres(connectionString, {
       connect_timeout: 5,
       idle_timeout: 20,
-      max: 3,
+      max: 1,
       onnotice: () => undefined,
     });
   }
