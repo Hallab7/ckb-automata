@@ -17,6 +17,15 @@ export const DEFAULT_QUEUE_PREFIX = "ckb-automata";
 export const MAX_QUEUE_DELAY_MS = 30 * 24 * 60 * 60 * 1_000;
 export const QUEUE_READINESS_TIMEOUT_MS = 5_000;
 
+export function executorQueuePrefix(instanceId?: string): string | undefined {
+  if (instanceId === undefined) return undefined;
+  const readable = `${DEFAULT_QUEUE_PREFIX}-${instanceId}`;
+  if (/^[a-z][a-z0-9-]{2,47}$/.test(readable)) return readable;
+  const normalized = instanceId.replaceAll("_", "-").slice(0, 22);
+  const digest = createHash("sha256").update(instanceId).digest("hex").slice(0, 12);
+  return `${DEFAULT_QUEUE_PREFIX}-${normalized}-${digest}`;
+}
+
 export interface QueuePolicy {
   readonly attempts: number;
   readonly backoff: Readonly<{
@@ -271,6 +280,14 @@ export function forwardTerminalFailures(
     const terminal = error.name === "UnrecoverableError" || job.attemptsMade >= attempts;
     if (!terminal) return;
     const failureCode = executorFailureCode(error) ?? "EXECUTOR_RETRY_EXHAUSTED";
+    logger.error("executor.job.terminal_failure", "Executor queue job reached a terminal failure", {
+      queue: sourceQueue,
+      jobId: job.id,
+      failureCode,
+      attempts: job.attemptsMade,
+      failureName: error.name,
+      failureMessage: error.message.slice(0, 512),
+    });
     void queues
       .deadLetter(sourceQueue, job as Job<QueueJobEnvelope<unknown>>, failureCode)
       .catch((forwardingError: unknown) => {

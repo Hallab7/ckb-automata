@@ -213,7 +213,16 @@ test("only exhausted jobs are forwarded with their complete durable envelope", a
     (forwarded.data as { payload: DeadLetterPayload }).payload.sourceEnvelope,
     job.data,
   );
-  assert.deepEqual(errors, []);
+  assert.deepEqual(errors, [
+    {
+      queue: "evaluate",
+      jobId: payload().sourceJobId,
+      failureCode: "EXECUTOR_RETRY_EXHAUSTED",
+      attempts: 8,
+      failureName: "Error",
+      failureMessage: "exhausted",
+    },
+  ]);
   assert.deepEqual(parseDeadLetterPayload(payload()), payload());
   assert.throws(
     () => parseDeadLetterPayload({ ...payload(), failedAt: "not-a-timestamp" }),

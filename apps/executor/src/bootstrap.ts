@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import type { INestApplicationContext, LoggerService } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 
@@ -8,6 +6,7 @@ import { CorrelatedLogger, type LogWriter } from "@ckb-automata/telemetry";
 
 import { createExecutorModule, type ExecutorModuleDependencies } from "./app.module.ts";
 import { startExecutorHealthServer, type ExecutorHealthServer } from "./health.ts";
+import { executorQueuePrefix as queuePrefixForInstance } from "./queues.ts";
 import { ExecutorRuntime, type ExecutorEventLogger } from "./runtime.ts";
 
 const SERVICE_NAME = "ckb-automata-executor";
@@ -115,13 +114,7 @@ export interface ExecutorBootstrapDependencies {
 }
 
 export function executorQueuePrefix(environment: AutomataEnvironment): string | undefined {
-  const instanceId = environment.EXECUTOR_INSTANCE_ID;
-  if (instanceId === undefined) return undefined;
-  const readable = `ckb-automata-${instanceId}`;
-  if (/^[a-z][a-z0-9-]{2,47}$/.test(readable)) return readable;
-  const normalized = instanceId.replaceAll("_", "-").slice(0, 22);
-  const digest = createHash("sha256").update(instanceId).digest("hex").slice(0, 12);
-  return `ckb-automata-${normalized}-${digest}`;
+  return queuePrefixForInstance(environment.EXECUTOR_INSTANCE_ID);
 }
 
 async function createNestApplicationContext(

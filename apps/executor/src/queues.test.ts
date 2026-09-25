@@ -9,10 +9,21 @@ import {
   MAX_QUEUE_DELAY_MS,
   QUEUE_POLICIES,
   DurableQueueRegistry,
+  executorQueuePrefix,
   parseRedisConnection,
   queueRegistrationOptions,
   stableQueueJobId,
 } from "./queues.ts";
+
+test("executor identities derive valid isolated queue prefixes", () => {
+  assert.equal(executorQueuePrefix(), undefined);
+  assert.equal(executorQueuePrefix("operator-a"), "ckb-automata-operator-a");
+  const underscored = executorQueuePrefix("operator_a");
+  const long = executorQueuePrefix("operator-abcdefghijklmnopqrstuvwxyz");
+  assert.match(underscored ?? "", /^[a-z][a-z0-9-]{2,47}$/);
+  assert.match(long ?? "", /^[a-z][a-z0-9-]{2,47}$/);
+  assert.notEqual(underscored, "ckb-automata-operator-a");
+});
 
 function queueFixture(name: string) {
   const additions: { readonly name: string; readonly data: unknown; readonly options: unknown }[] =

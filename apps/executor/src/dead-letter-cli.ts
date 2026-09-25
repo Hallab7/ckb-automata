@@ -4,7 +4,12 @@ import { AUTOMATA_QUEUES } from "@ckb-automata/telemetry";
 
 import { PostgresDeadLetterStore } from "./dead-letter-store.ts";
 import { DeadLetterOperations } from "./dead-letter.ts";
-import { DEFAULT_QUEUE_PREFIX, DurableQueueRegistry, parseRedisConnection } from "./queues.ts";
+import {
+  DEFAULT_QUEUE_PREFIX,
+  DurableQueueRegistry,
+  executorQueuePrefix,
+  parseRedisConnection,
+} from "./queues.ts";
 
 interface Command {
   readonly action: "inspect" | "replay" | "close";
@@ -53,11 +58,13 @@ export async function runDeadLetterCommand(
   const command = parseCommand(arguments_);
   const databaseUrl = requiredEnvironment(environment, "DATABASE_URL");
   const redisUrl = requiredEnvironment(environment, "REDIS_URL");
+  const queuePrefix =
+    executorQueuePrefix(environment["EXECUTOR_INSTANCE_ID"]) ?? DEFAULT_QUEUE_PREFIX;
   const queues = AUTOMATA_QUEUES.map(
     (name) =>
       new Queue(name, {
         connection: parseRedisConnection(redisUrl),
-        prefix: DEFAULT_QUEUE_PREFIX,
+        prefix: queuePrefix,
       }),
   );
   const registry = new DurableQueueRegistry(queues);
