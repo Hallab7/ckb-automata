@@ -18,6 +18,7 @@
     "contracts:test": "cargo test-native --locked",
     "contracts:check-reproducible": "node scripts/check-contract-build.mjs",
     "database:migrate": "pnpm --filter @ckb-automata/api db:migrate",
+    "database:initialize-network": "pnpm --filter @ckb-automata/api db:initialize-network",
     "database:rollback": "pnpm --filter @ckb-automata/api db:rollback",
     "database:verify:local": "node scripts/verify-database-migrations-local.mjs",
     "contracts:fuzz:long": "node scripts/run-contract-fuzz.mjs --seconds 300",

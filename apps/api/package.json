@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "db:initialize-network": "node src/database/initialize-network-cli.ts",
     "db:migrate": "node src/database/cli.ts up",
     "db:rollback": "node src/database/cli.ts down",
     "start": "node dist/main.js",

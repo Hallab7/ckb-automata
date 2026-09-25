@@ -9,6 +9,9 @@ Render and never stored in `render.yaml` or deployment logs.
 
 - The API is built from the repository root with the pinned Node and pnpm
   versions.
+- The free-tier build applies pending migrations and idempotently initializes
+  the configured network from the integrity-checked deployment manifest before
+  the new release can start.
 - Automatic deploys are disabled. Operators deploy an audited commit explicitly.
 - `DATABASE_URL` uses PostgreSQL TLS with `sslmode=require`.
 - Redis has no public IP allowlist and uses `noeviction`, which is required for
@@ -21,10 +24,11 @@ Render and never stored in `render.yaml` or deployment logs.
   endpoint separately checks PostgreSQL, Redis, CKB RPC, the deployment
   manifest, and indexer lag.
 
-Apply schema migrations as an explicit job before each API deployment:
+For a paid service, move the database commands to Render's pre-deploy command.
+For the current free showcase tier, they remain at the end of the build command:
 
 ```text
-render jobs create <service-id> --start-command "pnpm database:migrate"
+pnpm database:migrate && pnpm database:initialize-network
 render deploys create <service-id> --commit <revision> --wait
 ```
 

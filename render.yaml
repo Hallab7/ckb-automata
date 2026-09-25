@@ -15,7 +15,7 @@ services:
     plan: free
     region: oregon
     autoDeployTrigger: off
-    buildCommand: npm install --global pnpm@12.5.1 && pnpm install --frozen-lockfile && pnpm --filter @ckb-automata/api build
+    buildCommand: npm install --global pnpm@12.5.1 && pnpm install --frozen-lockfile && pnpm --filter @ckb-automata/api build && pnpm database:migrate && pnpm database:initialize-network
     startCommand: pnpm --filter @ckb-automata/api start
     healthCheckPath: /v1/health/live
     envVars:

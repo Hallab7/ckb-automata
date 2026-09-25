@@ -13,6 +13,7 @@ test("public data services use explicit testnet and secret references", () => {
     "value: testnet-public",
     "value: ckb_testnet",
     "healthCheckPath: /v1/health/live",
+    "pnpm database:migrate && pnpm database:initialize-network",
     "maxmemoryPolicy: noeviction",
     "DATABASE_URL\n        sync: false",
     "property: connectionString",
