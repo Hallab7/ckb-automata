@@ -453,6 +453,17 @@ function sameInput(
   );
 }
 
+function sameCellDep(
+  left: UnsignedDeadlineTransaction["cellDeps"][number],
+  right: UnsignedDeadlineTransaction["cellDeps"][number],
+): boolean {
+  return (
+    left.depType === right.depType &&
+    left.outPoint.txHash === right.outPoint.txHash &&
+    BigInt(left.outPoint.index) === BigInt(right.outPoint.index)
+  );
+}
+
 function witnessOutputType(witness: Hex): Hex | null {
   const bytes = hexToBytes(witness);
   if (bytes.length < 16) throw new Error("completed witness 0 is not a Molecule WitnessArgs table");
@@ -511,7 +522,7 @@ export function assertDeadlineCompletion(
     throw new Error("completed outputs and data lengths differ");
   }
   for (const requiredDep of build.transaction.cellDeps) {
-    if (!completed.cellDeps.some((candidate) => stable(candidate) === stable(requiredDep))) {
+    if (!completed.cellDeps.some((candidate) => sameCellDep(candidate, requiredDep))) {
       throw new Error("wallet completion removed a required cell dependency");
     }
   }

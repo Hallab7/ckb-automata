@@ -164,6 +164,18 @@ test("wallet completion may append funding and change without changing commitmen
     ),
   );
 
+  const equivalentDependencyEncoding = {
+    ...completed,
+    cellDeps: completed.cellDeps.map((dependency) => ({
+      depType: dependency.depType,
+      outPoint: {
+        index: `0x0${BigInt(dependency.outPoint.index).toString(16)}`,
+        txHash: dependency.outPoint.txHash,
+      },
+    })),
+  } as unknown as UnsignedDeadlineTransaction;
+  assert.doesNotThrow(() => assertDeadlineCompletion(build, equivalentDependencyEncoding));
+
   const changedInput = structuredClone(completed) as unknown as {
     inputs: { previousOutput: { txHash: string } }[];
   };
@@ -173,6 +185,15 @@ test("wallet completion may append funding and change without changing commitmen
   assert.throws(
     () => assertDeadlineCompletion(build, changedInput as unknown as UnsignedDeadlineTransaction),
     /changed required input outpoint or since at index 0/,
+  );
+
+  const removedDependency = {
+    ...completed,
+    cellDeps: completed.cellDeps.slice(1),
+  } as UnsignedDeadlineTransaction;
+  assert.throws(
+    () => assertDeadlineCompletion(build, removedDependency),
+    /removed a required cell dependency/,
   );
 });
 
