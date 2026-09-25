@@ -34,12 +34,14 @@ function fakeApplication() {
     interceptors: unknown[];
     shutdownHooks: number;
     listens: [number, string][];
+    indexerStarts: number;
   } = {
     pipes: [],
     prefixes: [],
     interceptors: [],
     shutdownHooks: 0,
     listens: [],
+    indexerStarts: 0,
   };
   const app = {
     useGlobalPipes(...pipes: unknown[]) {
@@ -60,6 +62,13 @@ function fakeApplication() {
     },
     async listen(port: number, host: string) {
       calls.listens.push([port, host]);
+    },
+    get() {
+      return {
+        start() {
+          calls.indexerStarts += 1;
+        },
+      };
     },
   };
   return { app: app as unknown as INestApplication, calls };
@@ -155,6 +164,7 @@ test("start listens only after successful configuration", async () => {
   });
   assert.equal(result.app, fixture.app);
   assert.deepEqual(fixture.calls.listens, [[3001, "0.0.0.0"]]);
+  assert.equal(fixture.calls.indexerStarts, 1);
 });
 
 test("default application factory uses the pinned Fastify adapter", async () => {

@@ -78,8 +78,17 @@ export class LiveIndexerRuntime {
   }
 
   onApplicationBootstrap(): void {
+    this.start();
+  }
+
+  start(): void {
     if (!this.#options.enabled || !this.#stopped) return;
     this.#stopped = false;
+    this.#logger.info("indexer.runtime.started", "Canonical indexer runtime started", {
+      batchBlocks: INDEXER_BATCH_BLOCKS.toString(),
+      initialBackfillBlocks: INDEXER_INITIAL_BACKFILL_BLOCKS.toString(),
+      pollIntervalMs: this.#options.pollIntervalMs,
+    });
     this.#schedule(0);
   }
 

@@ -13,6 +13,7 @@ import {
   ApiTimeoutInterceptor,
   installFastifyAbuseControls,
 } from "./abuse-controls.ts";
+import { LiveIndexerRuntime } from "./indexer/runtime.ts";
 import { createBackendLogger } from "./telemetry.ts";
 
 export const API_GLOBAL_PREFIX = "v1" as const;
@@ -157,5 +158,6 @@ export async function startApi(
 ): Promise<ApiBootstrapResult> {
   const result = await createApiApplication(input, dependencies);
   await result.app.listen(result.config.port, result.config.host);
+  result.app.get(LiveIndexerRuntime, { strict: false }).start();
   return result;
 }

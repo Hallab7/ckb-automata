@@ -51,3 +51,26 @@ test("runtime leaves the chain untouched when the checkpoint is current", async 
   );
   assert.deepEqual(await runtime.runBatch(), { caughtUp: true, scanned: 0 });
 });
+
+test("explicit and lifecycle startup share one idempotent scanner", () => {
+  const events: string[] = [];
+  const runtime = new LiveIndexerRuntime(
+    { getTipHeader: async () => ({ number: 100n }) } as never,
+    { load: async () => ({ blockNumber: 100n }) } as never,
+    { scanBlock: async () => assert.fail("shutdown must cancel the scheduled scan") } as never,
+    {
+      error: () => undefined,
+      info: (event) => events.push(event),
+    },
+    {
+      enabled: true,
+      loadDeployment: async () => ({ network: "ckb_testnet" }) as RegisteredDeployment,
+    },
+  );
+
+  runtime.start();
+  runtime.onApplicationBootstrap();
+  runtime.onApplicationShutdown();
+
+  assert.deepEqual(events, ["indexer.runtime.started"]);
+});
