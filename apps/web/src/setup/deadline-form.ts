@@ -1,9 +1,11 @@
 import {
   CONTRACT_CAPACITY,
   isAbsoluteBlockDeadline,
+  minimumPlainCellCapacity,
   parseBlockNumber,
   parseDeadlineCreationRequest,
   parseHash32,
+  type ScriptIdentity,
 } from "@ckb-automata/core";
 
 import { ckbToShannons, shannonsToCkb } from "./ckb-amount.ts";
@@ -22,6 +24,7 @@ export const DEADLINE_INITIAL_DRAFT: SetupDraft = Object.freeze({
 
 export interface DeadlineValidationContext {
   readonly ownerLockHash: string | undefined;
+  readonly resolveLock: (address: string) => Promise<ScriptIdentity>;
   readonly resolveLockHash: (address: string) => Promise<string>;
   readonly walletReady: boolean;
 }
@@ -74,11 +77,18 @@ async function address(
   label: string,
   context: DeadlineValidationContext,
   errors: Record<string, string>,
-): Promise<string | undefined> {
+): Promise<{ readonly lockHash: string; readonly minimumCapacity: bigint } | undefined> {
   const value = required(draft, name, `Enter the ${label}.`, errors);
   if (!value) return undefined;
   try {
-    return parseHash32(await context.resolveLockHash(value));
+    const [lockHash, lock] = await Promise.all([
+      context.resolveLockHash(value),
+      context.resolveLock(value),
+    ]);
+    return Object.freeze({
+      lockHash: parseHash32(lockHash),
+      minimumCapacity: minimumPlainCellCapacity(lock),
+    });
   } catch {
     errors[name] = `Enter a valid CKB testnet address for the ${label}.`;
     return undefined;
@@ -92,14 +102,34 @@ export async function validateDeadlineStep(
 ): Promise<SetupErrors> {
   const errors: Record<string, string> = {};
   if (step === "details") {
-    amount(draft, "pledgeCkb", "recipient amount", CONTRACT_CAPACITY.plainWalletCell, errors);
+    const pledge = amount(
+      draft,
+      "pledgeCkb",
+      "recipient amount",
+      CONTRACT_CAPACITY.plainWalletCell,
+      errors,
+    );
     amount(draft, "targetCkb", "condition amount", 1n, errors);
-    const [successLockHash] = await Promise.all([
+    const [success, refund] = await Promise.all([
       address(draft, "successAddress", "recipient address", context, errors),
       address(draft, "refundAddress", "refund address", context, errors),
     ]);
-    if (successLockHash !== undefined && successLockHash === context.ownerLockHash) {
+    if (success !== undefined && success.lockHash === context.ownerLockHash) {
       errors["successAddress"] = "Recipient address must be different from your connected wallet.";
+    }
+    const requiredCapacity =
+      success === undefined || refund === undefined
+        ? undefined
+        : success.minimumCapacity > refund.minimumCapacity
+          ? success.minimumCapacity
+          : refund.minimumCapacity;
+    if (
+      pledge !== undefined &&
+      requiredCapacity !== undefined &&
+      BigInt(pledge) < requiredCapacity
+    ) {
+      errors["pledgeCkb"] =
+        `Recipient amount must be at least ${shannonsToCkb(requiredCapacity)} CKB for the selected recipient and refund addresses.`;
     }
   }
 
@@ -141,20 +171,34 @@ export async function validateDeadlineStep(
     if (!context.walletReady || context.ownerLockHash === undefined) {
       errors["ownerAddress"] = "Connect a supported CKB testnet wallet for recovery authority.";
     }
-    const [successLockHash, refundLockHash] = await Promise.all([
+    const [success, refund] = await Promise.all([
       address(draft, "successAddress", "recipient address", context, errors),
       address(draft, "refundAddress", "refund address", context, errors),
     ]);
-    if (successLockHash !== undefined && successLockHash === context.ownerLockHash) {
+    if (success !== undefined && success.lockHash === context.ownerLockHash) {
       errors["successAddress"] = "Recipient address must be different from your connected wallet.";
+    }
+    const requiredCapacity =
+      success === undefined || refund === undefined
+        ? undefined
+        : success.minimumCapacity > refund.minimumCapacity
+          ? success.minimumCapacity
+          : refund.minimumCapacity;
+    if (
+      pledge !== undefined &&
+      requiredCapacity !== undefined &&
+      BigInt(pledge) < requiredCapacity
+    ) {
+      errors["pledgeCkb"] =
+        `Recipient amount must be at least ${shannonsToCkb(requiredCapacity)} CKB for the selected recipient and refund addresses.`;
     }
     if (
       pledge !== undefined &&
       target !== undefined &&
       reward !== undefined &&
       deadline !== undefined &&
-      successLockHash !== undefined &&
-      refundLockHash !== undefined &&
+      success !== undefined &&
+      refund !== undefined &&
       context.ownerLockHash !== undefined &&
       errors["successAddress"] === undefined
     ) {
@@ -163,13 +207,13 @@ export async function validateDeadlineStep(
           pledges: [
             {
               outPoint: { txHash: SYNTHETIC_PLEDGE_OUT_POINT, index: "0" },
-              refundLockHash,
+              refundLockHash: refund.lockHash,
               amount: pledge,
             },
           ],
           target,
           deadlineBlock: deadline,
-          successLockHash,
+          successLockHash: success.lockHash,
           cancelLockHash: context.ownerLockHash,
           reward,
           creatorNonce: "0",

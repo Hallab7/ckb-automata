@@ -43,10 +43,12 @@ import {
   buildRecurringCreation,
   buildTopUp,
   deploymentRegistry,
+  minimumPlainCellCapacity,
   parseDeadlineCreationRequest,
   parseHash32,
   parseOutPoint,
   parseRecurringCreationRequest,
+  parseShannons,
   type LiveCellResolver,
   type RegisteredDeployment,
   type ScriptIdentity,
@@ -205,6 +207,21 @@ function verifiedResolutions(
     throw new TypeError("lockResolutions must resolve every recipient and recovery address");
   }
   return Object.freeze([...resolved.values()]);
+}
+
+function resolvedLock(resolutions: readonly ScriptIdentity[], lockHash: string): ScriptIdentity {
+  const expected = parseHash32(lockHash);
+  const lock = resolutions.find((value) => parseHash32(scriptToHash(value)) === expected);
+  if (!lock) throw new TypeError("resolved lock is unavailable");
+  return lock;
+}
+
+function requirePlainOutputCapacity(value: string, lock: ScriptIdentity, name: string): void {
+  const amount = parseShannons(value);
+  const minimum = minimumPlainCellCapacity(lock);
+  if (amount < minimum) {
+    throw new RangeError(`${name} must be at least ${minimum} shannons for this address`);
+  }
 }
 
 function parseTransaction(value: unknown): UnsignedDeadlineTransaction {
@@ -699,6 +716,22 @@ export class TransactionBuildService {
       request.cancelLockHash,
       ...request.pledges.map(({ refundLockHash }) => refundLockHash),
     ]);
+    const pledged = request.pledges.reduce(
+      (total, pledge) => parseShannons(total + parseShannons(pledge.amount)),
+      parseShannons(0n),
+    );
+    requirePlainOutputCapacity(
+      pledged.toString(),
+      resolvedLock(resolutions, request.successLockHash),
+      "recipient amount",
+    );
+    for (const [index, pledge] of request.pledges.entries()) {
+      requirePlainOutputCapacity(
+        pledge.amount,
+        resolvedLock(resolutions, pledge.refundLockHash),
+        `pledges[${index}].amount`,
+      );
+    }
     const build = buildDeadlineCreation({
       deployment,
       pledges: request.pledges,
@@ -736,6 +769,11 @@ export class TransactionBuildService {
       request.ownerLockHash,
       request.recipientLockHash,
     ]);
+    requirePlainOutputCapacity(
+      request.amount,
+      resolvedLock(resolutions, request.recipientLockHash),
+      "amount",
+    );
     const build = buildRecurringCreation({
       deployment,
       ownerLockHash: request.ownerLockHash,

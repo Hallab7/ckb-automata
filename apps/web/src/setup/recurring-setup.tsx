@@ -57,7 +57,7 @@ function RecurringDetails(context: SetupStepRenderContext) {
         />
         <TextField
           {...error(context, "amountCkb")}
-          hint="At least 61 CKB so every payment is a valid output."
+          hint="The app checks the minimum required by the recipient address."
           inputMode="decimal"
           label="Amount per run (CKB)"
           name="amountCkb"
@@ -267,6 +267,7 @@ export function RecurringSetup() {
   const validationContext: RecurringValidationContext = {
     balanceShannons: session.balanceShannons,
     ownerLockHash: session.ownerLockHash,
+    resolveLock: session.resolveLock,
     resolveLockHash: session.resolveLockHash,
     walletReady: session.status === "ready",
   };

@@ -18,6 +18,7 @@ import {
   hash32FromBytes,
   hash32ToBytes,
   isValidRecurringSchedule,
+  minimumPlainCellCapacity,
   parseBlockNumber,
   parseHash32,
   parseRunCount,
@@ -302,6 +303,12 @@ function buildRecurring(context: ExecutorContext, inspection: RecurringInspectio
   const residual = parseShannons(jobCapacity - consumed);
   const feeCapacity = parseShannons(inspection.feeCell.output.capacity);
   const feeChange = parseShannons(feeCapacity - context.identity.transactionFee);
+  if (inspection.amount < minimumPlainCellCapacity(inspection.recipientLock)) {
+    throw new RecurringAdapterError(
+      "INVALID_RECURRING_JOB",
+      "recurring amount cannot fund the resolved recipient output",
+    );
+  }
   const outputs: UnsignedDeadlineTransaction["outputs"][number][] = [
     plainOutput(reward, context.identity.rewardLock),
     plainOutput(inspection.amount, inspection.recipientLock),

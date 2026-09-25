@@ -44,7 +44,7 @@ function DeadlineDetails(context: SetupStepRenderContext) {
       <div className="setup-form-grid">
         <TextField
           {...error(context, "pledgeCkb")}
-          hint="This is the amount the recipient can receive. It must be at least 61 CKB."
+          hint="This is the amount the recipient can receive. The app checks the minimum required by both addresses."
           inputMode="decimal"
           label="Recipient amount (CKB)"
           name="pledgeCkb"
@@ -224,6 +224,7 @@ export function DeadlineSetup() {
   );
   const validationContext: DeadlineValidationContext = {
     ownerLockHash: session.ownerLockHash,
+    resolveLock: session.resolveLock,
     resolveLockHash: session.resolveLockHash,
     walletReady: session.status === "ready",
   };

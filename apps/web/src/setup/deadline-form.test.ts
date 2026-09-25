@@ -2,8 +2,17 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
+import { parseHash32 } from "@ckb-automata/core";
+
 import { clientAcceptsDeadlineRequest, validateDeadlineStep } from "./deadline-form.ts";
 import { ckbToShannons } from "./ckb-amount.ts";
+
+const STANDARD_LOCK = Object.freeze({
+  codeHash: parseHash32(`0x${"11".repeat(32)}`),
+  hashType: "type" as const,
+  args: `0x${"22".repeat(20)}` as const,
+});
+const CCC_LOCK = Object.freeze({ ...STANDARD_LOCK, args: `0x${"22".repeat(22)}` as const });
 
 interface Fixture {
   readonly valid: Record<string, unknown> & {
@@ -53,6 +62,7 @@ test("deadline form reports the exact one-shannon target minimum", async () => {
     },
     {
       ownerLockHash: undefined,
+      resolveLock: async () => STANDARD_LOCK,
       resolveLockHash: async () => `0x${"22".repeat(32)}`,
       walletReady: false,
     },
@@ -72,6 +82,7 @@ test("deadline form rejects the connected wallet as the recipient", async () => 
     },
     {
       ownerLockHash,
+      resolveLock: async () => STANDARD_LOCK,
       resolveLockHash: async (address) =>
         address === "owner" ? ownerLockHash : `0x${"33".repeat(32)}`,
       walletReady: true,
@@ -80,6 +91,29 @@ test("deadline form rejects the connected wallet as the recipient", async () => 
   assert.equal(
     errors["successAddress"],
     "Recipient address must be different from your connected wallet.",
+  );
+});
+
+test("deadline form uses the larger recipient or refund address minimum", async () => {
+  const errors = await validateDeadlineStep(
+    "details",
+    {
+      pledgeCkb: "61",
+      targetCkb: "61",
+      successAddress: "recipient",
+      refundAddress: "refund",
+    },
+    {
+      ownerLockHash: undefined,
+      resolveLock: async (address) => (address === "recipient" ? CCC_LOCK : STANDARD_LOCK),
+      resolveLockHash: async (address) =>
+        address === "recipient" ? `0x${"33".repeat(32)}` : `0x${"44".repeat(32)}`,
+      walletReady: true,
+    },
+  );
+  assert.equal(
+    errors["pledgeCkb"],
+    "Recipient amount must be at least 63 CKB for the selected recipient and refund addresses.",
   );
 });
 

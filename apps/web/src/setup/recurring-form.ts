@@ -2,10 +2,12 @@ import {
   CONTRACT_CAPACITY,
   MAX_UINT32,
   calculateRecurringQuote,
+  minimumPlainCellCapacity,
   parseBlockNumber,
   parseHash32,
   parseRecurringCreationRequest,
   parseRunCount,
+  type ScriptIdentity,
 } from "@ckb-automata/core";
 
 import { ckbToShannons, shannonsToCkb } from "./ckb-amount.ts";
@@ -29,6 +31,7 @@ export const RECURRING_INITIAL_DRAFT: SetupDraft = Object.freeze({
 export interface RecurringValidationContext {
   readonly balanceShannons: bigint | undefined;
   readonly ownerLockHash: string | undefined;
+  readonly resolveLock: (address: string) => Promise<ScriptIdentity>;
   readonly resolveLockHash: (address: string) => Promise<string>;
   readonly walletReady: boolean;
 }
@@ -103,11 +106,18 @@ async function recipient(
   draft: SetupDraft,
   context: RecurringValidationContext,
   errors: Record<string, string>,
-): Promise<string | undefined> {
+): Promise<{ readonly lockHash: string; readonly minimumCapacity: bigint } | undefined> {
   const value = required(draft, "recipientAddress", "Enter the payment recipient.", errors);
   if (!value) return undefined;
   try {
-    return parseHash32(await context.resolveLockHash(value));
+    const [lockHash, lock] = await Promise.all([
+      context.resolveLockHash(value),
+      context.resolveLock(value),
+    ]);
+    return Object.freeze({
+      lockHash: parseHash32(lockHash),
+      minimumCapacity: minimumPlainCellCapacity(lock),
+    });
   } catch {
     errors["recipientAddress"] = "Enter a valid CKB testnet recipient address.";
     return undefined;
@@ -181,15 +191,31 @@ export async function validateRecurringStep(
 ): Promise<SetupErrors> {
   const errors: Record<string, string> = {};
   if (step === "details") {
-    await recipient(draft, context, errors);
-    validateAmount(draft, "amountCkb", "payment per run", errors);
+    const resolvedRecipient = await recipient(draft, context, errors);
+    const amount = validateAmount(draft, "amountCkb", "payment per run", errors);
+    if (
+      resolvedRecipient !== undefined &&
+      amount !== undefined &&
+      amount < resolvedRecipient.minimumCapacity
+    ) {
+      errors["amountCkb"] =
+        `Payment per run must be at least ${shannonsToCkb(resolvedRecipient.minimumCapacity)} CKB for this recipient address.`;
+    }
   }
   if (step === "timing") timingValues(draft, errors);
   if (step === "funding") {
     const amount = validateAmount(draft, "amountCkb", "payment per run", errors);
     const reward = validateAmount(draft, "rewardCkb", "executor reward", errors);
     const { first, interval, runs } = timingValues(draft, errors);
-    const recipientLockHash = await recipient(draft, context, errors);
+    const resolvedRecipient = await recipient(draft, context, errors);
+    if (
+      resolvedRecipient !== undefined &&
+      amount !== undefined &&
+      amount < resolvedRecipient.minimumCapacity
+    ) {
+      errors["amountCkb"] =
+        `Payment per run must be at least ${shannonsToCkb(resolvedRecipient.minimumCapacity)} CKB for this recipient address.`;
+    }
     if (!context.walletReady || context.ownerLockHash === undefined) {
       errors["ownerAddress"] = "Connect a supported CKB testnet wallet for funding and refunds.";
     }
@@ -215,13 +241,13 @@ export async function validateRecurringStep(
       first !== undefined &&
       interval !== undefined &&
       runs !== undefined &&
-      recipientLockHash !== undefined &&
+      resolvedRecipient !== undefined &&
       context.ownerLockHash !== undefined
     ) {
       try {
         parseRecurringCreationRequest({
           ownerLockHash: context.ownerLockHash,
-          recipientLockHash,
+          recipientLockHash: resolvedRecipient.lockHash,
           amount: amount.toString(),
           intervalBlocks: interval.toString(),
           firstNotBefore: first.toString(),

@@ -55,6 +55,7 @@ export {
   CONTRACT_CAPACITY,
   minimumCampaignCellCapacity,
   minimumJobCellCapacity,
+  minimumPlainCellCapacity,
   type ContractCapacityId,
 } from "./contract-costs.ts";
 

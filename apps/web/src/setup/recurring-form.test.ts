@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
+import { parseHash32 } from "@ckb-automata/core";
+
 import {
   clientAcceptsRecurringRequest,
   recurringFundingPreview,
@@ -9,6 +11,12 @@ import {
 } from "./recurring-form.ts";
 
 const HASH = `0x${"22".repeat(32)}`;
+const STANDARD_LOCK = Object.freeze({
+  codeHash: parseHash32(`0x${"11".repeat(32)}`),
+  hashType: "type" as const,
+  args: `0x${"22".repeat(20)}` as const,
+});
+const CCC_LOCK = Object.freeze({ ...STANDARD_LOCK, args: `0x${"22".repeat(22)}` as const });
 const VALID_DRAFT = {
   amountCkb: "100",
   firstExecutionBlock: "15000000",
@@ -20,6 +28,7 @@ const VALID_DRAFT = {
 const CONTEXT = {
   balanceShannons: 100_000_000_000n,
   ownerLockHash: HASH,
+  resolveLock: async () => STANDARD_LOCK,
   resolveLockHash: async () => HASH,
   walletReady: true,
 };
@@ -79,6 +88,18 @@ test("recurring validation rejects overflow and insufficient wallet balance", as
     balanceShannons: 86_399_999_999n,
   });
   assert.equal(errors["ownerAddress"], "Wallet balance is below the 864 CKB locked total.");
+});
+
+test("recurring validation uses the resolved recipient address minimum", async () => {
+  const errors = await validateRecurringStep(
+    "details",
+    { ...VALID_DRAFT, amountCkb: "61" },
+    { ...CONTEXT, resolveLock: async () => CCC_LOCK },
+  );
+  assert.equal(
+    errors["amountCkb"],
+    "Payment per run must be at least 63 CKB for this recipient address.",
+  );
 });
 
 test("recurring client rejects every invalid API fixture", async () => {

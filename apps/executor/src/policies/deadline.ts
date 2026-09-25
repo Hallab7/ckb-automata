@@ -14,6 +14,7 @@ import {
   determineCampaignOutcome,
   hash32FromBytes,
   hash32ToBytes,
+  minimumPlainCellCapacity,
   parseHash32,
   parseOutPoint,
   parseShannons,
@@ -409,10 +410,22 @@ function buildDeadline(context: ExecutorContext, inspection: DeadlineInspection)
   ];
   const outputsData: Hex[] = ["0x", "0x"];
   if (inspection.outcome === "SUCCEEDED") {
+    if (pledged < minimumPlainCellCapacity(inspection.successLock)) {
+      throw new DeadlineAdapterError(
+        "INVALID_CAMPAIGN",
+        "campaign pledge cannot fund the resolved recipient output",
+      );
+    }
     outputs.push(plainOutput(pledged, inspection.successLock));
     outputsData.push("0x");
   } else {
     for (const record of inspection.refundRecords) {
+      if (record.amount < minimumPlainCellCapacity(record.refundLock)) {
+        throw new DeadlineAdapterError(
+          "INVALID_CAMPAIGN",
+          "campaign pledge cannot fund a resolved refund output",
+        );
+      }
       outputs.push(plainOutput(record.amount, record.refundLock));
       outputsData.push("0x");
     }

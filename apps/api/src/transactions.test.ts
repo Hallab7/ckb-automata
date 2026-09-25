@@ -30,6 +30,10 @@ const RECIPIENT_LOCK: ScriptIdentity = Object.freeze({
   hashType: "type",
   args: "0x02",
 });
+const CCC_RECIPIENT_LOCK: ScriptIdentity = Object.freeze({
+  ...RECIPIENT_LOCK,
+  args: `0x${"22".repeat(22)}`,
+});
 const noOpResolutionRecorder = Object.freeze({
   remember: async () => undefined,
 });
@@ -233,6 +237,54 @@ test("creation rejects missing, incomplete, and unrelated lock resolutions", asy
       return true;
     });
   }
+});
+
+test("creation rejects payouts below the resolved address capacity", async () => {
+  const recurringFixture = JSON.parse(
+    await readFile(
+      new URL("../../../contracts/fixtures/recurring_request_validation_v1.json", import.meta.url),
+      "utf8",
+    ),
+  ) as RecurringValidationFixture;
+  const deadlineFixture = await deadlineValidationFixture();
+  const service = new TransactionBuildService(
+    {} as never,
+    {
+      getTipHeader: async () => {
+        throw new Error("capacity validation must run before reading the tip");
+      },
+    } as never,
+    environment().CKB_GENESIS_HASH,
+    noOpResolutionRecorder,
+  );
+
+  await assert.rejects(
+    service.construct("create_recurring_job", {
+      ...recurringFixture.valid,
+      ownerLockHash: scriptToHash(OWNER_LOCK),
+      recipientLockHash: scriptToHash(CCC_RECIPIENT_LOCK),
+      amount: "6100000000",
+      lockResolutions: [OWNER_LOCK, CCC_RECIPIENT_LOCK],
+    }),
+    /amount must be at least 6300000000 shannons/,
+  );
+
+  await assert.rejects(
+    service.construct("create_deadline_job", {
+      ...deadlineFixture.valid,
+      pledges: [
+        {
+          ...deadlineFixture.valid.pledges[0],
+          amount: "6100000000",
+          refundLockHash: scriptToHash(OWNER_LOCK),
+        },
+      ],
+      successLockHash: scriptToHash(CCC_RECIPIENT_LOCK),
+      cancelLockHash: scriptToHash(OWNER_LOCK),
+      lockResolutions: [OWNER_LOCK, CCC_RECIPIENT_LOCK],
+    }),
+    /recipient amount must be at least 6300000000 shannons/,
+  );
 });
 
 test("signed creation validation accepts canonical tip advances and rejects expiry or reorg", async () => {

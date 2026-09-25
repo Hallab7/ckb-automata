@@ -27,11 +27,11 @@ async function deployment(): Promise<RegisteredDeployment> {
   return loaded.deployment;
 }
 
-function lock(value: RegisteredDeployment, byte: string): ScriptIdentity {
+function lock(value: RegisteredDeployment, byte: string, argsBytes = 20): ScriptIdentity {
   return {
     codeHash: value.manifest.secp256k1Blake160.codeHash,
     hashType: value.manifest.secp256k1Blake160.hashType,
-    args: `0x${byte.repeat(40)}`,
+    args: `0x${byte.repeat(argsBytes * 2)}`,
   };
 }
 
@@ -44,16 +44,19 @@ function header(number: bigint) {
   });
 }
 
-async function deadlineFixture(outcome: "SUCCEEDED" | "REFUNDING"): Promise<{
+async function deadlineFixture(
+  outcome: "SUCCEEDED" | "REFUNDING",
+  pledged = 10_000_000_000n,
+  successArgsBytes = 20,
+): Promise<{
   readonly snapshot: ExecutorSnapshot;
   readonly executorLock: ScriptIdentity;
   readonly successLock: ScriptIdentity;
 }> {
   const registered = await deployment();
   const ownerLock = lock(registered, "11");
-  const successLock = lock(registered, "22");
+  const successLock = lock(registered, "22", successArgsBytes);
   const executorLock = lock(registered, "33");
-  const pledged = 10_000_000_000n;
   const deadline = 100n;
   const creation = buildDeadlineCreation({
     deployment: registered,
@@ -145,6 +148,14 @@ test("deadline adapter derives success and binds every terminal output", async (
   assert.equal(first.build.transaction.outputs[2]?.capacity, "0x2540be400");
   const terminal = CampaignDataV1.unpack(hexToBytes(first.build.transaction.outputsData[3]!));
   assert.equal(terminal.state, 1);
+});
+
+test("deadline adapter rejects a payout below the resolved recipient minimum", async () => {
+  const fixture = await deadlineFixture("SUCCEEDED", 6_100_000_000n, 22);
+  assert.throws(
+    () => execute(fixture),
+    (error: unknown) => error instanceof DeadlineAdapterError && error.code === "INVALID_CAMPAIGN",
+  );
 });
 
 test("deadline adapter derives refund outputs from committed records", async () => {

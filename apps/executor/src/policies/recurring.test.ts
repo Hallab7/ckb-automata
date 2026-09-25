@@ -30,11 +30,11 @@ async function deployment(): Promise<RegisteredDeployment> {
   return loaded.deployment;
 }
 
-function lock(value: RegisteredDeployment, byte: string): ScriptIdentity {
+function lock(value: RegisteredDeployment, byte: string, argsBytes = 20): ScriptIdentity {
   return {
     codeHash: value.manifest.secp256k1Blake160.codeHash,
     hashType: value.manifest.secp256k1Blake160.hashType,
-    args: `0x${byte.repeat(40)}`,
+    args: `0x${byte.repeat(argsBytes * 2)}`,
   };
 }
 
@@ -50,6 +50,8 @@ function header(number: bigint) {
 async function recurringFixture(
   sequence: bigint,
   tip: bigint,
+  amount = 10_000_000_000n,
+  recipientArgsBytes = 20,
 ): Promise<{
   readonly snapshot: ExecutorSnapshot;
   readonly executorLock: ScriptIdentity;
@@ -58,9 +60,8 @@ async function recurringFixture(
 }> {
   const registered = await deployment();
   const ownerLock = lock(registered, "11");
-  const recipientLock = lock(registered, "22");
+  const recipientLock = lock(registered, "22", recipientArgsBytes);
   const executorLock = lock(registered, "33");
-  const amount = 10_000_000_000n;
   const reward = 10_000_000_000n;
   const totalRuns = 4n;
   const interval = 10n;
@@ -142,6 +143,15 @@ function execute(fixture: Awaited<ReturnType<typeof recurringFixture>>) {
     { rewardLock: fixture.executorLock, transactionFee: parseShannons("1000000") },
   );
 }
+
+test("recurring adapter rejects a payout below the resolved recipient minimum", async () => {
+  const fixture = await recurringFixture(0n, 100n, 6_100_000_000n, 22);
+  assert.throws(
+    () => execute(fixture),
+    (error: unknown) =>
+      error instanceof RecurringAdapterError && error.code === "INVALID_RECURRING_JOB",
+  );
+});
 
 for (const [label, sequence, tip, expectedNext] of [
   ["first", 0n, 100n, 110n],
