@@ -269,21 +269,27 @@ test("concurrent build deliveries share one durable operational attempt", async 
       adapterId: "recurring-v1",
       evaluatedAt: { blockHash: hash(90), blockNumber: "90" },
     };
-    const claims = await Promise.all([store.claim(payload), store.claim(payload)]);
+    const builderLockHash = hash(91);
+    const claims = await Promise.all([
+      store.claim(payload, builderLockHash),
+      store.claim(payload, builderLockHash),
+    ]);
     const claimed = claims.find((result) => result.status === "claimed");
     const duplicate = claims.find((result) => result.status === "duplicate");
     assert.ok(claimed && duplicate);
     assert.equal(duplicate.attemptId, claimed.claim.attemptId);
+    assert.equal(duplicate.builderLockHash, builderLockHash);
     assert.equal(
       await store.complete(claimed.claim, { tip: payload.evaluatedAt }, hash(72), {
         version: "0x0",
       }),
       true,
     );
-    const replay = await store.claim(payload);
+    const replay = await store.claim(payload, builderLockHash);
     assert.equal(replay.status, "duplicate");
     assert.equal(replay.attemptId, claimed.claim.attemptId);
     assert.equal(replay.intentHash, hash(72));
+    assert.equal(replay.builderLockHash, builderLockHash);
 
     simulationStore = new PostgresSimulationStore(database.url);
     const simulationAttempt = await simulationStore.load(claimed.claim.attemptId, hash(72));
@@ -387,9 +393,10 @@ test("concurrent build deliveries share one durable operational attempt", async 
       { status: "transitioned", state: "confirmed" },
     );
     assert.deepEqual(await confirmationStore.listPending(), []);
-    const afterApproval = await store.claim(payload);
+    const afterApproval = await store.claim(payload, hash(92));
     assert.equal(afterApproval.status, "duplicate");
     assert.equal(afterApproval.attemptId, claimed.claim.attemptId);
+    assert.equal(afterApproval.builderLockHash, builderLockHash);
 
     const sql = postgres(database.url, { max: 1, onnotice: () => undefined });
     try {

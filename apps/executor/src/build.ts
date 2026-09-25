@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { rawTransactionToHash } from "@nervosnetwork/ckb-sdk-utils";
+import { rawTransactionToHash, scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
 
 import { parseHash32, parseSequence, type Hash32 } from "@ckb-automata/core";
 
@@ -32,11 +32,12 @@ export type BuildClaimResult =
       readonly status: "duplicate";
       readonly attemptId: string;
       readonly intentHash?: Hash32;
+      readonly builderLockHash?: Hash32;
     }
   | { readonly status: "stale" };
 
 export interface BuildAttemptStore {
-  claim(payload: BuildQueuePayload): Promise<BuildClaimResult>;
+  claim(payload: BuildQueuePayload, builderLockHash: Hash32): Promise<BuildClaimResult>;
   complete(
     claim: BuildAttemptClaim,
     snapshot: Readonly<Record<string, unknown>>,
@@ -111,6 +112,7 @@ export class TransactionBuildService {
   }
 
   async build(payload: BuildQueuePayload): Promise<TransactionBuildResult> {
+    const builderLockHash = parseHash32(scriptToHash(this.#identity.rewardLock));
     const canonicalPayload = Object.freeze({
       ...payload,
       jobId: parseHash32(payload.jobId),
@@ -120,10 +122,10 @@ export class TransactionBuildService {
         blockNumber: payload.evaluatedAt.blockNumber,
       }),
     });
-    const claimed = await this.#store.claim(canonicalPayload);
+    const claimed = await this.#store.claim(canonicalPayload, builderLockHash);
     if (claimed.status === "stale") return Object.freeze({ status: "stale" });
     if (claimed.status === "duplicate") {
-      if (claimed.intentHash !== undefined) {
+      if (claimed.intentHash !== undefined && claimed.builderLockHash === builderLockHash) {
         await this.#enqueueSimulation(claimed.attemptId, claimed.intentHash);
       }
       return Object.freeze({

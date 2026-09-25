@@ -147,6 +147,7 @@ async function fixture(): Promise<{
 
 class MemoryStore implements BuildAttemptStore {
   readonly claimValue: BuildAttemptClaim;
+  builderLockHash: Hash32 | undefined;
   completed:
     | {
         readonly snapshot: Readonly<Record<string, unknown>>;
@@ -164,14 +165,16 @@ class MemoryStore implements BuildAttemptStore {
     });
   }
 
-  async claim(): Promise<BuildClaimResult> {
+  async claim(_payload: BuildQueuePayload, builderLockHash: Hash32): Promise<BuildClaimResult> {
     if (this.completed) {
       return Object.freeze({
         status: "duplicate",
         attemptId: this.claimValue.attemptId,
         intentHash: parseHash32(this.completed.intentHash),
+        ...(this.builderLockHash === undefined ? {} : { builderLockHash: this.builderLockHash }),
       });
     }
+    this.builderLockHash = builderLockHash;
     return Object.freeze({ status: "claimed", claim: this.claimValue });
   }
 
@@ -238,6 +241,29 @@ test("build work records its exact snapshot and intent before simulation", async
 
   const duplicate = await service.build(payload(value.record));
   assert.equal(duplicate.status, "duplicate");
+  assert.equal(calls.length, 2);
+
+  const otherOperator = new TransactionBuildService({
+    registry: new ExecutorAdapterRegistry([RECURRING_EXECUTOR_ADAPTER]),
+    identity: {
+      rewardLock: lock(value.snapshot.deployment, "44"),
+      transactionFee: parseShannons("1000000"),
+    },
+    store,
+    source: {
+      async reload() {
+        throw new Error("duplicate builds must not reload the chain snapshot");
+      },
+    },
+    queues: {
+      async enqueue(...args: unknown[]) {
+        calls.push(args);
+        return {} as never;
+      },
+    },
+  });
+  const crossOperatorDuplicate = await otherOperator.build(payload(value.record));
+  assert.equal(crossOperatorDuplicate.status, "duplicate");
   assert.equal(calls.length, 2);
 });
 

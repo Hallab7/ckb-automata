@@ -16,6 +16,7 @@ import type { BuildQueuePayload } from "./eligibility.ts";
 interface AttemptRow {
   readonly id: string;
   readonly intent_hash: string | null;
+  readonly builder_lock_hash: string | null;
   readonly build_claim_expires_at: Date | null;
 }
 
@@ -61,9 +62,10 @@ export class PostgresBuildAttemptStore implements BuildAttemptStore {
     });
   }
 
-  async claim(payload: BuildQueuePayload): Promise<BuildClaimResult> {
+  async claim(payload: BuildQueuePayload, builderLockHash: Hash32): Promise<BuildClaimResult> {
     const jobId = parseHash32(payload.jobId);
     const sequence = parseSequence(payload.sequence).toString();
+    const canonicalBuilderLockHash = parseHash32(builderLockHash);
     const claimToken = createBuildAttemptId();
     const now = this.#now();
     const expiresAt = new Date(now.getTime() + BUILD_CLAIM_LEASE_MS);
@@ -83,7 +85,7 @@ export class PostgresBuildAttemptStore implements BuildAttemptStore {
       if (!job) return Object.freeze({ status: "stale" as const });
 
       const existing = await sql<AttemptRow[]>`
-        SELECT id, intent_hash, build_claim_expires_at
+        SELECT id, intent_hash, builder_lock_hash, build_claim_expires_at
         FROM transaction_attempts
         WHERE network_id = ${this.#network}
           AND job_id = ${jobId}
@@ -105,9 +107,10 @@ export class PostgresBuildAttemptStore implements BuildAttemptStore {
             UPDATE transaction_attempts
             SET build_claim_token = ${claimToken},
                 build_claim_expires_at = ${expiresAt},
+                builder_lock_hash = ${canonicalBuilderLockHash},
                 updated_at = ${now}
             WHERE id = ${active.id} AND state = 'draft' AND intent_hash IS NULL
-            RETURNING id, intent_hash, build_claim_expires_at
+            RETURNING id, intent_hash, builder_lock_hash, build_claim_expires_at
           `;
           if (reclaimed[0]) {
             return Object.freeze({
@@ -124,6 +127,9 @@ export class PostgresBuildAttemptStore implements BuildAttemptStore {
           status: "duplicate" as const,
           attemptId: active.id,
           ...(active.intent_hash === null ? {} : { intentHash: parseHash32(active.intent_hash) }),
+          ...(active.builder_lock_hash === null
+            ? {}
+            : { builderLockHash: parseHash32(active.builder_lock_hash) }),
         });
       }
 
@@ -131,10 +137,10 @@ export class PostgresBuildAttemptStore implements BuildAttemptStore {
       await sql`
         INSERT INTO transaction_attempts (
           id, network_id, job_id, sequence, operation, state,
-          build_claim_token, build_claim_expires_at
+          build_claim_token, build_claim_expires_at, builder_lock_hash
         ) VALUES (
           ${attemptId}, ${this.#network}, ${jobId}, ${sequence}, 'execute', 'draft',
-          ${claimToken}, ${expiresAt}
+          ${claimToken}, ${expiresAt}, ${canonicalBuilderLockHash}
         )
       `;
       return Object.freeze({

@@ -270,6 +270,7 @@ export const transactionAttempts = pgTable(
     simulation: jsonb("simulation"),
     buildClaimToken: uuid("build_claim_token"),
     buildClaimExpiresAt: timestamp("build_claim_expires_at", { withTimezone: true }),
+    builderLockHash: hash("builder_lock_hash"),
     unsignedTxHash: hash("unsigned_tx_hash"),
     txHash: hash("tx_hash"),
     errorCode: varchar("error_code", { length: 96 }),
@@ -310,6 +311,10 @@ export const transactionAttempts = pgTable(
     check(
       "transaction_attempts_build_claim_ck",
       sql`(${table.buildClaimToken} IS NULL) = (${table.buildClaimExpiresAt} IS NULL)`,
+    ),
+    check(
+      "transaction_attempts_builder_lock_hash_ck",
+      sql`${table.builderLockHash} IS NULL OR ${table.builderLockHash} ~ '^0x[0-9a-f]{64}$'`,
     ),
   ],
 );
