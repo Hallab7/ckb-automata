@@ -20,6 +20,7 @@ import { useWalletSession } from "../ccc/session.tsx";
 import { browserWebEnvironment } from "../environment.ts";
 import { ckbToShannons } from "./ckb-amount.ts";
 import {
+  reviewTechnicalDetailsJson,
   verifyCreationReview,
   type CreationRequest,
   type CreationReviewModel,
@@ -366,7 +367,7 @@ export function ReviewSummary({
             </dd>
           </div>
         </dl>
-        <pre>{JSON.stringify(model.technicalDetails, null, 2)}</pre>
+        <pre>{reviewTechnicalDetailsJson(model.technicalDetails)}</pre>
       </details>
     </div>
   );

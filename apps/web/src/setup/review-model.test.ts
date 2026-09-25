@@ -15,7 +15,11 @@ import {
   type ScriptIdentity,
   type UnsignedDeadlineTransaction,
 } from "@ckb-automata/core";
-import { verifyCreationReview, type CreationRequest } from "./review-model.ts";
+import {
+  reviewTechnicalDetailsJson,
+  verifyCreationReview,
+  type CreationRequest,
+} from "./review-model.ts";
 
 const DEADLINE_FEE = {
   transactionBytes: { minimum: "700", maximum: "900" },
@@ -436,4 +440,11 @@ test("review uses CCC completion without invoking a wallet signature", async () 
   assert.match(review, /reviewStateError/);
   assert.match(review, /freezeReviewedTransaction\(completed\.transaction\)/);
   assert.match(review, /connected wallet network does not match the reviewed deployment/i);
+});
+
+test("technical review details render bigint values as exact decimal strings", () => {
+  assert.equal(
+    reviewTechnicalDetailsJson({ capacity: 10_000_000_000n }),
+    '{\n  "capacity": "10000000000"\n}',
+  );
 });

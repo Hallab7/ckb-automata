@@ -91,6 +91,10 @@ function canonicalJson(value: unknown): string {
   return JSON.stringify(normalized(value));
 }
 
+export function reviewTechnicalDetailsJson(value: unknown): string {
+  return JSON.stringify(normalized(value), null, 2);
+}
+
 async function sha256(value: unknown): Promise<string> {
   const bytes = new TextEncoder().encode(canonicalJson(value));
   const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
