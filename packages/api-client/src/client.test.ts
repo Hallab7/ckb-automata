@@ -5,6 +5,24 @@ import { ApiClientError, createApiClient } from "./client.ts";
 
 const jsonHeaders = { "content-type": "application/json" };
 
+test("invokes browser fetch with the global receiver", async () => {
+  let calls = 0;
+  const client = createApiClient({
+    baseUrl: "https://api.example.test/",
+    fetch: async function fetchWithReceiver(this: unknown) {
+      assert.equal(this, globalThis);
+      calls += 1;
+      return new Response(JSON.stringify({ network: "ckb_testnet" }), {
+        headers: jsonHeaders,
+      });
+    },
+  });
+
+  await client.network();
+
+  assert.equal(calls, 1);
+});
+
 test("encodes path and query parameters", async () => {
   const requests: Request[] = [];
   const client = createApiClient({

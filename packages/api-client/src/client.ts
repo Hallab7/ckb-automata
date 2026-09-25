@@ -297,7 +297,7 @@ export class AutomataApiClient {
   ): Promise<Result> {
     const url = new URL(path, this.#baseUrl);
     appendQuery(url, options.query);
-    const response = await this.#fetch(url, {
+    const response = await this.#fetch.call(globalThis, url, {
       headers: {
         accept: "application/json",
         ...(options.body === undefined ? {} : { "content-type": "application/json" }),
