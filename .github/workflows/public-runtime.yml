@@ -25,6 +25,7 @@ jobs:
         with:
           node-version-file: .node-version
           check-latest: false
+          package-manager-cache: false
       - name: Check public runtime
         env:
           PUBLIC_API_URL: https://ckb-automata-api.onrender.com/
@@ -38,5 +39,5 @@ jobs:
         with:
           name: public-runtime-failure-${{ github.run_id }}
           path: public-runtime-evidence.json
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
