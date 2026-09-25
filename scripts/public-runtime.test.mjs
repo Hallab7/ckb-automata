@@ -57,6 +57,26 @@ test("public runtime verification binds both independent operator identities", a
   );
 });
 
+test("public runtime verification warms the API through transient unavailability", async () => {
+  let apiRequests = 0;
+  const report = await verifyPublicRuntime(environment, {
+    attempts: 3,
+    retryDelayMs: 0,
+    sleep: async () => {},
+    fetchImpl: async (url) => {
+      if (url.hostname !== "api.example.test") {
+        return readyExecutor(
+          url.hostname === "executor-a.example.test" ? "operator-a" : "operator-b",
+        );
+      }
+      apiRequests += 1;
+      return apiRequests === 1 ? response({ status: "not_ready" }, 503) : readyApi();
+    },
+  });
+  assert.equal(apiRequests, 2);
+  assert.equal(report.checks.find(({ name }) => name === "api")?.status, "ready");
+});
+
 test("public runtime verification fails closed on an operator identity mismatch", async () => {
   await assert.rejects(
     verifyPublicRuntime(environment, {

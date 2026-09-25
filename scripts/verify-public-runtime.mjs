@@ -6,6 +6,9 @@ import { pathToFileURL } from "node:url";
 
 const EXPECTED_GENESIS = "0x10639e0895502b5688a6be8cf69460d76541bfa4821629d86d62ba0aae3f9606";
 const EXPECTED_ADAPTERS = Object.freeze(["deadline-v1", "recurring-v1"]);
+const TRANSIENT_STATUSES = new Set([502, 503, 504]);
+const DEFAULT_ATTEMPTS = 18;
+const DEFAULT_RETRY_DELAY_MS = 10_000;
 
 function endpoint(value, name, path) {
   if (!value) throw new Error(`${name} is required`);
@@ -16,15 +19,33 @@ function endpoint(value, name, path) {
   return url;
 }
 
-async function requestJson(fetchImpl, target, name) {
+async function requestJson(fetchImpl, target, name, options) {
+  const attempts = options.attempts ?? DEFAULT_ATTEMPTS;
+  const retryDelayMs = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
+  const sleep =
+    options.sleep ?? ((delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)));
   const startedAt = Date.now();
-  const response = await fetchImpl(target, {
-    headers: { accept: "application/json" },
-    signal: AbortSignal.timeout(90_000),
-  });
-  const latencyMs = Date.now() - startedAt;
-  assert.equal(response.status, 200, `${name} returned ${response.status}`);
-  return Object.freeze({ body: await response.json(), latencyMs });
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    let response;
+    try {
+      response = await fetchImpl(target, {
+        headers: { accept: "application/json" },
+        signal: AbortSignal.timeout(90_000),
+      });
+    } catch (error) {
+      lastError = error;
+    }
+    if (response?.status === 200) {
+      return Object.freeze({ body: await response.json(), latencyMs: Date.now() - startedAt });
+    }
+    if (response !== undefined) {
+      assert.ok(TRANSIENT_STATUSES.has(response.status), `${name} returned ${response.status}`);
+      lastError = new Error(`${name} returned ${response.status}`);
+    }
+    if (attempt < attempts) await sleep(retryDelayMs);
+  }
+  throw lastError ?? new Error(`${name} did not become ready`);
 }
 
 export async function verifyPublicRuntime(environment, options = {}) {
@@ -48,7 +69,7 @@ export async function verifyPublicRuntime(environment, options = {}) {
   ]);
   const checks = await Promise.all(
     targets.map(async (target) => {
-      const result = await requestJson(fetchImpl, target.url, target.name);
+      const result = await requestJson(fetchImpl, target.url, target.name, options);
       if (target.kind === "api") {
         assert.equal(result.body.status, "ready", "public API is not ready");
         for (const dependency of ["postgres", "redis", "rpc", "deployment", "indexLag"]) {
