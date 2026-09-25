@@ -114,6 +114,20 @@ function stable(value: unknown): string {
   );
 }
 
+export function assertSnapshotTipContinuity(
+  before: ExecutorHeaderSnapshot,
+  after: ExecutorHeaderSnapshot,
+): void {
+  if (
+    after.number < before.number ||
+    (after.number === before.number && after.hash !== before.hash)
+  ) {
+    throw Object.assign(new Error("chain tip changed while assembling the build snapshot"), {
+      code: "EXECUTOR_CHAIN_SNAPSHOT_MOVED",
+    });
+  }
+}
+
 export class ChainBuildSnapshotSource implements BuildSnapshotSource {
   readonly #deployment: RegisteredDeployment;
   readonly #runtime: ExecutorRuntime;
@@ -172,11 +186,7 @@ export class ChainBuildSnapshotSource implements BuildSnapshotSource {
     const applicationCells = await this.#applicationCells(lineage, inspected.policy);
     const feeCells = await this.#feeCells();
     const tip = headerSnapshot(await this.#runtime.getTipHeader());
-    if (tip.hash !== tipBefore.hash || tip.number !== tipBefore.number) {
-      throw Object.assign(new Error("chain tip changed while assembling the build snapshot"), {
-        code: "EXECUTOR_CHAIN_SNAPSHOT_MOVED",
-      });
-    }
+    assertSnapshotTipContinuity(tipBefore, tip);
     return Object.freeze({
       deployment: this.#deployment,
       tip,
