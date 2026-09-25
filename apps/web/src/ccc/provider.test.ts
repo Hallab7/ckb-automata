@@ -7,8 +7,10 @@ import {
   EXPECTED_CKB_ADDRESS_PREFIX,
   PREFERRED_CCC_NETWORKS,
   SUPPORTED_CCC_SIGNER_TYPES,
+  SUPPORTED_EVM_WALLETS,
   deriveWalletReadiness,
   isSupportedSignerType,
+  isSupportedWalletSigner,
 } from "./policy.ts";
 
 test("wallet policy is testnet-only and excludes unreviewed signer families", () => {
@@ -18,18 +20,28 @@ test("wallet policy is testnet-only and excludes unreviewed signer families", ()
   });
   assert.equal(EXPECTED_CKB_ADDRESS_PREFIX, "ckt");
   assert.deepEqual(SUPPORTED_CCC_SIGNER_TYPES, ["CKB", "BTC"]);
+  assert.deepEqual(SUPPORTED_EVM_WALLETS, ["MetaMask"]);
   assert.deepEqual(PREFERRED_CCC_NETWORKS, [
     { addressPrefix: "ckt", network: "btcTestnet", signerType: "BTC" },
   ]);
   assert.equal(isSupportedSignerType("CKB"), true);
   assert.equal(isSupportedSignerType("BTC"), true);
   assert.equal(isSupportedSignerType("EVM"), false);
+  assert.equal(isSupportedWalletSigner("MetaMask", "EVM"), true);
+  assert.equal(isSupportedWalletSigner("metamask", "EVM"), true);
+  assert.equal(isSupportedWalletSigner("OKX Wallet", "EVM"), false);
+  assert.equal(isSupportedWalletSigner("MetaMask", "Doge"), false);
 });
 
 test("wrong network always wins over connection readiness", () => {
   assert.equal(deriveWalletReadiness("ckt", undefined, false), "disconnected");
   assert.equal(deriveWalletReadiness("ckt", "ckt", true, "CKB"), "ready");
   assert.equal(deriveWalletReadiness("ckt", "ckt", true, "EVM"), "unsupported_wallet");
+  assert.equal(deriveWalletReadiness("ckt", "ckt", true, "EVM", "MetaMask"), "ready");
+  assert.equal(
+    deriveWalletReadiness("ckt", "ckt", true, "EVM", "OKX Wallet"),
+    "unsupported_wallet",
+  );
   assert.equal(deriveWalletReadiness("ckb", "ckb", true, "EVM"), "wrong_network");
   assert.equal(deriveWalletReadiness("ckt", "ckb", true, "CKB"), "wrong_network");
 });
@@ -60,6 +72,7 @@ test("connector runtime stays inside the dedicated client boundary", async () =>
   assert.match(provider, /name=\{AUTOMATA_CCC_IDENTITY\.name\}/);
   assert.match(provider, /installConnectorClientGuard\(\)/);
   assert.match(provider, /if \(client === undefined\) return/);
+  assert.match(provider, /isSupportedWalletSigner\(walletName, signerInfo\.signer\.type\)/);
   assert.match(provider, /name: AUTOMATA_CCC_IDENTITY\.name/);
   assert.match(provider, /const signer = ccc\.useSigner\(\)/);
   assert.match(provider, /class FixtureSigner extends ccc\.Signer/);

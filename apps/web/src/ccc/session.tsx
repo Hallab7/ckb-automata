@@ -88,7 +88,7 @@ function UnsupportedWalletNotice() {
   const session = useWalletSession();
   return (
     <InlineNotice title="Unsupported wallet" tone="danger">
-      <p>Disconnect this wallet and select a supported CKB or BTC testnet wallet.</p>
+      <p>Disconnect this wallet and select MetaMask or a supported CKB or BTC testnet wallet.</p>
       <Button onClick={session.disconnect} tone="secondary">
         Disconnect wallet
       </Button>

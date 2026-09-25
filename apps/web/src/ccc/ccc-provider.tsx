@@ -15,7 +15,7 @@ import {
   AUTOMATA_CCC_IDENTITY,
   PREFERRED_CCC_NETWORKS,
   deriveWalletReadiness,
-  isSupportedSignerType,
+  isSupportedWalletSigner,
 } from "./policy.ts";
 import { WalletSessionContext, type WalletSession } from "./session.tsx";
 
@@ -137,7 +137,7 @@ class AutomataSignersController extends ccc.SignersController {
     signerInfo: ccc.SignerInfo,
     context: ccc.SignersControllerRefreshContext,
   ): Promise<void> {
-    if (!isSupportedSignerType(signerInfo.signer.type)) return;
+    if (!isSupportedWalletSigner(walletName, signerInfo.signer.type)) return;
     await super.addSigner(walletName, icon, signerInfo, context);
   }
 }
@@ -240,6 +240,7 @@ function WalletSessionBridge({ children }: Readonly<{ children: ReactNode }>) {
     signer?.client.addressPrefix,
     signer !== undefined,
     signer?.type,
+    connector.wallet?.name,
   );
   const [refreshKey, setRefreshKey] = useState(0);
   const [details, setDetails] = useState<{
