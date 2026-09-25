@@ -1,4 +1,4 @@
-import { and, eq, gt, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gt, lt, sql } from "drizzle-orm";
 
 import { parseBlockNumber, parseHash32, type BlockNumber, type Hash32 } from "@ckb-automata/core";
 
@@ -127,6 +127,19 @@ export class CanonicalCheckpointStore {
       .where(eq(indexerCheckpoints.networkId, networkId))
       .limit(1);
     return row ? position(row) : undefined;
+  }
+
+  async listRetained(networkIdValue: string): Promise<readonly CanonicalPosition[]> {
+    const networkId = assertNetworkId(networkIdValue);
+    const rows = await this.#database
+      .select({
+        blockNumber: canonicalBlocks.blockNumber,
+        blockHash: canonicalBlocks.blockHash,
+      })
+      .from(canonicalBlocks)
+      .where(eq(canonicalBlocks.networkId, networkId))
+      .orderBy(desc(canonicalBlocks.blockNumber));
+    return Object.freeze(rows.map(position));
   }
 
   async record(input: CanonicalBlockInput): Promise<CheckpointUpdate> {

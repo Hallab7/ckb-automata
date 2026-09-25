@@ -356,12 +356,37 @@ export class CanonicalBlockProjector {
       if (blockNumber === 0n) {
         throw new CheckpointError("REORG_BEYOND_WINDOW", "genesis cannot replace indexed history");
       }
+      const retained = await this.#checkpoints.listRetained(deployment.network);
+      let commonAncestor: (typeof retained)[number] | undefined;
+      for (const candidate of retained) {
+        if (candidate.blockNumber >= blockNumber) continue;
+        const canonical = await this.#ckbClient.getBlockByNumber(candidate.blockNumber);
+        if (canonical?.header.hash === candidate.blockHash) {
+          commonAncestor = candidate;
+          break;
+        }
+      }
+      if (!commonAncestor) {
+        throw new CheckpointError(
+          "REORG_BEYOND_WINDOW",
+          "reorg ancestor is not in the retained canonical window",
+        );
+      }
       rollback = await this.#rollback.rollbackToParent(
         deployment.network,
-        blockNumber - 1n,
-        parentHash,
+        commonAncestor.blockNumber,
+        commonAncestor.blockHash,
       );
       this.#instrumentation.metrics?.reorgsTotal.inc();
+
+      if (commonAncestor.blockNumber + 1n < blockNumber) {
+        let replayed: CanonicalBlockProjectionResult | undefined;
+        for (let height = commonAncestor.blockNumber + 1n; height <= blockNumber; height += 1n) {
+          replayed = await this.scanBlock(height, deployment);
+        }
+        if (!replayed) throw new Error("reorg replay did not project a replacement block");
+        return Object.freeze({ ...replayed, rollback });
+      }
     }
 
     const span = <T>(name: string, operation: () => Promise<T>): Promise<T> =>

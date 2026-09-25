@@ -6,6 +6,7 @@ import { Controller, Get, Inject, Injectable, ServiceUnavailableException } from
 import { deploymentRegistry } from "@ckb-automata/core";
 
 import type { CkbReadClient } from "./ckb-client.ts";
+import type { CanonicalCheckpointStore } from "./indexer/checkpoints.ts";
 
 export const HEALTH_DEPENDENCIES = ["postgres", "redis", "rpc", "deployment", "indexLag"] as const;
 
@@ -72,11 +73,13 @@ function requiredEnvironment(
 
 export function createDefaultHealthProbes(
   input: Readonly<Record<string, string | undefined>>,
-  ckbClient: Pick<CkbReadClient, "getGenesisHash" | "getIndexerTip" | "getTipHeader">,
+  ckbClient: Pick<CkbReadClient, "getBlockByNumber" | "getGenesisHash" | "getTipHeader">,
+  checkpoints: Pick<CanonicalCheckpointStore, "load">,
 ): readonly HealthProbe[] {
   const databaseUrl = requiredEnvironment(input, "DATABASE_URL");
   const redisUrl = requiredEnvironment(input, "REDIS_URL");
   const genesisHash = requiredEnvironment(input, "CKB_GENESIS_HASH");
+  const network = requiredEnvironment(input, "CKB_NETWORK");
 
   return Object.freeze([
     Object.freeze({
@@ -109,14 +112,22 @@ export function createDefaultHealthProbes(
     Object.freeze({
       name: "indexLag" as const,
       check: async () => {
-        const [chainTip, indexerTip] = await Promise.all([
+        const [chainTip, checkpoint] = await Promise.all([
           ckbClient.getTipHeader(),
-          ckbClient.getIndexerTip(),
+          checkpoints.load(network),
         ]);
-        const lag =
-          chainTip.number > indexerTip.blockNumber ? chainTip.number - indexerTip.blockNumber : 0n;
+        if (!checkpoint) throw new Error("application checkpoint is unavailable");
+        if (checkpoint.blockNumber > chainTip.number) {
+          throw new Error("application checkpoint is ahead of the chain");
+        }
+        const canonical = await ckbClient.getBlockByNumber(checkpoint.blockNumber);
+        if (!canonical || canonical.header.hash !== checkpoint.blockHash) {
+          throw new Error("application checkpoint is not canonical");
+        }
+        const lag = chainTip.number - checkpoint.blockNumber;
         if (lag > MAX_INDEX_LAG_BLOCKS) throw new Error("index lag exceeded");
         return Object.freeze({
+          checkpointBlockNumber: checkpoint.blockNumber.toString(),
           lagBlocks: lag.toString(),
           maximumLagBlocks: MAX_INDEX_LAG_BLOCKS.toString(),
         });

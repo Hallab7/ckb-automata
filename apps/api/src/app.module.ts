@@ -184,9 +184,9 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
       },
       {
         provide: HealthService,
-        inject: [CkbClient],
-        useFactory: (ckbClient: CkbClient) =>
-          new HealthService(createDefaultHealthProbes(environment, ckbClient)),
+        inject: [CkbClient, CanonicalCheckpointStore],
+        useFactory: (ckbClient: CkbClient, checkpoints: CanonicalCheckpointStore) =>
+          new HealthService(createDefaultHealthProbes(environment, ckbClient, checkpoints)),
       },
       {
         provide: NetworkMetadataService,

@@ -27,7 +27,9 @@ function probes(failing?: HealthDependencyName): readonly HealthProbe[] {
           "postgresql://user:secret@database.internal/private redis://:secret@redis.internal",
         );
       }
-      return name === "indexLag" ? { lagBlocks: "2", maximumLagBlocks: "12" } : undefined;
+      return name === "indexLag"
+        ? { checkpointBlockNumber: "40", lagBlocks: "2", maximumLagBlocks: "12" }
+        : undefined;
     },
   }));
 }
@@ -53,6 +55,7 @@ test("readiness reports every dependency and preserves non-sensitive evidence", 
   assert.equal(report.status, "ready");
   assert.deepEqual(Object.keys(report.dependencies), [...HEALTH_DEPENDENCIES]);
   assert.deepEqual(report.dependencies.indexLag.details, {
+    checkpointBlockNumber: "40",
     lagBlocks: "2",
     maximumLagBlocks: "12",
   });
@@ -91,11 +94,15 @@ test("default chain probes consume only the shared CKB client", async () => {
       DATABASE_URL: "postgresql://automata:test@127.0.0.1:55432/automata",
       REDIS_URL: "redis://127.0.0.1:56379",
       CKB_GENESIS_HASH: GENESIS_HASH,
+      CKB_NETWORK: "ckb_testnet",
     },
     {
       getGenesisHash: async () => parseHash32(GENESIS_HASH),
       getTipHeader: async () => ({ number: 42n, hash: TIP_HASH }) as ClientBlockHeader,
-      getIndexerTip: async () => ({
+      getBlockByNumber: async () => ({ header: { hash: TIP_HASH } }) as never,
+    },
+    {
+      load: async () => ({
         blockNumber: parseBlockNumber("40"),
         blockHash: parseHash32(TIP_HASH),
       }),
@@ -109,5 +116,38 @@ test("default chain probes consume only the shared CKB client", async () => {
   assert.deepEqual(await deployment.check(), {
     manifestSha256: "2904b44ffa3c1f292404540f2bc6c14dc96789f888e28aa7fc2527566110e1d1",
   });
-  assert.deepEqual(await indexLag.check(), { lagBlocks: "2", maximumLagBlocks: "12" });
+  assert.deepEqual(await indexLag.check(), {
+    checkpointBlockNumber: "40",
+    lagBlocks: "2",
+    maximumLagBlocks: "12",
+  });
+});
+
+test("index lag rejects stale and non-canonical application checkpoints", async () => {
+  const environment = {
+    DATABASE_URL: "postgresql://automata:test@127.0.0.1:55432/automata",
+    REDIS_URL: "redis://127.0.0.1:56379",
+    CKB_GENESIS_HASH: GENESIS_HASH,
+    CKB_NETWORK: "ckb_testnet",
+  };
+  const chain = {
+    getGenesisHash: async () => parseHash32(GENESIS_HASH),
+    getTipHeader: async () => ({ number: 100n, hash: TIP_HASH }) as ClientBlockHeader,
+    getBlockByNumber: async () => ({ header: { hash: TIP_HASH } }) as never,
+  };
+
+  const stale = createDefaultHealthProbes(environment, chain, {
+    load: async () => ({ blockNumber: parseBlockNumber("80"), blockHash: parseHash32(TIP_HASH) }),
+  }).find(({ name }) => name === "indexLag");
+  assert.ok(stale);
+  await assert.rejects(stale.check(), /index lag exceeded/);
+
+  const orphaned = createDefaultHealthProbes(environment, chain, {
+    load: async () => ({
+      blockNumber: parseBlockNumber("99"),
+      blockHash: parseHash32(`0x${"33".repeat(32)}`),
+    }),
+  }).find(({ name }) => name === "indexLag");
+  assert.ok(orphaned);
+  await assert.rejects(orphaned.check(), /not canonical/);
 });
