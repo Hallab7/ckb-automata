@@ -77,8 +77,14 @@ class MemoryStore implements DeadLetterStore {
     _id: string,
     operator: string,
     reason: string,
-    replayJobId: string,
   ): Promise<DeadLetterReplayDecision> {
+    this.actions.push({
+      id: String(this.actions.length + 1),
+      action: "inspect",
+      operator,
+      createdAt: FAILED_AT,
+    });
+    const replayJobId = stableQueueJobId("evaluate", "dead-letter/1/replay");
     const existing = this.actions.find((entry) => entry.action === "replay");
     if (existing) {
       return {

@@ -1,11 +1,6 @@
 import type { AutomataQueue } from "@ckb-automata/telemetry";
 
-import {
-  DurableQueueRegistry,
-  stableQueueJobId,
-  type DeadLetterPayload,
-  type QueueJobEnvelope,
-} from "./queues.ts";
+import { DurableQueueRegistry, type DeadLetterPayload, type QueueJobEnvelope } from "./queues.ts";
 
 export type DeadLetterSourceQueue = Exclude<AutomataQueue, "dead-letter">;
 export type DeadLetterActionKind = "inspect" | "replay" | "close";
@@ -48,12 +43,7 @@ export interface DeadLetterCloseDecision {
 export interface DeadLetterStore {
   persist(payload: DeadLetterPayload): Promise<DeadLetterRecord>;
   inspect(id: string, operator: string): Promise<DeadLetterRecord>;
-  beginReplay(
-    id: string,
-    operator: string,
-    reason: string,
-    replayJobId: string,
-  ): Promise<DeadLetterReplayDecision>;
+  beginReplay(id: string, operator: string, reason: string): Promise<DeadLetterReplayDecision>;
   markReplayDispatched(id: string, replayJobId: string): Promise<Date>;
   close(id: string, operator: string, reason: string): Promise<DeadLetterCloseDecision>;
 }
@@ -150,11 +140,9 @@ export class DeadLetterOperations {
     const deadLetterId = parseDeadLetterId(id);
     const actor = parseDeadLetterOperator(operator);
     const justification = parseDeadLetterReason(reason);
-    const record = await this.#store.inspect(deadLetterId, actor);
-    const replayKey = `dead-letter/${deadLetterId}/replay`;
-    const replayJobId = stableQueueJobId(record.queue, replayKey);
-    const decision = await this.#store.beginReplay(deadLetterId, actor, justification, replayJobId);
+    const decision = await this.#store.beginReplay(deadLetterId, actor, justification);
     if (decision.dispatchedAt !== undefined) return decision;
+    const replayKey = `dead-letter/${deadLetterId}/replay`;
     const job = await this.#queues.enqueue(
       decision.record.queue,
       decision.record.payload.sourceOperation,

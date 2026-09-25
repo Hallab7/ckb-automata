@@ -12,7 +12,7 @@ import {
   type DeadLetterSourceQueue,
   type DeadLetterStore,
 } from "./dead-letter.ts";
-import type { DeadLetterPayload } from "./queues.ts";
+import { stableQueueJobId, type DeadLetterPayload } from "./queues.ts";
 
 interface RecordRow {
   readonly id: string;
@@ -149,10 +149,14 @@ export class PostgresDeadLetterStore implements DeadLetterStore {
     id: string,
     operator: string,
     reason: string,
-    replayJobId: string,
   ): Promise<DeadLetterReplayDecision> {
     return this.#sql.begin(async (sql) => {
       const row = await selectRecord(sql, id, true);
+      const replayJobId = stableQueueJobId(sourceQueue(row.queue), `dead-letter/${id}/replay`);
+      await sql`
+        INSERT INTO dead_letter_actions (dead_letter_id, action, operator)
+        VALUES (${id}, 'inspect', ${operator})
+      `;
       const existing = (await selectActions(sql, id)).find(({ action: kind }) => kind === "replay");
       if (existing) {
         if (existing.replay_job_id !== replayJobId) {
