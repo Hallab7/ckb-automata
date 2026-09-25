@@ -8,10 +8,12 @@ import {
   parseBlockNumber,
   parseHash32,
   parseSequence,
+  parseShannons,
   type RegisteredDeployment,
 } from "@ckb-automata/core";
 
 import type { ExecutorAdapterRegistry, ExecutorHeaderSnapshot } from "./adapter.ts";
+import { chainScriptIdentity } from "./build-snapshot.ts";
 import {
   EligibilityEvaluator,
   type EligibilityJobRecord,
@@ -304,8 +306,26 @@ export class EligibilityCoordinator implements OnApplicationBootstrap, OnModuleD
     const payload = eligibilityPayload(job);
     const record = await this.#source.getLiveJob(payload.jobId, payload.sequence);
     if (!record) return Object.freeze({ status: "stale" });
+    let observedPolicyScript;
+    if (record.policyKind === "deadline") {
+      const live = await this.#runtime.getCellLive(record.outPoint);
+      if (!live) return Object.freeze({ status: "stale" });
+      if (
+        live.outputData.toString() !== record.data ||
+        parseShannons(live.cellOutput.capacity.toString()) !== parseShannons(record.capacity) ||
+        live.cellOutput.type === undefined
+      ) {
+        throw new Error("indexed live job does not match its chain cell");
+      }
+      observedPolicyScript = chainScriptIdentity(live.cellOutput.type);
+    }
     const tip = headerSnapshot(await this.#runtime.getTipHeader());
-    const result = await this.#evaluator().evaluate(record, tip, payload.wakeSequence);
+    const result = await this.#evaluator().evaluate(
+      record,
+      tip,
+      payload.wakeSequence,
+      observedPolicyScript,
+    );
     return Object.freeze({ status: result.status });
   }
 

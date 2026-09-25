@@ -6,6 +6,7 @@ import {
   parseSequence,
   parseShannons,
   type RegisteredDeployment,
+  type ScriptIdentity,
 } from "@ckb-automata/core";
 
 import {
@@ -82,11 +83,16 @@ export function nextEvaluationDelay(notBefore: bigint, observedTip: bigint): num
   );
 }
 
-function policyScript(record: EligibilityJobRecord, deployment: RegisteredDeployment) {
-  const contract =
-    record.policyKind === "deadline"
-      ? deployment.contracts["deadline-policy"]
-      : deployment.contracts["recurring-policy"];
+function policyScript(
+  record: EligibilityJobRecord,
+  deployment: RegisteredDeployment,
+  observed?: ScriptIdentity,
+) {
+  if (observed !== undefined) return observed;
+  if (record.policyKind === "deadline") {
+    throw new Error("deadline eligibility requires the live policy script");
+  }
+  const contract = deployment.contracts["recurring-policy"];
   return Object.freeze({ ...contract.script, args: "0x" as const });
 }
 
@@ -94,6 +100,7 @@ function snapshot(
   record: EligibilityJobRecord,
   tip: ExecutorHeaderSnapshot,
   deployment: RegisteredDeployment,
+  observedPolicyScript?: ScriptIdentity,
 ): ExecutorSnapshot {
   return Object.freeze({
     deployment,
@@ -103,7 +110,7 @@ function snapshot(
       output: Object.freeze({
         capacity: `0x${parseShannons(record.capacity).toString(16)}` as const,
         lock: Object.freeze({ ...deployment.contracts["job-lock"].script, args: "0x" as const }),
-        type: policyScript(record, deployment),
+        type: policyScript(record, deployment, observedPolicyScript),
       }),
       data: record.data,
       blockHash: parseHash32(record.block.hash),
@@ -156,6 +163,7 @@ export class EligibilityEvaluator {
     record: EligibilityJobRecord,
     tip: ExecutorHeaderSnapshot,
     wakeSequence: number,
+    observedPolicyScript?: ScriptIdentity,
   ): Promise<EligibilityEvaluationResult> {
     if (!Number.isSafeInteger(wakeSequence) || wakeSequence < 0) {
       throw new RangeError("eligibility wake sequence must be a non-negative safe integer");
@@ -163,7 +171,7 @@ export class EligibilityEvaluator {
     if (record.networkId !== this.#deployment.network) {
       throw new Error("eligibility job belongs to another network");
     }
-    const script = policyScript(record, this.#deployment);
+    const script = policyScript(record, this.#deployment, observedPolicyScript);
     const inspected = inspectJobData(record.data, {
       manifest: this.#deployment.manifest,
       expectedGenesisHash: this.#deployment.genesisHash,
@@ -179,7 +187,7 @@ export class EligibilityEvaluator {
     }
     const result = evaluateExecutorEligibility(
       this.#registry,
-      snapshot(record, tip, this.#deployment),
+      snapshot(record, tip, this.#deployment, observedPolicyScript),
     );
     if (result.eligibility.status === "eligible") {
       await this.#queues.enqueue(

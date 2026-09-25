@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildDeadlineCreation,
   buildRecurringCreation,
   deploymentRegistry,
   inspectJobData,
   parseBlockNumber,
   parseHash32,
+  parseOutPoint,
   type RegisteredDeployment,
 } from "@ckb-automata/core";
 
@@ -19,6 +21,7 @@ import {
   type EligibilityJobRecord,
 } from "./eligibility.ts";
 import { RECURRING_EXECUTOR_ADAPTER } from "./policies/recurring.ts";
+import { DEADLINE_EXECUTOR_ADAPTER } from "./policies/deadline.ts";
 
 async function deployment(): Promise<RegisteredDeployment> {
   const [genesisHash] = deploymentRegistry.genesisHashes;
@@ -66,6 +69,43 @@ async function fixture() {
     block: Object.freeze({ hash: parseHash32(`0x${"70".repeat(32)}`), number: "90" }),
   });
   return { registered, record };
+}
+
+async function deadlineFixture() {
+  const registered = await deployment();
+  const creation = buildDeadlineCreation({
+    deployment: registered,
+    pledges: [
+      {
+        outPoint: parseOutPoint({ txHash: `0x${"aa".repeat(32)}`, index: "0" }),
+        refundLockHash: parseHash32(`0x${"11".repeat(32)}`),
+        amount: "20000000000",
+      },
+    ],
+    target: "15000000000",
+    deadlineBlock: "500",
+    successLockHash: parseHash32(`0x${"33".repeat(32)}`),
+    cancelLockHash: parseHash32(`0x${"44".repeat(32)}`),
+    reward: "10000000000",
+    creatorNonce: "7",
+    creationFee: {
+      transactionBytes: { minimum: "700", maximum: "900" },
+      feeRatePerKilobyte: { minimum: "1000", maximum: "2000" },
+    },
+  });
+  const output = creation.transaction.outputs[1];
+  assert.ok(output?.type);
+  const record: EligibilityJobRecord = Object.freeze({
+    networkId: registered.network,
+    jobId: creation.jobId,
+    sequence: "0",
+    policyKind: "deadline",
+    data: creation.jobData,
+    capacity: BigInt(output.capacity).toString(),
+    outPoint: Object.freeze({ txHash: parseHash32(`0x${"71".repeat(32)}`), index: "1" }),
+    block: Object.freeze({ hash: parseHash32(`0x${"70".repeat(32)}`), number: "490" }),
+  });
+  return { registered, record, policyScript: output.type };
 }
 
 function tip(number: bigint) {
@@ -163,6 +203,21 @@ test("only the chain tip reaching the bound moves work to build", async () => {
   });
   assert.equal(queue.calls[0]?.[0], "build");
   assert.deepEqual(queue.calls[0]?.[4], undefined);
+});
+
+test("deadline eligibility verifies the campaign-bound live policy script", async () => {
+  const { registered, record, policyScript } = await deadlineFixture();
+  const queue = queueFixture();
+  const evaluator = new EligibilityEvaluator(
+    registered,
+    new ExecutorAdapterRegistry([DEADLINE_EXECUTOR_ADAPTER]),
+    queue.queues,
+  );
+  await assert.rejects(evaluator.evaluate(record, tip(500n), 0), /live policy script/);
+  const result = await evaluator.evaluate(record, tip(500n), 0, policyScript);
+  assert.equal(result.status, "ready");
+  assert.equal(result.status === "ready" ? result.adapterId : undefined, "deadline-v1");
+  assert.equal(queue.calls[0]?.[0], "build");
 });
 
 test("wake-up estimates are bounded and indexed data must match its commitment", async () => {

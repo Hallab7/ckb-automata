@@ -21,7 +21,7 @@ const MAX_FEE_CELLS = 100;
 
 type ChainCell = Awaited<ReturnType<ExecutorRuntime["getCellLive"]>>;
 
-function script(value: {
+export function chainScriptIdentity(value: {
   readonly codeHash: unknown;
   readonly hashType: unknown;
   readonly args: unknown;
@@ -61,8 +61,8 @@ function chainCellSnapshot(
     }),
     output: Object.freeze({
       capacity: `0x${parseShannons(cell.cellOutput.capacity.toString()).toString(16)}` as const,
-      lock: script(cell.cellOutput.lock),
-      type: cell.cellOutput.type === undefined ? null : script(cell.cellOutput.type),
+      lock: chainScriptIdentity(cell.cellOutput.lock),
+      type: cell.cellOutput.type === undefined ? null : chainScriptIdentity(cell.cellOutput.type),
     }),
     data: cell.outputData.toString() as `0x${string}`,
     blockHash: parseHash32(block.hash),
@@ -213,8 +213,8 @@ export class ChainBuildSnapshotSource implements BuildSnapshotSource {
     lineage: readonly ClientTransactionResponse[],
   ): Promise<readonly ScriptIdentity[]> {
     const locks = new Map<string, ScriptIdentity>();
-    const add = (value: Parameters<typeof script>[0]) => {
-      const normalized = script(value);
+    const add = (value: Parameters<typeof chainScriptIdentity>[0]) => {
+      const normalized = chainScriptIdentity(value);
       locks.set(stable(normalized), normalized);
     };
     add(this.#rewardLock);
@@ -242,7 +242,7 @@ export class ChainBuildSnapshotSource implements BuildSnapshotSource {
       for (const [index, output] of response.transaction.outputs.entries()) {
         if (
           !output.type ||
-          parseHash32(scriptToHash(script(output.type))) !== policy.campaignTypeHash
+          parseHash32(scriptToHash(chainScriptIdentity(output.type))) !== policy.campaignTypeHash
         ) {
           continue;
         }

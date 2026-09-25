@@ -2,7 +2,7 @@ import { WORKSPACE_NAME } from "@ckb-automata/core";
 
 export const EXECUTOR_APP_ID = `${WORKSPACE_NAME}:executor` as const;
 
-export { ChainBuildSnapshotSource } from "./build-snapshot.ts";
+export { ChainBuildSnapshotSource, chainScriptIdentity } from "./build-snapshot.ts";
 export { PostgresBuildAttemptStore } from "./build-store.ts";
 export { BuildCoordinator } from "./build-worker.ts";
 export { PostgresConfirmationStore, MAX_CONFIRMATION_ATTEMPTS } from "./confirmation-store.ts";

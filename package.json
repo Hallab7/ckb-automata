@@ -29,6 +29,7 @@
     "deploy:verify:public-runtime": "node scripts/verify-public-runtime.mjs",
     "executor:verify:recurring:local": "node scripts/verify-recurring-executor-local.mjs",
     "executor:verify:contention:local": "node scripts/verify-executor-contention-local.mjs",
+    "executor:diagnose:eligibility": "node scripts/diagnose-executor-eligibility.mjs",
     "indexer:verify:checkpoints:local": "node scripts/verify-checkpoints-local.mjs",
     "indexer:verify:discovery:local": "node scripts/verify-job-discovery-local.mjs",
     "indexer:verify:transitions:local": "node scripts/verify-job-transitions-local.mjs",
