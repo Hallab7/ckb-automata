@@ -20,7 +20,9 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
   return (
     <html lang="en">
       <body>
-        <CccProvider>{children}</CccProvider>
+        <div className="app-viewport">
+          <CccProvider>{children}</CccProvider>
+        </div>
         <AnalyticsConsent />
       </body>
     </html>
