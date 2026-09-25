@@ -20,6 +20,7 @@ import {
   dashboardSummary,
   shortJobId,
   type DashboardJob,
+  type RecipientAmountsByJob,
   type DashboardStatus,
 } from "./dashboard-model.ts";
 
@@ -52,14 +53,17 @@ function DashboardStatusBadge({ status }: Readonly<{ status: DashboardStatus }>)
   );
 }
 
-function Summary({ items }: Readonly<{ items: readonly DashboardJob[] }>) {
-  const summary = dashboardSummary(items);
+function Summary({
+  items,
+  recipientAmounts,
+}: Readonly<{ items: readonly DashboardJob[]; recipientAmounts: RecipientAmountsByJob }>) {
+  const summary = dashboardSummary(items, recipientAmounts);
   const values = [
     ["Loaded", summary.total.toLocaleString("en-US")],
     ["Live", summary.live.toLocaleString("en-US")],
     ["Completed", summary.spent.toLocaleString("en-US")],
     ["Reorged", summary.orphaned.toLocaleString("en-US")],
-    ["Funded value", summary.fundedValue],
+    ["Recipient total", summary.recipientTotal],
   ] as const;
   return (
     <dl className="automation-summary" aria-label="Loaded automation summary">
@@ -87,17 +91,26 @@ function LoadingRows() {
 function AutomationRows({
   checkpointBlock,
   items,
-}: Readonly<{ checkpointBlock: string | undefined; items: readonly DashboardJob[] }>) {
+  recipientAmounts,
+}: Readonly<{
+  checkpointBlock: string | undefined;
+  items: readonly DashboardJob[];
+  recipientAmounts: RecipientAmountsByJob;
+}>) {
   return (
     <div className="automation-list">
       <div aria-hidden="true" className="automation-list__header">
         <span>Automation</span>
         <span>Status</span>
         <span>Next eligibility</span>
-        <span>Funded value</span>
+        <span>Recipient amount</span>
       </div>
       {items.map((job) => {
-        const presentation = dashboardJobPresentation(job, checkpointBlock);
+        const presentation = dashboardJobPresentation(
+          job,
+          checkpointBlock,
+          recipientAmounts[job.jobId],
+        );
         return (
           <Link
             aria-label={`Open ${job.template} automation ${job.jobId}`}
@@ -121,8 +134,8 @@ function AutomationRows({
               <span>{job.remainingRuns} runs remaining</span>
             </div>
             <div className="automation-row__amount">
-              <span className="automation-row__mobile-label">Funded value</span>
-              <Amount>{presentation.fundedValue}</Amount>
+              <span className="automation-row__mobile-label">Recipient amount</span>
+              <Amount>{presentation.recipientAmount}</Amount>
               <span>Sequence {job.sequence}</span>
             </div>
           </Link>
@@ -141,6 +154,7 @@ export interface AutomationDashboardViewProperties {
   readonly loadState: DashboardLoadState;
   readonly loadingNextPage?: boolean | undefined;
   readonly mode: DashboardMode;
+  readonly recipientAmounts?: RecipientAmountsByJob | undefined;
   readonly onConnect?: (() => void) | undefined;
   readonly onLoadNext?: (() => void) | undefined;
   readonly onModeChange: (mode: DashboardMode) => void;
@@ -160,6 +174,7 @@ export function AutomationDashboardView({
   loadState,
   loadingNextPage = false,
   mode,
+  recipientAmounts = {},
   onConnect,
   onLoadNext,
   onModeChange,
@@ -233,7 +248,7 @@ export function AutomationDashboardView({
         </div>
       </div>
 
-      {items.length > 0 ? <Summary items={items} /> : null}
+      {items.length > 0 ? <Summary items={items} recipientAmounts={recipientAmounts} /> : null}
 
       {loadState === "loading" ? <LoadingRows /> : null}
       {loadState === "owner_required" ? (
@@ -267,7 +282,13 @@ export function AutomationDashboardView({
           <p>Adjust the filters or create a testnet automation.</p>
         </div>
       ) : null}
-      {items.length > 0 ? <AutomationRows checkpointBlock={checkpointBlock} items={items} /> : null}
+      {items.length > 0 ? (
+        <AutomationRows
+          checkpointBlock={checkpointBlock}
+          items={items}
+          recipientAmounts={recipientAmounts}
+        />
+      ) : null}
       {hasNextPage ? (
         <div className="automation-pagination">
           <Button disabled={loadingNextPage} onClick={onLoadNext} tone="secondary">

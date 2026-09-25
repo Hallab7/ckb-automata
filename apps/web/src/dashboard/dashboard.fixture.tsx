@@ -107,6 +107,9 @@ export function AutomationDashboardFixture() {
         items={items}
         loadState={loadState}
         mode={mode}
+        recipientAmounts={Object.fromEntries(
+          items.map((item) => [item.jobId, { perExecution: "10000000000", total: "40000000000" }]),
+        )}
         onConnect={() => setFixtureState("ready")}
         onLoadNext={() => undefined}
         onModeChange={setMode}

@@ -42,14 +42,16 @@ function job(state: DashboardJob["state"], overrides: Partial<DashboardJob> = {}
 }
 
 test("dashboard derives every lifecycle and operational status from canonical reads", () => {
-  assert.equal(dashboardJobPresentation(job("live"), "100").status, "waiting");
-  assert.equal(dashboardJobPresentation(job("live"), "110").status, "eligible");
+  const amounts = { perExecution: "10000000000", total: "30000000000" };
+  assert.equal(dashboardJobPresentation(job("live"), "100", amounts).status, "waiting");
+  assert.equal(dashboardJobPresentation(job("live"), "110", amounts).status, "eligible");
   assert.equal(
     dashboardJobPresentation(
       job("live", {
         funds: { capacity: "20000000000", executorReward: "100000000", remainingBudget: "0" },
       }),
       "110",
+      amounts,
     ).status,
     "needs_funding",
   );
@@ -66,24 +68,37 @@ test("dashboard derives every lifecycle and operational status from canonical re
         },
       }),
       "110",
+      amounts,
     ).status,
     "recovery_required",
   );
-  assert.equal(dashboardJobPresentation(job("spent"), "110").status, "completed");
-  assert.equal(dashboardJobPresentation(job("orphaned"), "110").status, "reorged");
+  assert.equal(dashboardJobPresentation(job("spent"), "110", null).status, "completed");
+  assert.equal(dashboardJobPresentation(job("orphaned"), "110", null).status, "reorged");
 });
 
-test("dashboard summary preserves exact funded values", () => {
-  const summary = dashboardSummary([
-    job("live"),
-    job("spent", { funds: { capacity: "123456789", executorReward: "0", remainingBudget: "0" } }),
-    job("orphaned"),
-  ]);
+test("dashboard summary preserves exact recipient amounts", () => {
+  const items = [
+    job("live", { jobId: `0x${"10".repeat(32)}` }),
+    job("spent", {
+      funds: { capacity: "123456789", executorReward: "0", remainingBudget: "0" },
+      jobId: `0x${"20".repeat(32)}`,
+    }),
+    job("orphaned", { jobId: `0x${"30".repeat(32)}` }),
+  ];
+  const summary = dashboardSummary(items, {
+    [items[0]!.jobId]: { perExecution: "10000000000", total: "30000000000" },
+    [items[1]!.jobId]: { perExecution: "200000000", total: "200000000" },
+    [items[2]!.jobId]: { perExecution: "300000000", total: "300000000" },
+  });
   assert.deepEqual(summary, {
-    fundedValue: "401.23456789 CKB",
+    recipientTotal: "305 CKB",
     live: 1,
     orphaned: 1,
     spent: 1,
     total: 3,
   });
+  assert.equal(
+    dashboardSummary(items, Object.fromEntries([[items[0]!.jobId, null]])).recipientTotal,
+    "Unavailable",
+  );
 });

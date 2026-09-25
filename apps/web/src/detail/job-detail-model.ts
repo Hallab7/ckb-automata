@@ -23,7 +23,8 @@ export interface JobDetailPresentation {
   readonly nextAction: string;
   readonly nextExecution: string;
   readonly policyName: string;
-  readonly fundedValue: string;
+  readonly recipientAmount: string;
+  readonly automationReserve: string;
   readonly remainingBudget: string;
   readonly executorReward: string;
 }
@@ -63,6 +64,7 @@ function blockLabel(value: bigint): string {
 export function jobDetailPresentation(
   job: DetailJob,
   events: readonly DetailEvent[],
+  recipientAmount?: string,
 ): JobDetailPresentation {
   const checkpoint = job.source.indexCheckpoint?.blockNumber;
   const checkpointBlock = checkpoint === undefined ? undefined : BigInt(checkpoint);
@@ -129,7 +131,9 @@ export function jobDetailPresentation(
         : job.template === "recurring"
           ? "Recurring distribution"
           : "Unknown policy",
-    fundedValue: formatCkbBalance(BigInt(job.funds.capacity)),
+    recipientAmount:
+      recipientAmount === undefined ? "Unavailable" : formatCkbBalance(BigInt(recipientAmount)),
+    automationReserve: formatCkbBalance(BigInt(job.funds.capacity)),
     remainingBudget: formatCkbBalance(remainingBudget),
     executorReward: formatCkbBalance(reward),
   });

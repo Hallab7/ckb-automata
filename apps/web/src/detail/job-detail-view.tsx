@@ -224,6 +224,7 @@ export interface JobDetailViewProperties {
   readonly onLoadNext?: () => void;
   readonly onRetry?: () => void;
   readonly ownerActions?: ReactNode;
+  readonly recipientAmount?: string;
 }
 
 export function JobDetailView({
@@ -236,6 +237,7 @@ export function JobDetailView({
   onLoadNext,
   onRetry,
   ownerActions,
+  recipientAmount,
 }: JobDetailViewProperties) {
   if (loadState === "loading") return <LoadingDetail />;
   if (loadState === "not_found") {
@@ -267,7 +269,7 @@ export function JobDetailView({
     );
   }
 
-  const presentation = jobDetailPresentation(job, events);
+  const presentation = jobDetailPresentation(job, events, recipientAmount);
   return (
     <article className="app-page job-detail" aria-labelledby="job-detail-title">
       <header className="job-detail__header">
@@ -286,9 +288,9 @@ export function JobDetailView({
 
       <dl className="job-detail__summary">
         <div>
-          <dt>Funded value</dt>
+          <dt>Recipient amount</dt>
           <dd>
-            <Amount>{presentation.fundedValue}</Amount>
+            <Amount>{presentation.recipientAmount}</Amount>
           </dd>
         </div>
         <div>
@@ -339,20 +341,20 @@ export function JobDetailView({
 
         <section className="job-detail__section" aria-labelledby="funds-heading">
           <div className="job-detail__section-heading">
-            <h2 id="funds-heading">Funds</h2>
-            <p>Committed native CKB values at the current outpoint.</p>
+            <h2 id="funds-heading">Automation costs</h2>
+            <p>CKB reserved to keep this automation running.</p>
           </div>
           <dl className="job-detail__facts">
             <div>
-              <dt>Total capacity</dt>
-              <dd>{presentation.fundedValue}</dd>
+              <dt>Automation reserve</dt>
+              <dd>{presentation.automationReserve}</dd>
             </div>
             <div>
-              <dt>Remaining budget</dt>
+              <dt>Remaining service budget</dt>
               <dd>{presentation.remainingBudget}</dd>
             </div>
             <div>
-              <dt>Executor reward</dt>
+              <dt>Automation service payment</dt>
               <dd>{presentation.executorReward}</dd>
             </div>
             <div>

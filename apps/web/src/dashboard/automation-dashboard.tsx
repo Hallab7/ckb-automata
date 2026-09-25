@@ -18,10 +18,28 @@ import {
   type DashboardLoadState,
   type DashboardMode,
 } from "./dashboard-view.tsx";
+import type { DashboardJob, RecipientAmountsByJob } from "./dashboard-model.ts";
 
 function browserApiClient(): AutomataApiClient {
   const environment = browserWebEnvironment();
   return createApiClient({ baseUrl: environment.apiUrl });
+}
+
+async function loadRecipientAmounts(
+  api: AutomataApiClient,
+  jobs: readonly DashboardJob[],
+): Promise<RecipientAmountsByJob> {
+  const entries = await Promise.all(
+    jobs.map(async (job) => {
+      try {
+        const quote = await api.getJobQuote(job.jobId);
+        return [job.jobId, quote.amounts.payout] as const;
+      } catch {
+        return [job.jobId, null] as const;
+      }
+    }),
+  );
+  return Object.fromEntries(entries);
 }
 
 export function AutomationDashboard() {
@@ -38,6 +56,7 @@ export function AutomationDashboard() {
   const [stateFilter, setStateFilter] = useState("");
   const [templateFilter, setTemplateFilter] = useState("");
   const [items, setItems] = useState<ApiJobList["items"]>([]);
+  const [recipientAmounts, setRecipientAmounts] = useState<RecipientAmountsByJob>({});
   const [checkpointBlock, setCheckpointBlock] = useState<string>();
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<DashboardLoadState>("loading");
@@ -62,23 +81,27 @@ export function AutomationDashboard() {
     if (apiResult.api === undefined) {
       setError(apiResult.error);
       setItems([]);
+      setRecipientAmounts({});
       setLoadState("error");
       return;
     }
     if (mode === "owner") {
       if (session.status !== "ready") {
         setItems([]);
+        setRecipientAmounts({});
         setLoadState("owner_required");
         return;
       }
       if (session.detailsStatus === "loading") {
         setItems([]);
+        setRecipientAmounts({});
         setLoadState("loading");
         return;
       }
       if (session.ownerLockHash === undefined) {
         setError("The connected wallet lock could not be resolved. Retry the wallet details.");
         setItems([]);
+        setRecipientAmounts({});
         setLoadState("error");
         return;
       }
@@ -87,6 +110,7 @@ export function AutomationDashboard() {
     let active = true;
     setError(undefined);
     setItems([]);
+    setRecipientAmounts({});
     setCheckpointBlock(undefined);
     setNextCursor(null);
     setLoadState("loading");
@@ -101,6 +125,9 @@ export function AutomationDashboard() {
         setCheckpointBlock(response.indexCheckpoint?.blockNumber);
         setNextCursor(response.page.nextCursor);
         setLoadState("ready");
+        void loadRecipientAmounts(apiResult.api!, response.items).then((amounts) => {
+          if (active) setRecipientAmounts(amounts);
+        });
       })
       .catch((reason: unknown) => {
         if (!active) return;
@@ -134,6 +161,9 @@ export function AutomationDashboard() {
         setItems((current) => [...current, ...response.items]);
         setCheckpointBlock(response.indexCheckpoint?.blockNumber);
         setNextCursor(response.page.nextCursor);
+        void loadRecipientAmounts(apiResult.api!, response.items).then((amounts) => {
+          setRecipientAmounts((current) => ({ ...current, ...amounts }));
+        });
       })
       .catch((reason: unknown) => {
         setError(requestErrorMessage("dashboard", reason));
@@ -152,6 +182,7 @@ export function AutomationDashboard() {
       loadState={loadState}
       loadingNextPage={loadingNextPage}
       mode={mode}
+      recipientAmounts={recipientAmounts}
       onConnect={session.open}
       onLoadNext={loadNextPage}
       onModeChange={setMode}

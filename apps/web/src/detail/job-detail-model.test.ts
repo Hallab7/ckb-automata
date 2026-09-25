@@ -68,7 +68,9 @@ function event(
 }
 
 test("detail presentation covers waiting, eligible, completed, and funding states", () => {
-  assert.equal(jobDetailPresentation(job(), []).status, "waiting");
+  assert.equal(jobDetailPresentation(job(), [], "10000000000").status, "waiting");
+  assert.equal(jobDetailPresentation(job(), [], "10000000000").recipientAmount, "100 CKB");
+  assert.equal(jobDetailPresentation(job(), [], "10000000000").automationReserve, "125 CKB");
   assert.equal(
     jobDetailPresentation(
       job({

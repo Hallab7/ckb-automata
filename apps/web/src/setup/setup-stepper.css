@@ -102,16 +102,6 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.setup-address-field {
-  align-content: start;
-  display: grid;
-  gap: var(--ui-space-3);
-}
-
-.setup-address-field .ui-button {
-  justify-self: start;
-}
-
 .setup-funding-preview {
   border-bottom: 1px solid var(--ui-color-border);
   border-top: 1px solid var(--ui-color-border);

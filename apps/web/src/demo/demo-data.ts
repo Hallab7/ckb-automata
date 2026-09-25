@@ -20,7 +20,7 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = Object.freeze([
     tone: "info",
     facts: Object.freeze([
       { label: "Template", value: "Recurring distribution" },
-      { label: "Funded value", value: "125 CKB" },
+      { label: "Recipient amount", value: "100 CKB" },
       { label: "Next execution", value: "Block #15,843,200" },
       { label: "Runs remaining", value: "4" },
     ]),

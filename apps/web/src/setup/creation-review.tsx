@@ -286,13 +286,13 @@ export function ReviewSummary({
           ) : (
             <>
               <div>
-                <dt>Success recipient</dt>
+                <dt>Recipient address</dt>
                 <dd>
                   <code>{draft["successAddress"]}</code>
                 </dd>
               </div>
               <div>
-                <dt>Refund recipient</dt>
+                <dt>Refund address</dt>
                 <dd>
                   <code>{draft["refundAddress"]}</code>
                 </dd>

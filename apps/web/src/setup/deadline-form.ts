@@ -92,11 +92,11 @@ export async function validateDeadlineStep(
 ): Promise<SetupErrors> {
   const errors: Record<string, string> = {};
   if (step === "details") {
-    amount(draft, "pledgeCkb", "campaign funds", CONTRACT_CAPACITY.plainWalletCell, errors);
-    amount(draft, "targetCkb", "success target", 1n, errors);
+    amount(draft, "pledgeCkb", "recipient amount", CONTRACT_CAPACITY.plainWalletCell, errors);
+    amount(draft, "targetCkb", "minimum amount", 1n, errors);
     await Promise.all([
-      address(draft, "successAddress", "success recipient", context, errors),
-      address(draft, "refundAddress", "refund recipient", context, errors),
+      address(draft, "successAddress", "recipient address", context, errors),
+      address(draft, "refundAddress", "refund address", context, errors),
     ]);
   }
 
@@ -116,15 +116,15 @@ export async function validateDeadlineStep(
     const pledge = amount(
       draft,
       "pledgeCkb",
-      "campaign funds",
+      "recipient amount",
       CONTRACT_CAPACITY.plainWalletCell,
       errors,
     );
-    const target = amount(draft, "targetCkb", "success target", 1n, errors);
+    const target = amount(draft, "targetCkb", "minimum amount", 1n, errors);
     const reward = amount(
       draft,
       "rewardCkb",
-      "executor reward",
+      "automation service payment",
       CONTRACT_CAPACITY.plainWalletCell,
       errors,
     );
@@ -139,8 +139,8 @@ export async function validateDeadlineStep(
       errors["ownerAddress"] = "Connect a supported CKB testnet wallet for recovery authority.";
     }
     const [successLockHash, refundLockHash] = await Promise.all([
-      address(draft, "successAddress", "success recipient", context, errors),
-      address(draft, "refundAddress", "refund recipient", context, errors),
+      address(draft, "successAddress", "recipient address", context, errors),
+      address(draft, "refundAddress", "refund address", context, errors),
     ]);
     if (
       pledge !== undefined &&

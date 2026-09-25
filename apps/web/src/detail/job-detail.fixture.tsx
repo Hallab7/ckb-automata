@@ -238,6 +238,7 @@ export function JobDetailFixture() {
         job={fixtureJob(state)}
         loadState="ready"
         ownerActions={<FixtureOwnerActions />}
+        recipientAmount="10000000000"
       />
     </div>
   );

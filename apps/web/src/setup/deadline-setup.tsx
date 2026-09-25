@@ -38,17 +38,15 @@ function DeadlineDetails(context: SetupStepRenderContext) {
   return (
     <div className="setup-step__group">
       <div>
-        <h2>Campaign outcome</h2>
-        <p>
-          The committed campaign total determines whether funds release or refund at the deadline.
-        </p>
+        <h2>Recipient payment</h2>
+        <p>Choose the amount, the minimum needed, and where the payment should go.</p>
       </div>
       <div className="setup-form-grid">
         <TextField
           {...error(context, "pledgeCkb")}
-          hint="At least 61 CKB so a refund output remains valid."
+          hint="This is the amount the recipient can receive. The minimum is 61 CKB."
           inputMode="decimal"
-          label="Campaign funds (CKB)"
+          label="Recipient amount (CKB)"
           name="pledgeCkb"
           onChange={(event) => context.setField("pledgeCkb", event.target.value)}
           placeholder="80"
@@ -57,9 +55,9 @@ function DeadlineDetails(context: SetupStepRenderContext) {
         />
         <TextField
           {...error(context, "targetCkb")}
-          hint="Meeting or exceeding this amount releases funds to the success recipient."
+          hint="The recipient is paid when the recipient amount is at least this value."
           inputMode="decimal"
-          label="Success target (CKB)"
+          label="Minimum amount (CKB)"
           name="targetCkb"
           onChange={(event) => context.setField("targetCkb", event.target.value)}
           placeholder="150"
@@ -69,36 +67,40 @@ function DeadlineDetails(context: SetupStepRenderContext) {
         <TextField
           {...error(context, "successAddress")}
           autoComplete="off"
-          hint="Receives the campaign funds when the target is met."
-          label="Success recipient"
+          hint="Receives the recipient amount when the minimum is met."
+          label="Recipient address"
           name="successAddress"
           onChange={(event) => context.setField("successAddress", event.target.value)}
           placeholder="ckt1..."
           required
+          startAction={{
+            disabled: session.address === undefined,
+            label: "Use mine",
+            onClick: () => {
+              if (session.address !== undefined)
+                context.setField("successAddress", session.address);
+            },
+          }}
           value={context.draft["successAddress"] ?? ""}
         />
-        <div className="setup-address-field">
-          <TextField
-            {...error(context, "refundAddress")}
-            autoComplete="off"
-            hint="Receives the original campaign funds when the target is missed."
-            label="Refund recipient"
-            name="refundAddress"
-            onChange={(event) => context.setField("refundAddress", event.target.value)}
-            placeholder="ckt1..."
-            required
-            value={context.draft["refundAddress"] ?? ""}
-          />
-          <Button
-            disabled={session.address === undefined}
-            onClick={() => {
+        <TextField
+          {...error(context, "refundAddress")}
+          autoComplete="off"
+          hint="Receives the recipient amount when the minimum is not met."
+          label="Refund address"
+          name="refundAddress"
+          onChange={(event) => context.setField("refundAddress", event.target.value)}
+          placeholder="ckt1..."
+          required
+          startAction={{
+            disabled: session.address === undefined,
+            label: "Use mine",
+            onClick: () => {
               if (session.address !== undefined) context.setField("refundAddress", session.address);
-            }}
-            tone="secondary"
-          >
-            Use connected wallet
-          </Button>
-        </div>
+            },
+          }}
+          value={context.draft["refundAddress"] ?? ""}
+        />
       </div>
     </div>
   );
@@ -108,12 +110,12 @@ function DeadlineTiming(context: SetupStepRenderContext) {
   return (
     <div className="setup-step__group">
       <div>
-        <h2>Deadline timing</h2>
-        <p>Finalization becomes eligible when CKB reaches this absolute testnet block.</p>
+        <h2>Payment deadline</h2>
+        <p>The payment is checked when the testnet reaches this block.</p>
       </div>
       <TextField
         {...error(context, "deadlineBlock")}
-        hint="Use a future CKB Pudge Testnet block number."
+        hint="Enter a future CKB Pudge Testnet block number."
         inputMode="numeric"
         label="Deadline block"
         name="deadlineBlock"
@@ -132,17 +134,14 @@ function DeadlineFunding(context: SetupStepRenderContext) {
   return (
     <div className="setup-step__group">
       <div>
-        <h2>Funding and recovery</h2>
-        <p>
-          The reward is reserved for one successful finalization. Your wallet retains recovery
-          control.
-        </p>
+        <h2>Automation payment and recovery</h2>
+        <p>This payment goes to the service that completes the automation.</p>
       </div>
       <TextField
         {...error(context, "rewardCkb")}
-        hint="At least 61 CKB so the executor reward can be paid as a valid output."
+        hint="The minimum payment for the automation service is 61 CKB."
         inputMode="decimal"
-        label="Executor reward (CKB)"
+        label="Automation service payment (CKB)"
         name="rewardCkb"
         onChange={(event) => context.setField("rewardCkb", event.target.value)}
         required
@@ -151,16 +150,16 @@ function DeadlineFunding(context: SetupStepRenderContext) {
       <ReadonlyField
         code
         error={context.errors["ownerAddress"]}
-        label="Cancellation and recovery wallet"
+        label="Recovery wallet"
         name="ownerAddress"
       >
         {ownerAddress}
       </ReadonlyField>
       {session.status === "ready" ? (
-        <InlineNotice title="Owner path confirmed" tone="success">
+        <InlineNotice title="Recovery wallet confirmed" tone="success">
           <p>
-            {session.walletName ?? "Connected wallet"}: {shortenCkbAddress(ownerAddress)}. Only a
-            transaction authorized by this lock can cancel or recover the automation.
+            {session.walletName ?? "Connected wallet"}: {shortenCkbAddress(ownerAddress)}. This
+            wallet can cancel the automation or recover its remaining funds.
           </p>
         </InlineNotice>
       ) : (

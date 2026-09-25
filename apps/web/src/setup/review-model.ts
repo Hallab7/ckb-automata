@@ -361,22 +361,25 @@ export async function verifyCreationReview(
     ownerLockHash = request.value.cancelLockHash;
     requiredOutputCount = build.completion.requiredOutputCount;
     title = "Deadline finalization";
-    summary = `${shannonsToCkb(BigInt(build.intent.pledged))} CKB will resolve against a ${shannonsToCkb(BigInt(request.value.target))} CKB target at the deadline.`;
+    summary = `${shannonsToCkb(BigInt(build.intent.pledged))} CKB will be sent to the recipient if the ${shannonsToCkb(BigInt(request.value.target))} CKB minimum is met at the deadline.`;
     timing = timingCopy(BigInt(request.value.deadlineBlock), chainSnapshot.block);
-    recovery = `If the target is missed, the committed campaign funds return to refund lock ${request.value.pledges[0]?.refundLockHash}. The connected owner controls cancellation and recovery of the Job Cell.`;
+    recovery = `If the minimum is not met, the recipient amount returns to refund address ${request.value.pledges[0]?.refundLockHash}. The connected wallet can cancel the automation or recover its remaining funds.`;
     amounts = Object.freeze([
-      { label: "Campaign funds", value: `${shannonsToCkb(BigInt(build.intent.pledged))} CKB` },
-      { label: "Success target", value: `${shannonsToCkb(BigInt(request.value.target))} CKB` },
-      { label: "Executor reward", value: `${shannonsToCkb(BigInt(request.value.reward))} CKB` },
+      { label: "Recipient amount", value: `${shannonsToCkb(BigInt(build.intent.pledged))} CKB` },
+      { label: "Minimum amount", value: `${shannonsToCkb(BigInt(request.value.target))} CKB` },
+      {
+        label: "Automation service payment",
+        value: `${shannonsToCkb(BigInt(request.value.reward))} CKB`,
+      },
       { label: "Total capacity locked", value: `${shannonsToCkb(totalLocked)} CKB` },
       { label: "Recoverable residual", value: `${shannonsToCkb(build.quote.residualRefund)} CKB` },
     ]);
     immutableTerms = Object.freeze([
-      `Success lock ${request.value.successLockHash}`,
-      `Refund commitment ${build.intent.refundCommitment}`,
-      `Target ${request.value.target} shannons at block ${request.value.deadlineBlock}`,
-      `${request.value.reward} shannons executor reward`,
-      `Owner cancellation and recovery lock ${request.value.cancelLockHash}`,
+      `Recipient address lock ${request.value.successLockHash}`,
+      `Refund address commitment ${build.intent.refundCommitment}`,
+      `Minimum ${request.value.target} shannons at block ${request.value.deadlineBlock}`,
+      `${request.value.reward} shannons automation service payment`,
+      `Recovery wallet lock ${request.value.cancelLockHash}`,
     ]);
     normalizedIntent = build.intent;
   }

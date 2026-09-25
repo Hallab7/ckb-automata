@@ -6,6 +6,7 @@ import {
   createApiClient,
   type ApiJob,
   type ApiJobEvents,
+  type ApiJobQuote,
   type AutomataApiClient,
 } from "@ckb-automata/api-client";
 
@@ -44,6 +45,7 @@ export function AutomationDetail({ jobId }: Readonly<{ jobId: string }>) {
   }, []);
   const [job, setJob] = useState<ApiJob>();
   const [events, setEvents] = useState<ApiJobEvents["items"]>([]);
+  const [quote, setQuote] = useState<ApiJobQuote>();
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<JobDetailLoadState>("loading");
   const [loadingNextPage, setLoadingNextPage] = useState(false);
@@ -52,13 +54,15 @@ export function AutomationDetail({ jobId }: Readonly<{ jobId: string }>) {
 
   const load = useCallback(
     async (api: AutomataApiClient) => {
-      const [nextJob, timeline] = await Promise.all([
+      const [nextJob, timeline, nextQuote] = await Promise.all([
         api.getJob(jobId),
         api.listJobEvents(jobId, { limit: EVENT_PAGE_SIZE }),
+        api.getJobQuote(jobId).catch(() => undefined),
       ]);
       setJob(nextJob);
       setEvents(timeline.items);
       setNextCursor(timeline.page.nextCursor);
+      setQuote(nextQuote);
     },
     [jobId],
   );
@@ -95,13 +99,15 @@ export function AutomationDetail({ jobId }: Readonly<{ jobId: string }>) {
     let polling: ReturnType<typeof setInterval> | undefined;
     const refresh = async () => {
       try {
-        const [nextJob, timeline] = await Promise.all([
+        const [nextJob, timeline, nextQuote] = await Promise.all([
           apiResult.api!.getJob(jobId),
           apiResult.api!.listJobEvents(jobId, { limit: 100 }),
+          apiResult.api!.getJobQuote(jobId).catch(() => undefined),
         ]);
         if (stopped) return;
         setJob(nextJob);
         setEvents((current) => mergeTimeline(current, timeline.items));
+        setQuote(nextQuote);
       } catch {
         // The existing verified state remains visible until the next successful read.
       }
@@ -175,6 +181,7 @@ export function AutomationDetail({ jobId }: Readonly<{ jobId: string }>) {
       loadingNextPage={loadingNextPage}
       onLoadNext={loadNextPage}
       onRetry={() => setRefreshKey((current) => current + 1)}
+      {...(quote === undefined ? {} : { recipientAmount: quote.amounts.payout.perExecution })}
       {...(job === undefined
         ? {}
         : {

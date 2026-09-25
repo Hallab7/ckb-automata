@@ -129,7 +129,7 @@ export function VisualSystemFixture() {
           columns={[
             { key: "automation", label: "Automation", width: "42%" },
             { key: "status", label: "Status", width: "20%" },
-            { align: "end", key: "amount", label: "Funded value", width: "30%" },
+            { align: "end", key: "amount", label: "Recipient amount", width: "30%" },
             { align: "end", key: "action", label: "Actions", width: "8%" },
           ]}
           rows={rows}

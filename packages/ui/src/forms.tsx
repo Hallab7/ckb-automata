@@ -53,6 +53,11 @@ export interface TextFieldProperties extends Omit<
   readonly hint?: string;
   readonly id?: string;
   readonly label: string;
+  readonly startAction?: Readonly<{
+    disabled?: boolean;
+    label: string;
+    onClick: () => void;
+  }>;
 }
 
 export function TextField({
@@ -61,20 +66,42 @@ export function TextField({
   id,
   label,
   required,
+  startAction,
   ...properties
 }: TextFieldProperties) {
   return (
     <FieldFrame error={error} hint={hint} id={id} label={label} required={required}>
-      {(inputId, describedBy) => (
-        <input
-          aria-describedby={describedBy}
-          aria-invalid={error === undefined ? undefined : true}
-          className="ui-input"
-          id={inputId}
-          required={required}
-          {...properties}
-        />
-      )}
+      {(inputId, describedBy) =>
+        startAction === undefined ? (
+          <input
+            aria-describedby={describedBy}
+            aria-invalid={error === undefined ? undefined : true}
+            className="ui-input"
+            id={inputId}
+            required={required}
+            {...properties}
+          />
+        ) : (
+          <span className="ui-input-action">
+            <button
+              className="ui-input-action__button"
+              disabled={startAction.disabled}
+              onClick={startAction.onClick}
+              type="button"
+            >
+              {startAction.label}
+            </button>
+            <input
+              aria-describedby={describedBy}
+              aria-invalid={error === undefined ? undefined : true}
+              className="ui-input ui-input--with-start-action"
+              id={inputId}
+              required={required}
+              {...properties}
+            />
+          </span>
+        )
+      }
     </FieldFrame>
   );
 }

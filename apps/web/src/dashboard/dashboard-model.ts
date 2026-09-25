@@ -3,18 +3,23 @@ import type { ApiJobList } from "@ckb-automata/api-client";
 import { formatCkbBalance } from "../ccc/wallet-display.ts";
 
 export type DashboardJob = ApiJobList["items"][number];
+export interface RecipientAmounts {
+  readonly perExecution: string;
+  readonly total: string;
+}
+export type RecipientAmountsByJob = Readonly<Record<string, RecipientAmounts | null>>;
 export type DashboardStatus =
   "completed" | "eligible" | "needs_funding" | "recovery_required" | "reorged" | "waiting";
 
 export interface DashboardJobPresentation {
-  readonly fundedValue: string;
+  readonly recipientAmount: string;
   readonly nextAction: string;
   readonly nextEligibility: string;
   readonly status: DashboardStatus;
 }
 
 export interface DashboardSummary {
-  readonly fundedValue: string;
+  readonly recipientTotal: string;
   readonly live: number;
   readonly orphaned: number;
   readonly spent: number;
@@ -28,10 +33,17 @@ function blockLabel(value: bigint): string {
 export function dashboardJobPresentation(
   job: DashboardJob,
   checkpointBlock: string | undefined,
+  recipientAmounts: RecipientAmounts | null | undefined,
 ): DashboardJobPresentation {
+  const formattedRecipientAmount =
+    recipientAmounts === undefined
+      ? "Loading..."
+      : recipientAmounts === null
+        ? "Unavailable"
+        : formatCkbBalance(BigInt(recipientAmounts.perExecution));
   if (job.state === "orphaned") {
     return {
-      fundedValue: formatCkbBalance(BigInt(job.funds.capacity)),
+      recipientAmount: formattedRecipientAmount,
       nextAction: "Wait for canonical replay",
       nextEligibility: "Canonical status pending",
       status: "reorged",
@@ -39,7 +51,7 @@ export function dashboardJobPresentation(
   }
   if (job.state === "spent") {
     return {
-      fundedValue: formatCkbBalance(BigInt(job.funds.capacity)),
+      recipientAmount: formattedRecipientAmount,
       nextAction: "Review execution history",
       nextEligibility: "No further execution",
       status: "completed",
@@ -77,22 +89,34 @@ export function dashboardJobPresentation(
   }
 
   return {
-    fundedValue: formatCkbBalance(BigInt(job.funds.capacity)),
+    recipientAmount: formattedRecipientAmount,
     nextAction,
     nextEligibility,
     status,
   };
 }
 
-export function dashboardSummary(items: readonly DashboardJob[]): DashboardSummary {
+export function dashboardSummary(
+  items: readonly DashboardJob[],
+  recipientAmounts: RecipientAmountsByJob,
+): DashboardSummary {
   const counts = { live: 0, orphaned: 0, spent: 0 };
-  let funded = 0n;
+  let recipientTotal = 0n;
+  let hasLoadingAmount = false;
+  let hasUnavailableAmount = false;
   for (const item of items) {
     counts[item.state] += 1;
-    funded += BigInt(item.funds.capacity);
+    const amounts = recipientAmounts[item.jobId];
+    if (amounts === undefined) hasLoadingAmount = true;
+    else if (amounts === null) hasUnavailableAmount = true;
+    else recipientTotal += BigInt(amounts.total);
   }
   return {
-    fundedValue: formatCkbBalance(funded),
+    recipientTotal: hasUnavailableAmount
+      ? "Unavailable"
+      : hasLoadingAmount
+        ? "Loading..."
+        : formatCkbBalance(recipientTotal),
     ...counts,
     total: items.length,
   };
