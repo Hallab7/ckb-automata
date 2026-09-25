@@ -1,7 +1,7 @@
 import type { RegisteredDeployment } from "@ckb-automata/core";
 
 import type { CkbReadClient } from "../ckb-client.ts";
-import type { CanonicalCheckpointStore } from "./checkpoints.ts";
+import { CheckpointError, type CanonicalCheckpointStore } from "./checkpoints.ts";
 import type { CanonicalBlockProjector } from "./reorg.ts";
 
 export const INDEXER_INITIAL_BACKFILL_BLOCKS = 256n;
@@ -135,7 +135,12 @@ export class LiveIndexerRuntime {
       if (!result.caughtUp) delay = 0;
     } catch (error) {
       this.#logger.error("indexer.batch.failed", "Canonical indexer batch failed", {
-        code: error instanceof Error ? error.name : "UNKNOWN_ERROR",
+        code:
+          error instanceof CheckpointError
+            ? error.code
+            : error instanceof Error
+              ? error.name
+              : "UNKNOWN_ERROR",
       });
     } finally {
       this.#running = false;

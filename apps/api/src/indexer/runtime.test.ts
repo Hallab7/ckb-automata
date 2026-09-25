@@ -74,3 +74,37 @@ test("explicit and lifecycle startup share one idempotent scanner", () => {
 
   assert.deepEqual(events, ["indexer.runtime.started"]);
 });
+
+test("polling logs the stable checkpoint failure code without sensitive details", async () => {
+  const errors: Readonly<Record<string, unknown>>[] = [];
+  const runtime = new LiveIndexerRuntime(
+    { getTipHeader: async () => ({ number: 100n }) } as never,
+    { load: async () => ({ blockNumber: 99n }) } as never,
+    {
+      scanBlock: async () => {
+        const { CheckpointError } = await import("./checkpoints.ts");
+        throw new CheckpointError(
+          "REORG_BEYOND_WINDOW",
+          "postgresql://user:secret@database.internal/private",
+        );
+      },
+    } as never,
+    {
+      error: (_event, _message, fields = {}) => errors.push(fields),
+      info: () => undefined,
+    },
+    {
+      enabled: true,
+      loadDeployment: async () => ({ network: "ckb_testnet" }) as RegisteredDeployment,
+      pollIntervalMs: 1,
+    },
+  );
+
+  runtime.start();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  runtime.onApplicationShutdown();
+
+  assert.ok(errors.length > 0);
+  assert.deepEqual(errors[0], { code: "REORG_BEYOND_WINDOW" });
+  assert.doesNotMatch(JSON.stringify(errors), /secret|database\.internal/);
+});
