@@ -107,8 +107,17 @@ test("standalone context reports readiness without creating an HTTP listener", a
 test("public operators derive isolated durable queue namespaces", () => {
   assert.equal(
     executorQueuePrefix(parseEnvironment(environment({ EXECUTOR_INSTANCE_ID: "operator-a" }))),
-    "ckb-automata:operator-a",
+    "ckb-automata-operator-a",
   );
+  const underscored = executorQueuePrefix(
+    parseEnvironment(environment({ EXECUTOR_INSTANCE_ID: "operator_a" })),
+  );
+  const long = executorQueuePrefix(
+    parseEnvironment(environment({ EXECUTOR_INSTANCE_ID: "operator-abcdefghijklmnopqrstuvwxyz" })),
+  );
+  assert.match(underscored ?? "", /^[a-z][a-z0-9-]{2,47}$/);
+  assert.match(long ?? "", /^[a-z][a-z0-9-]{2,47}$/);
+  assert.notEqual(underscored, "ckb-automata-operator-a");
   assert.equal(executorQueuePrefix(parseEnvironment(environment())), undefined);
 });
 
