@@ -93,7 +93,7 @@ export async function validateDeadlineStep(
   const errors: Record<string, string> = {};
   if (step === "details") {
     amount(draft, "pledgeCkb", "recipient amount", CONTRACT_CAPACITY.plainWalletCell, errors);
-    amount(draft, "targetCkb", "minimum amount", 1n, errors);
+    amount(draft, "targetCkb", "condition amount", 1n, errors);
     await Promise.all([
       address(draft, "successAddress", "recipient address", context, errors),
       address(draft, "refundAddress", "refund address", context, errors),
@@ -120,7 +120,7 @@ export async function validateDeadlineStep(
       CONTRACT_CAPACITY.plainWalletCell,
       errors,
     );
-    const target = amount(draft, "targetCkb", "minimum amount", 1n, errors);
+    const target = amount(draft, "targetCkb", "condition amount", 1n, errors);
     const reward = amount(
       draft,
       "rewardCkb",

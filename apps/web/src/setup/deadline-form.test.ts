@@ -57,7 +57,7 @@ test("deadline form reports the exact one-shannon target minimum", async () => {
       walletReady: false,
     },
   );
-  assert.equal(errors["targetCkb"], "minimum amount must be at least 0.00000001 CKB.");
+  assert.equal(errors["targetCkb"], "condition amount must be at least 0.00000001 CKB.");
 });
 
 test("deadline client rejects every invalid API fixture", async () => {
@@ -94,6 +94,7 @@ test("deadline form asks for addresses and never raw scripts or hashes", async (
     assert.match(source, new RegExp(`name="${field}"`));
   }
   assert.doesNotMatch(source, /name="[^"]*(?:script|hash|outPoint)/i);
-  assert.equal(source.match(/label: "Use mine"/g)?.length, 2);
+  assert.equal(source.match(/label: "Use mine"/g)?.length, 1);
+  assert.match(source, /endAction=\{\{/);
   assert.doesNotMatch(source, /Use connected wallet/);
 });

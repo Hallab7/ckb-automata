@@ -361,12 +361,12 @@ export async function verifyCreationReview(
     ownerLockHash = request.value.cancelLockHash;
     requiredOutputCount = build.completion.requiredOutputCount;
     title = "Deadline finalization";
-    summary = `${shannonsToCkb(BigInt(build.intent.pledged))} CKB will be sent to the recipient if the ${shannonsToCkb(BigInt(request.value.target))} CKB minimum is met at the deadline.`;
+    summary = `${shannonsToCkb(BigInt(build.intent.pledged))} CKB will be sent to the recipient if the ${shannonsToCkb(BigInt(request.value.target))} CKB condition amount is met at the deadline.`;
     timing = timingCopy(BigInt(request.value.deadlineBlock), chainSnapshot.block);
-    recovery = `If the minimum is not met, the recipient amount returns to refund address ${request.value.pledges[0]?.refundLockHash}. The connected wallet can cancel the automation or recover its remaining funds.`;
+    recovery = `If the condition is not met, the recipient amount returns to refund address ${request.value.pledges[0]?.refundLockHash}. The connected wallet can cancel the automation or recover its remaining funds.`;
     amounts = Object.freeze([
       { label: "Recipient amount", value: `${shannonsToCkb(BigInt(build.intent.pledged))} CKB` },
-      { label: "Minimum amount", value: `${shannonsToCkb(BigInt(request.value.target))} CKB` },
+      { label: "Condition amount", value: `${shannonsToCkb(BigInt(request.value.target))} CKB` },
       {
         label: "Automation service payment",
         value: `${shannonsToCkb(BigInt(request.value.reward))} CKB`,
@@ -377,7 +377,7 @@ export async function verifyCreationReview(
     immutableTerms = Object.freeze([
       `Recipient address lock ${request.value.successLockHash}`,
       `Refund address commitment ${build.intent.refundCommitment}`,
-      `Minimum ${request.value.target} shannons at block ${request.value.deadlineBlock}`,
+      `Condition amount ${request.value.target} shannons at block ${request.value.deadlineBlock}`,
       `${request.value.reward} shannons automation service payment`,
       `Recovery wallet lock ${request.value.cancelLockHash}`,
     ]);

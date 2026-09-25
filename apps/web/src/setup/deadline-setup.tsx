@@ -39,12 +39,12 @@ function DeadlineDetails(context: SetupStepRenderContext) {
     <div className="setup-step__group">
       <div>
         <h2>Recipient payment</h2>
-        <p>Choose the amount, the minimum needed, and where the payment should go.</p>
+        <p>Choose the recipient amount, the condition amount, and where the payment should go.</p>
       </div>
       <div className="setup-form-grid">
         <TextField
           {...error(context, "pledgeCkb")}
-          hint="This is the amount the recipient can receive. The minimum is 61 CKB."
+          hint="This is the amount the recipient can receive. It must be at least 61 CKB."
           inputMode="decimal"
           label="Recipient amount (CKB)"
           name="pledgeCkb"
@@ -57,7 +57,7 @@ function DeadlineDetails(context: SetupStepRenderContext) {
           {...error(context, "targetCkb")}
           hint="The recipient is paid when the recipient amount is at least this value."
           inputMode="decimal"
-          label="Minimum amount (CKB)"
+          label="Condition amount (CKB)"
           name="targetCkb"
           onChange={(event) => context.setField("targetCkb", event.target.value)}
           placeholder="150"
@@ -67,32 +67,24 @@ function DeadlineDetails(context: SetupStepRenderContext) {
         <TextField
           {...error(context, "successAddress")}
           autoComplete="off"
-          hint="Receives the recipient amount when the minimum is met."
+          hint="Receives the recipient amount when the condition is met."
           label="Recipient address"
           name="successAddress"
           onChange={(event) => context.setField("successAddress", event.target.value)}
           placeholder="ckt1..."
           required
-          startAction={{
-            disabled: session.address === undefined,
-            label: "Use mine",
-            onClick: () => {
-              if (session.address !== undefined)
-                context.setField("successAddress", session.address);
-            },
-          }}
           value={context.draft["successAddress"] ?? ""}
         />
         <TextField
           {...error(context, "refundAddress")}
           autoComplete="off"
-          hint="Receives the recipient amount when the minimum is not met."
+          hint="Receives the recipient amount when the condition is not met."
           label="Refund address"
           name="refundAddress"
           onChange={(event) => context.setField("refundAddress", event.target.value)}
           placeholder="ckt1..."
           required
-          startAction={{
+          endAction={{
             disabled: session.address === undefined,
             label: "Use mine",
             onClick: () => {
