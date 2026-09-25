@@ -238,6 +238,10 @@ test("deadline creation rejects unsafe pledge and timing inputs", async () => {
       buildDeadlineCreation({ ...baseline, pledges: [...baseline.pledges, baseline.pledges[0]] }),
     /unique/,
   );
+  assert.throws(
+    () => buildDeadlineCreation({ ...baseline, successLockHash: baseline.cancelLockHash }),
+    /recipient address must differ from the recovery address/,
+  );
 });
 
 const CONTRACT_MINIMUM_MINUS_ONE = "6099999999";

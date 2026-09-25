@@ -65,7 +65,7 @@ const build = buildDeadlineCreation({
   ],
   target: "15000000000",
   deadlineBlock,
-  successLockHash: ownerLockHash,
+  successLockHash: parseHash32(`0x${"55".repeat(32)}`),
   cancelLockHash: ownerLockHash,
   reward: "10000000000",
   creatorNonce: "44",

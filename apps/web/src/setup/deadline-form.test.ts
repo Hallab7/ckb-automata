@@ -60,6 +60,29 @@ test("deadline form reports the exact one-shannon target minimum", async () => {
   assert.equal(errors["targetCkb"], "condition amount must be at least 0.00000001 CKB.");
 });
 
+test("deadline form rejects the connected wallet as the recipient", async () => {
+  const ownerLockHash = `0x${"22".repeat(32)}`;
+  const errors = await validateDeadlineStep(
+    "details",
+    {
+      pledgeCkb: "61",
+      targetCkb: "100",
+      successAddress: "owner",
+      refundAddress: "refund",
+    },
+    {
+      ownerLockHash,
+      resolveLockHash: async (address) =>
+        address === "owner" ? ownerLockHash : `0x${"33".repeat(32)}`,
+      walletReady: true,
+    },
+  );
+  assert.equal(
+    errors["successAddress"],
+    "Recipient address must be different from your connected wallet.",
+  );
+});
+
 test("deadline client rejects every invalid API fixture", async () => {
   const fixture = JSON.parse(
     await readFile(

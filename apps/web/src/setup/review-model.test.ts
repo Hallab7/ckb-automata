@@ -431,7 +431,7 @@ test("typed deadline transaction exposes outcome and recovery commitments", asyn
     ],
     target: "15000000000",
     deadlineBlock: "220",
-    successLockHash: ownerLockHash,
+    successLockHash: parseHash32(`0x${"55".repeat(32)}`),
     cancelLockHash: ownerLockHash,
     reward: "6100000000",
     creatorNonce: "11",

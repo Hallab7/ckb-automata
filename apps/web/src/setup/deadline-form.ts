@@ -94,10 +94,13 @@ export async function validateDeadlineStep(
   if (step === "details") {
     amount(draft, "pledgeCkb", "recipient amount", CONTRACT_CAPACITY.plainWalletCell, errors);
     amount(draft, "targetCkb", "condition amount", 1n, errors);
-    await Promise.all([
+    const [successLockHash] = await Promise.all([
       address(draft, "successAddress", "recipient address", context, errors),
       address(draft, "refundAddress", "refund address", context, errors),
     ]);
+    if (successLockHash !== undefined && successLockHash === context.ownerLockHash) {
+      errors["successAddress"] = "Recipient address must be different from your connected wallet.";
+    }
   }
 
   if (step === "timing") {
@@ -142,6 +145,9 @@ export async function validateDeadlineStep(
       address(draft, "successAddress", "recipient address", context, errors),
       address(draft, "refundAddress", "refund address", context, errors),
     ]);
+    if (successLockHash !== undefined && successLockHash === context.ownerLockHash) {
+      errors["successAddress"] = "Recipient address must be different from your connected wallet.";
+    }
     if (
       pledge !== undefined &&
       target !== undefined &&
@@ -149,7 +155,8 @@ export async function validateDeadlineStep(
       deadline !== undefined &&
       successLockHash !== undefined &&
       refundLockHash !== undefined &&
-      context.ownerLockHash !== undefined
+      context.ownerLockHash !== undefined &&
+      errors["successAddress"] === undefined
     ) {
       try {
         parseDeadlineCreationRequest({

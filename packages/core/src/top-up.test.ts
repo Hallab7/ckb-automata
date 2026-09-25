@@ -87,7 +87,7 @@ function deadlineCell(value: RegisteredDeployment, owner: ScriptIdentity): Resol
     ],
     target: "10000000000",
     deadlineBlock: "500",
-    successLockHash: ownerHash,
+    successLockHash: parseHash32(`0x${"49".repeat(32)}`),
     cancelLockHash: ownerHash,
     reward: "10000000000",
     creatorNonce: "48",

@@ -281,6 +281,9 @@ export function buildDeadlineCreation(input: DeadlineCreationInput): DeadlineCre
   const creatorNonce = parseSequence(input.creatorNonce);
   const successLockHash = requireNonzeroHash(input.successLockHash, "successLockHash");
   const cancelLockHash = requireNonzeroHash(input.cancelLockHash, "cancelLockHash");
+  if (successLockHash === cancelLockHash) {
+    throw new RangeError("recipient address must differ from the recovery address");
+  }
   const quote = calculateDeadlineQuote({
     pledgedAmount: pledged,
     reward,

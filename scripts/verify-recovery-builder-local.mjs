@@ -232,7 +232,7 @@ async function createDeadline() {
     ],
     target: "15000000000",
     deadlineBlock: BigInt(tip.number) + 20n,
-    successLockHash: ownerLockHash,
+    successLockHash: parseHash32(`0x${"55".repeat(32)}`),
     cancelLockHash: ownerLockHash,
     reward: "10000000000",
     creatorNonce: "4702",
