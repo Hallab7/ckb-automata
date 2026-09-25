@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { WitnessArgs, type ClientBlock } from "@ckb-ccc/shell";
 
@@ -150,6 +150,47 @@ export class JobTransitionIndexer {
     let terminalTransitions = 0;
     let successorTransitions = 0;
     let consumedByOther = 0;
+    const inputTransactionHashes = [
+      ...new Set(
+        block.transactions.flatMap((transaction) =>
+          transaction.inputs.map((input) => input.previousOutput.txHash),
+        ),
+      ),
+    ];
+    if (inputTransactionHashes.length === 0) {
+      return Object.freeze({
+        indexedTransitions,
+        terminalTransitions,
+        successorTransitions,
+        consumedByOther,
+      });
+    }
+    const possibleConsumptions = await this.#database
+      .select({
+        outpointTxHash: jobVersions.outpointTxHash,
+        outpointIndex: jobVersions.outpointIndex,
+      })
+      .from(jobVersions)
+      .where(
+        and(
+          eq(jobVersions.networkId, deployment.network),
+          eq(jobVersions.status, "live"),
+          inArray(jobVersions.outpointTxHash, inputTransactionHashes),
+        ),
+      );
+    const possibleOutpoints = new Set(
+      possibleConsumptions.map(
+        ({ outpointTxHash, outpointIndex }) => `${outpointTxHash}:${outpointIndex}`,
+      ),
+    );
+    if (possibleOutpoints.size === 0) {
+      return Object.freeze({
+        indexedTransitions,
+        terminalTransitions,
+        successorTransitions,
+        consumedByOther,
+      });
+    }
 
     await this.#database.transaction(async (databaseTransaction) => {
       await databaseTransaction.execute(
@@ -158,6 +199,13 @@ export class JobTransitionIndexer {
       for (const [transactionIndex, chainTransaction] of block.transactions.entries()) {
         const txHash = parseHash32(chainTransaction.hash());
         for (const [inputIndex, input] of chainTransaction.inputs.entries()) {
+          if (
+            !possibleOutpoints.has(
+              `${input.previousOutput.txHash}:${input.previousOutput.index.toString()}`,
+            )
+          ) {
+            continue;
+          }
           const [consumed] = await databaseTransaction
             .select({
               id: jobVersions.id,

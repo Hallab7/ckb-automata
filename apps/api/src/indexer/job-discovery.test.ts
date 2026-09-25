@@ -6,7 +6,7 @@ import type { ClientBlock } from "@ckb-ccc/shell";
 
 import { deploymentRegistry } from "@ckb-automata/core";
 
-import { extractSupportedJobCells } from "./job-discovery.ts";
+import { extractSupportedJobCells, JobCellDiscovery } from "./job-discovery.ts";
 
 const manifest = JSON.parse(
   await readFile(new URL("../../../../deploy/manifests/local.json", import.meta.url), "utf8"),
@@ -79,4 +79,21 @@ test("counts malformed and unsupported JobData without projecting it", () => {
   assert.equal(result.malformedOrInvalid, 1);
   assert.equal(result.unsupportedVersions, 1);
   assert.equal(result.cells.length, 0);
+});
+
+test("skips database work when a block has no supported Job Cells", async () => {
+  let transactionCalled = false;
+  const discovery = new JobCellDiscovery(
+    {
+      transaction: async () => {
+        transactionCalled = true;
+        throw new Error("empty blocks must not open a transaction");
+      },
+    } as never,
+    {} as never,
+  );
+  const result = await discovery.projectBlock(block(["0x1234"]), deployment);
+  assert.equal(transactionCalled, false);
+  assert.equal(result.insertedJobs, 0);
+  assert.equal(result.existingJobs, 0);
 });

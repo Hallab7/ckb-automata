@@ -182,6 +182,10 @@ export class JobCellDiscovery {
     let insertedJobs = 0;
     let existingJobs = 0;
 
+    if (extraction.cells.length === 0) {
+      return Object.freeze({ ...extraction, insertedJobs, existingJobs });
+    }
+
     await this.#database.transaction(async (transaction) => {
       await transaction.execute(
         sql`SELECT pg_advisory_xact_lock(hashtextextended(${deployment.network}, 0))`,
