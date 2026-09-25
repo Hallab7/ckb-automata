@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { ccc } from "@ckb-ccc/connector-react";
 
 import {
+  REVIEW_FEE_RATE_MAXIMUM,
   parseHash32,
   type ScriptIdentity,
   type UnsignedDeadlineTransaction,
@@ -296,7 +297,9 @@ function WalletSessionBridge({ children }: Readonly<{ children: ReactNode }>) {
       completeForReview: async (transaction) => {
         const currentSigner = requireSigner();
         const completed = cccTransaction(transaction);
-        await completed.completeFeeBy(currentSigner);
+        await completed.completeFeeBy(currentSigner, undefined, undefined, {
+          maxFeeRate: REVIEW_FEE_RATE_MAXIMUM,
+        });
         return Object.freeze({
           hash: completed.hash(),
           transaction: reviewedTransaction(completed),

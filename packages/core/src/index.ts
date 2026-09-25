@@ -144,6 +144,8 @@ export {
 } from "./deployment-registry.ts";
 
 export {
+  REVIEW_FEE_RATE_MAXIMUM,
+  REVIEW_TRANSACTION_MAXIMUM_BYTES,
   calculateDeadlineQuote,
   calculateRecurringQuote,
   estimateTransactionFeeRange,

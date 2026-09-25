@@ -27,6 +27,8 @@ import { and, eq, lte } from "drizzle-orm";
 
 import {
   CONTRACT_CAPACITY,
+  REVIEW_FEE_RATE_MAXIMUM,
+  REVIEW_TRANSACTION_MAXIMUM_BYTES,
   calculateDeadlineQuote,
   calculateRecurringQuote,
   deriveDeadlinePayloadHash,
@@ -48,12 +50,24 @@ const TARGET_BLOCK_SECONDS = 10n;
 
 export const JOB_QUOTE_ASSUMPTIONS = Object.freeze({
   deadline: Object.freeze({
-    transactionBytes: Object.freeze({ minimum: "700", maximum: "900" }),
-    feeRatePerKilobyte: Object.freeze({ minimum: "1000", maximum: "2000" }),
+    transactionBytes: Object.freeze({
+      minimum: "700",
+      maximum: REVIEW_TRANSACTION_MAXIMUM_BYTES.toString(),
+    }),
+    feeRatePerKilobyte: Object.freeze({
+      minimum: "1000",
+      maximum: REVIEW_FEE_RATE_MAXIMUM.toString(),
+    }),
   }),
   recurring: Object.freeze({
-    transactionBytes: Object.freeze({ minimum: "500", maximum: "800" }),
-    feeRatePerKilobyte: Object.freeze({ minimum: "1000", maximum: "2000" }),
+    transactionBytes: Object.freeze({
+      minimum: "500",
+      maximum: REVIEW_TRANSACTION_MAXIMUM_BYTES.toString(),
+    }),
+    feeRatePerKilobyte: Object.freeze({
+      minimum: "1000",
+      maximum: REVIEW_FEE_RATE_MAXIMUM.toString(),
+    }),
   }),
 });
 

@@ -6,6 +6,8 @@ import benchmarks from "../../../contracts/benchmarks.json" with { type: "json" 
 import { MAX_UINT64 } from "./chain-values.ts";
 import { CONTRACT_CAPACITY } from "./contract-costs.ts";
 import {
+  REVIEW_FEE_RATE_MAXIMUM,
+  REVIEW_TRANSACTION_MAXIMUM_BYTES,
   calculateDeadlineQuote,
   calculateRecurringQuote,
   estimateTransactionFeeRange,
@@ -80,6 +82,18 @@ test("fee estimates round upward at shannons per thousand bytes", () => {
       feeRatePerKilobyte: { minimum: "1", maximum: "1000" },
     }),
     { minimum: 1n, maximum: 1_001n },
+  );
+});
+
+test("review fee ceilings cover prepared wallet transactions while remaining bounded", () => {
+  assert.equal(REVIEW_TRANSACTION_MAXIMUM_BYTES, 4_096n);
+  assert.equal(REVIEW_FEE_RATE_MAXIMUM, 100_000n);
+  assert.deepEqual(
+    estimateTransactionFeeRange({
+      transactionBytes: { minimum: "1", maximum: REVIEW_TRANSACTION_MAXIMUM_BYTES },
+      feeRatePerKilobyte: { minimum: "1", maximum: REVIEW_FEE_RATE_MAXIMUM },
+    }),
+    { minimum: 1n, maximum: 409_600n },
   );
 });
 

@@ -8,6 +8,9 @@ import {
 } from "./chain-values.ts";
 import { CONTRACT_CAPACITY } from "./contract-costs.ts";
 
+export const REVIEW_TRANSACTION_MAXIMUM_BYTES = 4_096n;
+export const REVIEW_FEE_RATE_MAXIMUM = 100_000n;
+
 export interface FeeRangeInput {
   readonly transactionBytes: {
     readonly minimum: IntegerInput;

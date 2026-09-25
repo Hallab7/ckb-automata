@@ -429,7 +429,8 @@ test("review uses CCC completion without invoking a wallet signature", async () 
   const completionStart = provider.indexOf("completeForReview:");
   const completionEnd = provider.indexOf("detailsStatus:", completionStart);
   const completion = provider.slice(completionStart, completionEnd);
-  assert.match(completion, /await completed\.completeFeeBy\(currentSigner\)/);
+  assert.match(completion, /await completed\.completeFeeBy\(currentSigner, undefined, undefined,/);
+  assert.match(completion, /maxFeeRate: REVIEW_FEE_RATE_MAXIMUM/);
   assert.match(provider, /getHeaderByNumber\(0\)/);
   assert.doesNotMatch(completion, /sign(?:Only)?Transaction\(/);
   assert.match(review, /reviewStateError/);
