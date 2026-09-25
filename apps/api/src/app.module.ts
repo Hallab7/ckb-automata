@@ -2,6 +2,7 @@ import { Module, type DynamicModule } from "@nestjs/common";
 import { APP_INTERCEPTOR } from "@nestjs/core";
 
 import type { AutomataEnvironment } from "@ckb-automata/config";
+import { deploymentRegistry } from "@ckb-automata/core";
 
 import { CkbClient, createCkbClient } from "./ckb-client.ts";
 import { AuthController, AuthService } from "./auth.ts";
@@ -18,6 +19,7 @@ import { CanonicalCheckpointStore } from "./indexer/checkpoints.ts";
 import { JobCellDiscovery } from "./indexer/job-discovery.ts";
 import { JobTransitionIndexer } from "./indexer/job-transitions.ts";
 import { CanonicalBlockProjector, JobProjectionRollback } from "./indexer/reorg.ts";
+import { LiveIndexerRuntime } from "./indexer/runtime.ts";
 import {
   AccountJobsController,
   JobReadService,
@@ -160,6 +162,24 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
           new CanonicalBlockProjector(ckbClient, checkpoints, rollback, discovery, transitions, {
             metrics: telemetry.metrics,
             telemetry: telemetry.runtime,
+          }),
+      },
+      {
+        provide: LiveIndexerRuntime,
+        inject: [CkbClient, CanonicalCheckpointStore, CanonicalBlockProjector, BackendTelemetry],
+        useFactory: (
+          ckbClient: CkbClient,
+          checkpoints: CanonicalCheckpointStore,
+          projector: CanonicalBlockProjector,
+          telemetry: BackendTelemetry,
+        ) =>
+          new LiveIndexerRuntime(ckbClient, checkpoints, projector, telemetry.logger, {
+            enabled: environment.AUTOMATA_PROFILE === "testnet-public",
+            loadDeployment: async () => {
+              const result = await deploymentRegistry.load(environment.CKB_GENESIS_HASH);
+              if (result.status !== "ok") throw new Error("indexer deployment is unavailable");
+              return result.deployment;
+            },
           }),
       },
       {

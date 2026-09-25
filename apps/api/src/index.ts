@@ -107,6 +107,15 @@ export {
   type ReorgRollbackResult,
 } from "./indexer/reorg.ts";
 export {
+  INDEXER_BATCH_BLOCKS,
+  INDEXER_INITIAL_BACKFILL_BLOCKS,
+  INDEXER_POLL_INTERVAL_MS,
+  LiveIndexerRuntime,
+  nextIndexerScanRange,
+  type IndexerScanRange,
+  type LiveIndexerRuntimeOptions,
+} from "./indexer/runtime.ts";
+export {
   API_GLOBAL_PREFIX,
   DEFAULT_API_HOST,
   DEFAULT_API_PORT,
