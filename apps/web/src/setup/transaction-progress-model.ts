@@ -66,6 +66,14 @@ export function transactionProgressPresentation(
   return TRANSACTION_PROGRESS_PRESENTATIONS[state];
 }
 
+export function transactionConfirmationLabel(
+  progress: Pick<ApiTransactionProgress, "confirmations" | "requiredConfirmations">,
+): string {
+  const observed = BigInt(progress.confirmations);
+  const required = BigInt(progress.requiredConfirmations);
+  return `${observed > required ? required : observed} / ${required}`;
+}
+
 export interface StoredTransactionProgress extends ApiTransactionProgress {
   readonly version: typeof STORAGE_VERSION;
 }

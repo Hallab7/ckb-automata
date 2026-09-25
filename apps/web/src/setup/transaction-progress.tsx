@@ -26,6 +26,7 @@ import {
   progressQuery,
   readTransactionProgress,
   sameTransactionProgress,
+  transactionConfirmationLabel,
   transactionProgressPresentation,
   writeTransactionProgress,
   type TransactionProgressState,
@@ -116,9 +117,7 @@ export function TransactionProgressPanel({
       <dl className="transaction-progress__facts">
         <div>
           <dt>Confirmations</dt>
-          <dd>
-            {progress.confirmations} / {progress.requiredConfirmations}
-          </dd>
+          <dd>{transactionConfirmationLabel(progress)}</dd>
         </div>
         <div>
           <dt>Block</dt>

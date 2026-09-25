@@ -9,6 +9,7 @@ import {
   progressQuery,
   readTransactionProgress,
   sameTransactionProgress,
+  transactionConfirmationLabel,
   transactionProgressPresentation,
   transactionProgressStorageKey,
   writeTransactionProgress,
@@ -118,4 +119,12 @@ test("only canonical confirmation uses success copy and styling", () => {
     assert.notEqual(transactionProgressPresentation(state).tone, "success", state);
   }
   assert.equal(transactionProgressPresentation("committed").title, "Committed");
+});
+
+test("confirmation label stops at the required depth", () => {
+  assert.equal(transactionConfirmationLabel(committed), "2 / 3");
+  assert.equal(
+    transactionConfirmationLabel({ confirmations: "36", requiredConfirmations: 24 }),
+    "24 / 24",
+  );
 });
