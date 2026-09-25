@@ -442,6 +442,17 @@ function stable(value: unknown): string {
   return JSON.stringify(value);
 }
 
+function sameInput(
+  left: UnsignedDeadlineTransaction["inputs"][number],
+  right: UnsignedDeadlineTransaction["inputs"][number],
+): boolean {
+  return (
+    left.previousOutput.txHash === right.previousOutput.txHash &&
+    BigInt(left.previousOutput.index) === BigInt(right.previousOutput.index) &&
+    BigInt(left.since) === BigInt(right.since)
+  );
+}
+
 function witnessOutputType(witness: Hex): Hex | null {
   const bytes = hexToBytes(witness);
   if (bytes.length < 16) throw new Error("completed witness 0 is not a Molecule WitnessArgs table");
@@ -477,8 +488,12 @@ export function assertDeadlineCompletion(
     throw new Error("wallet completion removed required inputs");
   }
   for (let index = 0; index < build.completion.requiredInputCount; index += 1) {
-    if (stable(completed.inputs[index]) !== stable(build.transaction.inputs[index])) {
-      throw new Error(`wallet completion changed required input ${index}`);
+    const required = build.transaction.inputs[index];
+    const actual = completed.inputs[index];
+    if (!required || !actual || !sameInput(actual, required)) {
+      throw new Error(
+        `wallet completion changed required input outpoint or since at index ${index}`,
+      );
     }
   }
   if (completed.outputs.length < build.completion.requiredOutputCount) {

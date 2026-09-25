@@ -149,6 +149,31 @@ test("wallet completion may append funding and change without changing commitmen
       } as UnsignedDeadlineTransaction),
     /changed transaction metadata/,
   );
+
+  const equivalentInputEncoding = structuredClone(completed) as unknown as {
+    inputs: { previousOutput: { index: string }; since: string }[];
+  };
+  const firstEquivalentInput = equivalentInputEncoding.inputs[0];
+  assert.ok(firstEquivalentInput);
+  firstEquivalentInput.previousOutput.index = "0x00";
+  firstEquivalentInput.since = "0x00";
+  assert.doesNotThrow(() =>
+    assertDeadlineCompletion(
+      build,
+      equivalentInputEncoding as unknown as UnsignedDeadlineTransaction,
+    ),
+  );
+
+  const changedInput = structuredClone(completed) as unknown as {
+    inputs: { previousOutput: { txHash: string } }[];
+  };
+  const firstChangedInput = changedInput.inputs[0];
+  assert.ok(firstChangedInput);
+  firstChangedInput.previousOutput.txHash = `0x${"ee".repeat(32)}`;
+  assert.throws(
+    () => assertDeadlineCompletion(build, changedInput as unknown as UnsignedDeadlineTransaction),
+    /changed required input outpoint or since at index 0/,
+  );
 });
 
 test("deadline creation rejects unsafe pledge and timing inputs", async () => {
