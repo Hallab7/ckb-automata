@@ -1,4 +1,6 @@
 import {
+  CREATION_REVIEW_EXPIRY_CONDITION,
+  CREATION_REVIEW_WINDOW_BLOCKS,
   assertDeadlineCompletion,
   assertRecurringCompletion,
   buildDeadlineCreation,
@@ -144,6 +146,19 @@ function snapshot(artifact: ApiTransactionBuild): {
   };
 }
 
+export function creationReviewExpiryBlock(artifact: ApiTransactionBuild): string {
+  const chainSnapshot = snapshot(artifact);
+  const expiry = record(artifact.quoteExpiry, "quote expiry");
+  const afterBlock = decimal(expiry["afterBlock"], "quote expiry block");
+  if (
+    expiry["condition"] !== CREATION_REVIEW_EXPIRY_CONDITION ||
+    afterBlock !== chainSnapshot.block + CREATION_REVIEW_WINDOW_BLOCKS
+  ) {
+    throw new Error("API review expiry does not match the bounded canonical snapshot window");
+  }
+  return afterBlock.toString();
+}
+
 function feeMaximum(artifact: ApiTransactionBuild): bigint {
   const quote = record(artifact.quote, "quote");
   const estimatedFee = record(quote["estimatedFee"], "estimated fee");
@@ -267,6 +282,7 @@ export async function verifyCreationReview(
 ): Promise<CreationReviewModel> {
   await verifyEnvelope(artifact, request.operation);
   const chainSnapshot = snapshot(artifact);
+  creationReviewExpiryBlock(artifact);
   if (
     context.deployment.manifestSha256 !== chainSnapshot.manifestSha256 ||
     context.deployment.genesisHash !== record(artifact.intent, "normalized intent")["genesisHash"]

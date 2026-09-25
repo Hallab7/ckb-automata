@@ -99,12 +99,24 @@ for (const message of ["The wallet rejected the request", "The wallet window was
   });
 }
 
-test("stale quote blocks the wallet invocation", async () => {
+test("a newer canonical tip does not invalidate an unchanged reviewed artifact", async () => {
   const context = dependencies({
     refreshArtifact: async () =>
       ({ ...artifact, policyCriticalHash: "55".repeat(32) }) as ApiTransactionBuild,
   });
-  await assert.rejects(submitCreationReview(review, context.dependencies), /snapshot is stale/);
+  await submitCreationReview(review, context.dependencies);
+  assert.deepEqual(context.calls, ["reverify", "sign", "validate", "broadcast", "persist"]);
+});
+
+test("a changed quote blocks the wallet invocation", async () => {
+  const context = dependencies({
+    refreshArtifact: async () =>
+      ({ ...artifact, quote: { maximumLockedTotal: "1" } }) as ApiTransactionBuild,
+  });
+  await assert.rejects(
+    submitCreationReview(review, context.dependencies),
+    /quote, or policy changed/,
+  );
   assert.deepEqual(context.calls, []);
   assert.equal(context.persisted(), undefined);
 });
@@ -159,7 +171,10 @@ test("CCC submission signs without rebuilding and checks ambiguous resubmission"
   assert.match(provider, /currentSigner\.signOnlyTransaction\(cccTransactionLike\(transaction\)\)/);
   assert.doesNotMatch(provider, /currentSigner\.signTransaction\(/);
   assert.match(provider, /client\.getCellLive\(input\.previousOutput, true, true\)/);
+  assert.match(provider, /client\.getHeaderByNumber\(snapshotBlock\)/);
+  assert.match(provider, /assertCanonicalReviewWindow\(snapshot, tip\.number/);
   assert.match(provider, /currentSigner\.client\s*\.getTransaction\(expectedHash\)/);
   assert.match(approval, /window\.localStorage/);
   assert.match(approval, /api\.validateSigned/);
+  assert.match(approval, /reviewContext/);
 });

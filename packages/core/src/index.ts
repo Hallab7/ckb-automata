@@ -144,6 +144,8 @@ export {
 } from "./deployment-registry.ts";
 
 export {
+  CREATION_REVIEW_EXPIRY_CONDITION,
+  CREATION_REVIEW_WINDOW_BLOCKS,
   REVIEW_FEE_RATE_MAXIMUM,
   REVIEW_TRANSACTION_MAXIMUM_BYTES,
   calculateDeadlineQuote,

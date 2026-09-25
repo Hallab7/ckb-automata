@@ -75,7 +75,7 @@ function artifact(input: {
     deploymentManifestSha256: (input.intent as { deploymentManifestSha256: string })
       .deploymentManifestSha256,
   };
-  const quoteExpiry = { afterBlock: "100", condition: "tip_change_before_signing" } as const;
+  const quoteExpiry = { afterBlock: "130", condition: "canonical_snapshot_window" } as const;
   const normalizedIntent = normalized(input.intent) as Record<string, unknown>;
   const normalizedQuote = normalized(input.quote) as Record<string, unknown>;
   const intentHash = digest({ operation: input.operation, intent: normalizedIntent });
@@ -139,6 +139,24 @@ function withIntent(
       transaction: source.transaction,
     }),
   };
+}
+
+function withExpiry(
+  source: ApiTransactionBuild,
+  quoteExpiry: Readonly<Record<string, unknown>>,
+): ApiTransactionBuild {
+  return {
+    ...source,
+    quoteExpiry,
+    policyCriticalHash: digest({
+      operation: source.operation,
+      intentHash: source.intentHash,
+      quote: source.quote,
+      chainSnapshot: source.chainSnapshot,
+      quoteExpiry,
+      transaction: source.transaction,
+    }),
+  } as ApiTransactionBuild;
 }
 
 function completedTransaction(
@@ -308,6 +326,32 @@ test("review rejects every changed policy field, owner input, output, and fee mu
       context,
     ),
     /policy hash/,
+  );
+  await assert.rejects(
+    verifyCreationReview(
+      request,
+      withExpiry(apiArtifact, {
+        afterBlock: "131",
+        condition: "canonical_snapshot_window",
+      }),
+      completed,
+      INPUT_HASH,
+      context,
+    ),
+    /bounded canonical snapshot window/,
+  );
+  await assert.rejects(
+    verifyCreationReview(
+      request,
+      withExpiry(apiArtifact, {
+        afterBlock: "130",
+        condition: "tip_change_before_signing",
+      }),
+      completed,
+      INPUT_HASH,
+      context,
+    ),
+    /bounded canonical snapshot window/,
   );
   const changedQuote = {
     ...apiArtifact.quote,

@@ -25,6 +25,8 @@ import {
 } from "@nestjs/swagger";
 
 import {
+  CREATION_REVIEW_EXPIRY_CONDITION,
+  CREATION_REVIEW_WINDOW_BLOCKS,
   CancellationBuildError,
   RECOVERY_REASONS,
   RecoveryBuildError,
@@ -69,7 +71,7 @@ export const TRANSACTION_OPERATIONS = [
 export type TransactionOperation = (typeof TRANSACTION_OPERATIONS)[number];
 export type TransactionChainClient = Pick<
   CkbClient,
-  "dryRun" | "getTipHeader" | "getTransactionStatus"
+  "dryRun" | "getBlockByNumber" | "getTipHeader" | "getTransactionStatus"
 >;
 
 export interface TransactionBuildResponse {
@@ -324,12 +326,12 @@ function envelope(input: {
   const intent = normalized(input.intent);
   const quote = normalized(input.quote);
   const intentHash = digest({ operation: input.operation, intent });
-  const critical = Object.freeze({
+  const critical = policyCriticalContext({
     operation: input.operation,
     intentHash,
     quote,
-    chainSnapshot: normalized(input.chainSnapshot),
-    quoteExpiry: normalized(input.quoteExpiry),
+    chainSnapshot: input.chainSnapshot,
+    quoteExpiry: input.quoteExpiry,
     transaction: input.transaction,
   });
   return Object.freeze({
@@ -343,6 +345,31 @@ function envelope(input: {
     chainSnapshot: normalized(input.chainSnapshot),
     quoteExpiry: normalized(input.quoteExpiry),
     quote,
+  });
+}
+
+function policyCriticalContext(input: {
+  readonly operation: TransactionOperation;
+  readonly intentHash: string;
+  readonly quote: unknown;
+  readonly chainSnapshot: unknown;
+  readonly quoteExpiry: unknown;
+  readonly transaction: UnsignedDeadlineTransaction;
+}) {
+  return Object.freeze({
+    operation: input.operation,
+    intentHash: input.intentHash,
+    quote: normalized(input.quote),
+    chainSnapshot: normalized(input.chainSnapshot),
+    quoteExpiry: normalized(input.quoteExpiry),
+    transaction: input.transaction,
+  });
+}
+
+function creationExpiry(blockNumber: bigint) {
+  return Object.freeze({
+    afterBlock: (blockNumber + CREATION_REVIEW_WINDOW_BLOCKS).toString(),
+    condition: CREATION_REVIEW_EXPIRY_CONDITION,
   });
 }
 
@@ -361,6 +388,43 @@ function creationSnapshot(
   return Object.freeze({
     tip: Object.freeze({ blockNumber: tip.number.toString(), blockHash: tip.hash }),
     deploymentManifestSha256: deployment.manifestSha256,
+  });
+}
+
+function parseCreationReviewContext(value: unknown) {
+  const context = record(value, "reviewContext");
+  exact(context, ["chainSnapshot", "quoteExpiry"], "reviewContext");
+  const chainSnapshot = record(context["chainSnapshot"], "reviewContext.chainSnapshot");
+  exact(chainSnapshot, ["tip", "deploymentManifestSha256"], "reviewContext.chainSnapshot");
+  const tip = record(chainSnapshot["tip"], "reviewContext.chainSnapshot.tip");
+  exact(tip, ["blockNumber", "blockHash"], "reviewContext.chainSnapshot.tip");
+  const blockNumber = decimal(tip["blockNumber"], "reviewContext.chainSnapshot.tip.blockNumber");
+  const blockHash = hash(tip["blockHash"], "reviewContext.chainSnapshot.tip.blockHash");
+  const deploymentManifestSha256 = text(
+    chainSnapshot["deploymentManifestSha256"],
+    "reviewContext.chainSnapshot.deploymentManifestSha256",
+  );
+  if (!/^[0-9a-f]{64}$/.test(deploymentManifestSha256)) {
+    throw new TypeError("reviewContext deployment manifest must be a lowercase SHA-256 digest");
+  }
+  const quoteExpiry = record(context["quoteExpiry"], "reviewContext.quoteExpiry");
+  exact(quoteExpiry, ["afterBlock", "condition"], "reviewContext.quoteExpiry");
+  const afterBlock = decimal(quoteExpiry["afterBlock"], "reviewContext.quoteExpiry.afterBlock");
+  if (quoteExpiry["condition"] !== CREATION_REVIEW_EXPIRY_CONDITION) {
+    throw new TypeError("reviewContext quote expiry condition is unsupported");
+  }
+  return Object.freeze({
+    blockNumber: BigInt(blockNumber),
+    blockHash,
+    afterBlock: BigInt(afterBlock),
+    chainSnapshot: Object.freeze({
+      tip: Object.freeze({ blockNumber, blockHash }),
+      deploymentManifestSha256,
+    }),
+    quoteExpiry: Object.freeze({
+      afterBlock,
+      condition: CREATION_REVIEW_EXPIRY_CONDITION,
+    }),
   });
 }
 
@@ -408,7 +472,14 @@ export class TransactionBuildService {
       request = record(input, "validation request");
       exact(
         request,
-        ["operation", "request", "intentHash", "policyCriticalHash", "transaction"],
+        [
+          "operation",
+          "request",
+          "intentHash",
+          "policyCriticalHash",
+          "reviewContext",
+          "transaction",
+        ],
         "validation request",
       );
       operation = parseOperation(request["operation"]);
@@ -441,12 +512,29 @@ export class TransactionBuildService {
     } catch (error) {
       return this.#mapBuildError(error);
     }
-    if (reviewedPolicyHash !== artifact.response.policyCriticalHash) {
-      throw new ConflictException({
-        status: "conflict",
-        code: "STALE_POLICY_CONTEXT",
-        message: "the quote or chain snapshot changed; review a newly built transaction",
-      });
+    if (request["reviewContext"] === undefined) {
+      if (reviewedPolicyHash !== artifact.response.policyCriticalHash) {
+        throw new ConflictException({
+          status: "conflict",
+          code: "STALE_POLICY_CONTEXT",
+          message: "the quote or chain snapshot changed; review a newly built transaction",
+        });
+      }
+    } else {
+      if (operation !== "create_deadline_job" && operation !== "create_recurring_job") {
+        return this.#mapBuildError(
+          new TypeError("reviewContext is supported only for creation transactions"),
+        );
+      }
+      try {
+        await this.#assertCreationReviewContext(
+          artifact.response,
+          request["reviewContext"],
+          reviewedPolicyHash,
+        );
+      } catch (error) {
+        return this.#mapBuildError(error);
+      }
     }
 
     let transaction: UnsignedDeadlineTransaction;
@@ -474,9 +562,66 @@ export class TransactionBuildService {
       valid: true,
       operation,
       intentHash: artifact.response.intentHash,
-      policyCriticalHash: artifact.response.policyCriticalHash,
+      policyCriticalHash: reviewedPolicyHash,
       dryRunCycles: cycles.toString(),
     });
+  }
+
+  async #assertCreationReviewContext(
+    artifact: TransactionBuildResponse,
+    value: unknown,
+    reviewedPolicyHash: string,
+  ): Promise<void> {
+    const reviewed = parseCreationReviewContext(value);
+    const currentSnapshot = record(artifact.chainSnapshot, "current chain snapshot");
+    const currentTip = record(currentSnapshot["tip"], "current chain snapshot tip");
+    const currentBlock = BigInt(decimal(currentTip["blockNumber"], "current tip block"));
+    const currentManifest = text(
+      currentSnapshot["deploymentManifestSha256"],
+      "current deployment manifest",
+    );
+    if (
+      reviewed.chainSnapshot.deploymentManifestSha256 !== currentManifest ||
+      reviewed.afterBlock !== reviewed.blockNumber + CREATION_REVIEW_WINDOW_BLOCKS
+    ) {
+      throw new ConflictException({
+        status: "conflict",
+        code: "STALE_POLICY_CONTEXT",
+        message: "the reviewed policy context is no longer valid",
+      });
+    }
+    if (currentBlock < reviewed.blockNumber || currentBlock > reviewed.afterBlock) {
+      throw new ConflictException({
+        status: "conflict",
+        code: "STALE_CHAIN_SNAPSHOT",
+        message: "the reviewed chain snapshot expired",
+      });
+    }
+    const canonicalBlock = await this.#chain.getBlockByNumber(reviewed.blockNumber);
+    if (canonicalBlock?.header.hash !== reviewed.blockHash) {
+      throw new ConflictException({
+        status: "conflict",
+        code: "STALE_CHAIN_SNAPSHOT",
+        message: "the reviewed chain snapshot is no longer canonical",
+      });
+    }
+    const expectedPolicyHash = digest(
+      policyCriticalContext({
+        operation: artifact.operation,
+        intentHash: artifact.intentHash,
+        quote: artifact.quote,
+        chainSnapshot: reviewed.chainSnapshot,
+        quoteExpiry: reviewed.quoteExpiry,
+        transaction: artifact.transaction,
+      }),
+    );
+    if (reviewedPolicyHash !== expectedPolicyHash) {
+      throw new ConflictException({
+        status: "conflict",
+        code: "STALE_POLICY_CONTEXT",
+        message: "the reviewed policy context does not match the transaction",
+      });
+    }
   }
 
   async #artifact(operation: TransactionOperation, input: unknown): Promise<BuiltArtifact> {
@@ -507,7 +652,7 @@ export class TransactionBuildService {
       intent: build.intent,
       protocolIntentHash: build.intentHash,
       chainSnapshot: creationSnapshot(tip, deployment),
-      quoteExpiry: { afterBlock: tip.number.toString(), condition: "tip_change_before_signing" },
+      quoteExpiry: creationExpiry(tip.number),
       quote: quoteAmounts(build.quote),
     });
     return Object.freeze({
@@ -539,7 +684,7 @@ export class TransactionBuildService {
       intent: build.intent,
       protocolIntentHash: build.intentHash,
       chainSnapshot: creationSnapshot(tip, deployment),
-      quoteExpiry: { afterBlock: tip.number.toString(), condition: "tip_change_before_signing" },
+      quoteExpiry: creationExpiry(tip.number),
       quote: quoteAmounts(build.quote),
     });
     return Object.freeze({
@@ -850,7 +995,11 @@ const responseSchema = {
         afterBlock: decimalSchema,
         condition: {
           type: "string",
-          enum: ["tip_change_before_signing", "tip_or_job_snapshot_change"],
+          enum: [
+            "canonical_snapshot_window",
+            "tip_change_before_signing",
+            "tip_or_job_snapshot_change",
+          ],
         },
       },
     },
@@ -1020,6 +1169,23 @@ ApiBody({
       },
       intentHash: { type: "string", pattern: "^[0-9a-f]{64}$" },
       policyCriticalHash: { type: "string", pattern: "^[0-9a-f]{64}$" },
+      reviewContext: {
+        type: "object",
+        required: ["chainSnapshot", "quoteExpiry"],
+        additionalProperties: false,
+        properties: {
+          chainSnapshot: { type: "object" },
+          quoteExpiry: {
+            type: "object",
+            required: ["afterBlock", "condition"],
+            additionalProperties: false,
+            properties: {
+              afterBlock: decimalSchema,
+              condition: { type: "string", enum: ["canonical_snapshot_window"] },
+            },
+          },
+        },
+      },
       transaction: transactionSchema,
     },
   },

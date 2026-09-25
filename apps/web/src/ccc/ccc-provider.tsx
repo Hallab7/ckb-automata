@@ -18,6 +18,7 @@ import {
   deriveWalletReadiness,
   isSupportedWalletSigner,
 } from "./policy.ts";
+import { assertCanonicalReviewWindow } from "./review-window.ts";
 import { WalletSessionContext, type WalletSession } from "./session.tsx";
 
 const clientGuardSymbol = Symbol.for("ckb-automata.ccc-client-guard");
@@ -399,9 +400,9 @@ function WalletSessionBridge({ children }: Readonly<{ children: ReactNode }>) {
       signReviewedTransaction: async (transaction, expectedHash, snapshot) => {
         const currentSigner = requireSigner();
         const tip = await currentSigner.client.getTipHeader();
-        if (tip.number.toString() !== snapshot.blockNumber || tip.hash !== snapshot.blockHash) {
-          throw new Error("The reviewed chain snapshot is stale. Build a fresh review.");
-        }
+        const snapshotBlock = BigInt(snapshot.blockNumber);
+        const canonicalHeader = await currentSigner.client.getHeaderByNumber(snapshotBlock);
+        assertCanonicalReviewWindow(snapshot, tip.number, canonicalHeader?.hash);
         const unsigned = cccTransaction(transaction);
         if (unsigned.hash() !== expectedHash) {
           throw new Error("The transaction changed after review. Build a fresh review.");

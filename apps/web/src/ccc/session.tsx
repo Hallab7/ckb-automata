@@ -49,7 +49,11 @@ export interface WalletSession {
   readonly signReviewedTransaction: (
     transaction: UnsignedDeadlineTransaction,
     expectedHash: string,
-    snapshot: { readonly blockHash: string; readonly blockNumber: string },
+    snapshot: {
+      readonly blockHash: string;
+      readonly blockNumber: string;
+      readonly expiresAfterBlock?: string;
+    },
   ) => Promise<UnsignedDeadlineTransaction>;
   readonly status: WalletReadiness;
   readonly submitSignedTransaction: (

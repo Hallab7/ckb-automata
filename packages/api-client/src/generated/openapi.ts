@@ -1708,7 +1708,7 @@ export interface operations {
                         readonly quoteExpiry: {
                             readonly afterBlock: string;
                             /** @enum {string} */
-                            readonly condition: "tip_change_before_signing" | "tip_or_job_snapshot_change";
+                            readonly condition: "canonical_snapshot_window" | "tip_change_before_signing" | "tip_or_job_snapshot_change";
                         };
                         readonly signingEntries: readonly {
                             readonly inputIndices: readonly string[];
@@ -1825,7 +1825,7 @@ export interface operations {
                         readonly quoteExpiry: {
                             readonly afterBlock: string;
                             /** @enum {string} */
-                            readonly condition: "tip_change_before_signing" | "tip_or_job_snapshot_change";
+                            readonly condition: "canonical_snapshot_window" | "tip_change_before_signing" | "tip_or_job_snapshot_change";
                         };
                         readonly signingEntries: readonly {
                             readonly inputIndices: readonly string[];
@@ -1936,7 +1936,7 @@ export interface operations {
                         readonly quoteExpiry: {
                             readonly afterBlock: string;
                             /** @enum {string} */
-                            readonly condition: "tip_change_before_signing" | "tip_or_job_snapshot_change";
+                            readonly condition: "canonical_snapshot_window" | "tip_change_before_signing" | "tip_or_job_snapshot_change";
                         };
                         readonly signingEntries: readonly {
                             readonly inputIndices: readonly string[];
@@ -2049,7 +2049,7 @@ export interface operations {
                         readonly quoteExpiry: {
                             readonly afterBlock: string;
                             /** @enum {string} */
-                            readonly condition: "tip_change_before_signing" | "tip_or_job_snapshot_change";
+                            readonly condition: "canonical_snapshot_window" | "tip_change_before_signing" | "tip_or_job_snapshot_change";
                         };
                         readonly signingEntries: readonly {
                             readonly inputIndices: readonly string[];
@@ -2163,7 +2163,7 @@ export interface operations {
                         readonly quoteExpiry: {
                             readonly afterBlock: string;
                             /** @enum {string} */
-                            readonly condition: "tip_change_before_signing" | "tip_or_job_snapshot_change";
+                            readonly condition: "canonical_snapshot_window" | "tip_change_before_signing" | "tip_or_job_snapshot_change";
                         };
                         readonly signingEntries: readonly {
                             readonly inputIndices: readonly string[];
@@ -2305,6 +2305,14 @@ export interface operations {
                         };
                         readonly quoteId: string;
                         readonly rewardIncrease: string;
+                    };
+                    readonly reviewContext?: {
+                        readonly chainSnapshot: Record<string, unknown>;
+                        readonly quoteExpiry: {
+                            readonly afterBlock: string;
+                            /** @enum {string} */
+                            readonly condition: "canonical_snapshot_window";
+                        };
                     };
                     readonly transaction: {
                         readonly cellDeps: readonly {

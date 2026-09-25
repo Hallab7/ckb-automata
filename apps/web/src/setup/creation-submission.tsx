@@ -18,7 +18,7 @@ import {
   type CreationReviewResult,
   type CreationReviewState,
 } from "./creation-review.tsx";
-import { verifyCreationReview } from "./review-model.ts";
+import { creationReviewExpiryBlock, verifyCreationReview } from "./review-model.ts";
 import type { SetupDraft, SetupTemplateId } from "./setup-flow.ts";
 import {
   readSubmissionRecord,
@@ -89,6 +89,10 @@ function signedValidationBody(
     request: apiRequest(review),
     intentHash: review.artifact.intentHash,
     policyCriticalHash: review.artifact.policyCriticalHash,
+    reviewContext: {
+      chainSnapshot: review.artifact.chainSnapshot,
+      quoteExpiry: review.artifact.quoteExpiry,
+    },
     transaction,
   };
 }
@@ -267,6 +271,7 @@ export function CreationApproval({
           session.signReviewedTransaction(review.transaction, review.model.transactionHash, {
             blockHash: review.model.snapshotHash,
             blockNumber: review.model.snapshotBlock,
+            expiresAfterBlock: creationReviewExpiryBlock(review.artifact),
           }),
         validateSigned: (transaction) =>
           api.validateSigned(

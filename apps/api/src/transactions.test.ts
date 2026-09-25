@@ -113,6 +113,11 @@ test("transaction routes publish construction and signed-validation contracts", 
     ]) {
       assert.ok(schema.properties?.[property], `missing response property ${property}`);
     }
+    const validationRequest = document.paths["/v1/transactions/validate-signed"]?.post?.requestBody;
+    assert.ok(validationRequest && "content" in validationRequest);
+    const validationSchema = validationRequest.content?.["application/json"]?.schema;
+    assert.ok(validationSchema && !("$ref" in validationSchema));
+    assert.ok(validationSchema.properties?.["reviewContext"]);
 
     const fastify = result.app.getHttpAdapter().getInstance() as {
       inject(input: {
@@ -141,6 +146,90 @@ test("transaction routes publish construction and signed-validation contracts", 
   } finally {
     await result.app.close();
   }
+});
+
+test("creation builds remain reviewable for thirty canonical blocks", async () => {
+  const fixture = JSON.parse(
+    await readFile(
+      new URL("../../../contracts/fixtures/recurring_request_validation_v1.json", import.meta.url),
+      "utf8",
+    ),
+  ) as RecurringValidationFixture;
+  const service = new TransactionBuildService(
+    {} as never,
+    {
+      getTipHeader: async () => ({ hash: `0x${"a".repeat(64)}`, number: 100n }),
+    } as never,
+    environment().CKB_GENESIS_HASH,
+  );
+  const artifact = await service.construct("create_recurring_job", fixture.valid);
+  assert.deepEqual(artifact.quoteExpiry, {
+    afterBlock: "130",
+    condition: "canonical_snapshot_window",
+  });
+});
+
+test("signed creation validation accepts canonical tip advances and rejects expiry or reorg", async () => {
+  const fixture = JSON.parse(
+    await readFile(
+      new URL("../../../contracts/fixtures/recurring_request_validation_v1.json", import.meta.url),
+      "utf8",
+    ),
+  ) as RecurringValidationFixture;
+  const reviewedHash = `0x${"a".repeat(64)}`;
+  let tip = 100n;
+  let canonicalHash = reviewedHash;
+  const service = new TransactionBuildService(
+    {} as never,
+    {
+      dryRun: async () => 123n,
+      getBlockByNumber: async () => ({ header: { hash: canonicalHash } }),
+      getTipHeader: async () => ({
+        hash: tip === 100n ? reviewedHash : `0x${"b".repeat(64)}`,
+        number: tip,
+      }),
+    } as never,
+    environment().CKB_GENESIS_HASH,
+  );
+  const artifact = await service.construct("create_recurring_job", fixture.valid);
+  const completed = {
+    ...artifact.transaction,
+    inputs: [
+      {
+        previousOutput: { index: "0x0", txHash: `0x${"c".repeat(64)}` },
+        since: "0x0",
+      },
+    ],
+  };
+  const request = {
+    intentHash: artifact.intentHash,
+    operation: artifact.operation,
+    policyCriticalHash: artifact.policyCriticalHash,
+    request: fixture.valid,
+    reviewContext: {
+      chainSnapshot: artifact.chainSnapshot,
+      quoteExpiry: artifact.quoteExpiry,
+    },
+    transaction: completed,
+  };
+
+  tip = 112n;
+  const validation = await service.validate(request);
+  assert.equal(validation.policyCriticalHash, artifact.policyCriticalHash);
+  assert.equal(validation.dryRunCycles, "123");
+
+  tip = 131n;
+  await assert.rejects(service.validate(request), (error: unknown) => {
+    assert.equal((error as { getStatus(): number }).getStatus(), 409);
+    return true;
+  });
+
+  tip = 112n;
+  canonicalHash = `0x${"d".repeat(64)}`;
+  await assert.rejects(service.validate(request), (error: unknown) => {
+    assert.equal((error as { getStatus(): number }).getStatus(), 409);
+    return true;
+  });
 });
 
 test("chain read failures remain service outages instead of request errors", async () => {

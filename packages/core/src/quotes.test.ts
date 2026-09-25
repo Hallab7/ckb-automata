@@ -6,6 +6,8 @@ import benchmarks from "../../../contracts/benchmarks.json" with { type: "json" 
 import { MAX_UINT64 } from "./chain-values.ts";
 import { CONTRACT_CAPACITY } from "./contract-costs.ts";
 import {
+  CREATION_REVIEW_EXPIRY_CONDITION,
+  CREATION_REVIEW_WINDOW_BLOCKS,
   REVIEW_FEE_RATE_MAXIMUM,
   REVIEW_TRANSACTION_MAXIMUM_BYTES,
   calculateDeadlineQuote,
@@ -13,6 +15,11 @@ import {
   estimateTransactionFeeRange,
   type FeeRangeInput,
 } from "./quotes.ts";
+
+test("creation reviews use a bounded canonical snapshot window", () => {
+  assert.equal(CREATION_REVIEW_WINDOW_BLOCKS, 30n);
+  assert.equal(CREATION_REVIEW_EXPIRY_CONDITION, "canonical_snapshot_window");
+});
 
 const creationFee: FeeRangeInput = {
   transactionBytes: { minimum: "700", maximum: "900" },

@@ -1810,7 +1810,11 @@
                       "properties": {
                         "afterBlock": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
                         "condition": {
-                          "enum": ["tip_change_before_signing", "tip_or_job_snapshot_change"],
+                          "enum": [
+                            "canonical_snapshot_window",
+                            "tip_change_before_signing",
+                            "tip_or_job_snapshot_change"
+                          ],
                           "type": "string"
                         }
                       },
@@ -2067,7 +2071,11 @@
                       "properties": {
                         "afterBlock": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
                         "condition": {
-                          "enum": ["tip_change_before_signing", "tip_or_job_snapshot_change"],
+                          "enum": [
+                            "canonical_snapshot_window",
+                            "tip_change_before_signing",
+                            "tip_or_job_snapshot_change"
+                          ],
                           "type": "string"
                         }
                       },
@@ -2306,7 +2314,11 @@
                       "properties": {
                         "afterBlock": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
                         "condition": {
-                          "enum": ["tip_change_before_signing", "tip_or_job_snapshot_change"],
+                          "enum": [
+                            "canonical_snapshot_window",
+                            "tip_change_before_signing",
+                            "tip_or_job_snapshot_change"
+                          ],
                           "type": "string"
                         }
                       },
@@ -2548,7 +2560,11 @@
                       "properties": {
                         "afterBlock": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
                         "condition": {
-                          "enum": ["tip_change_before_signing", "tip_or_job_snapshot_change"],
+                          "enum": [
+                            "canonical_snapshot_window",
+                            "tip_change_before_signing",
+                            "tip_or_job_snapshot_change"
+                          ],
                           "type": "string"
                         }
                       },
@@ -2792,7 +2808,11 @@
                       "properties": {
                         "afterBlock": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
                         "condition": {
-                          "enum": ["tip_change_before_signing", "tip_or_job_snapshot_change"],
+                          "enum": [
+                            "canonical_snapshot_window",
+                            "tip_change_before_signing",
+                            "tip_or_job_snapshot_change"
+                          ],
                           "type": "string"
                         }
                       },
@@ -3135,6 +3155,23 @@
                         "type": "object"
                       }
                     ]
+                  },
+                  "reviewContext": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "chainSnapshot": { "type": "object" },
+                      "quoteExpiry": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "afterBlock": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                          "condition": { "enum": ["canonical_snapshot_window"], "type": "string" }
+                        },
+                        "required": ["afterBlock", "condition"],
+                        "type": "object"
+                      }
+                    },
+                    "required": ["chainSnapshot", "quoteExpiry"],
+                    "type": "object"
                   },
                   "transaction": {
                     "additionalProperties": false,

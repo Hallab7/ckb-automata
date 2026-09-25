@@ -10,6 +10,8 @@ import { CONTRACT_CAPACITY } from "./contract-costs.ts";
 
 export const REVIEW_TRANSACTION_MAXIMUM_BYTES = 4_096n;
 export const REVIEW_FEE_RATE_MAXIMUM = 100_000n;
+export const CREATION_REVIEW_WINDOW_BLOCKS = 30n;
+export const CREATION_REVIEW_EXPIRY_CONDITION = "canonical_snapshot_window" as const;
 
 export interface FeeRangeInput {
   readonly transactionBytes: {

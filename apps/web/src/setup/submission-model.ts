@@ -112,6 +112,39 @@ function matchesReview(record: SubmissionRecord, review: CreationReviewResult): 
   );
 }
 
+function normalized(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(normalized);
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .toSorted(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+        .map(([key, item]) => [key, normalized(item)]),
+    );
+  }
+  return value;
+}
+
+function immutableArtifact(artifact: ApiTransactionBuild): unknown {
+  return normalized({
+    intent: artifact.intent,
+    intentHash: artifact.intentHash,
+    operation: artifact.operation,
+    protocolIntentHash: artifact.protocolIntentHash,
+    quote: artifact.quote,
+    signingEntries: artifact.signingEntries,
+    transaction: artifact.transaction,
+  });
+}
+
+export function sameImmutableArtifact(
+  reviewed: ApiTransactionBuild,
+  refreshed: ApiTransactionBuild,
+): boolean {
+  return (
+    JSON.stringify(immutableArtifact(reviewed)) === JSON.stringify(immutableArtifact(refreshed))
+  );
+}
+
 export async function submitCreationReview(
   review: CreationReviewResult,
   dependencies: SubmissionDependencies,
@@ -122,11 +155,8 @@ export async function submitCreationReview(
   }
 
   const refreshed = await dependencies.refreshArtifact();
-  if (
-    refreshed.intentHash !== review.artifact.intentHash ||
-    refreshed.policyCriticalHash !== review.artifact.policyCriticalHash
-  ) {
-    throw new Error("The transaction quote or chain snapshot is stale. Build a fresh review.");
+  if (!sameImmutableArtifact(review.artifact, refreshed)) {
+    throw new Error("The transaction intent, quote, or policy changed. Build a fresh review.");
   }
   await dependencies.reverify();
 
