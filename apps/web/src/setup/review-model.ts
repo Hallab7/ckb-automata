@@ -68,6 +68,7 @@ export interface ReviewLine {
 }
 
 export interface CreationReviewModel {
+  readonly jobId: string;
   readonly operation: CreationRequest["operation"];
   readonly title: string;
   readonly summary: string;
@@ -315,6 +316,8 @@ export async function verifyCreationReview(
   let amounts: readonly ReviewLine[];
   let immutableTerms: readonly string[];
   let normalizedIntent: unknown;
+  let jobId: string;
+  let deadlinePledged: bigint | undefined;
 
   if (request.operation === "create_recurring_job") {
     const build = buildRecurringCreation({
@@ -359,6 +362,7 @@ export async function verifyCreationReview(
       `Owner and final refund lock ${request.value.ownerLockHash}`,
     ]);
     normalizedIntent = build.intent;
+    jobId = build.jobId;
   } else {
     const build = buildDeadlineCreation({
       deployment: context.deployment,
@@ -374,28 +378,25 @@ export async function verifyCreationReview(
     assertDeadlineCompletion(build, completed);
     ownerLockHash = request.value.cancelLockHash;
     requiredOutputCount = build.completion.requiredOutputCount;
-    title = "Deadline finalization";
-    summary = `${shannonsToCkb(BigInt(build.intent.pledged))} CKB will be sent to the recipient if the ${shannonsToCkb(BigInt(request.value.target))} CKB condition amount is met at the deadline.`;
+    title = "Scheduled payment";
+    const pledged = BigInt(build.intent.pledged);
+    const payRecipient = BigInt(request.value.target) <= pledged;
+    summary = payRecipient
+      ? `${shannonsToCkb(pledged)} CKB will be sent to the recipient at the scheduled time.`
+      : `${shannonsToCkb(pledged)} CKB will be returned to the refund address at the scheduled time.`;
     timing = timingCopy(BigInt(request.value.deadlineBlock), chainSnapshot.block);
-    recovery = `If the condition is not met, the recipient amount returns to refund address ${request.value.pledges[0]?.refundLockHash}. The connected wallet can cancel the automation or recover its remaining funds.`;
-    amounts = Object.freeze([
-      { label: "Recipient amount", value: `${shannonsToCkb(BigInt(build.intent.pledged))} CKB` },
-      { label: "Condition amount", value: `${shannonsToCkb(BigInt(request.value.target))} CKB` },
-      {
-        label: "Automation service payment",
-        value: `${shannonsToCkb(BigInt(request.value.reward))} CKB`,
-      },
-      { label: "Total capacity locked", value: `${shannonsToCkb(totalLocked)} CKB` },
-      { label: "Recoverable residual", value: `${shannonsToCkb(build.quote.residualRefund)} CKB` },
-    ]);
+    recovery = `${shannonsToCkb(build.quote.residualRefund)} CKB of the charges is returned to your connected wallet after completion. If you cancel or recover before execution, the reserved ${shannonsToCkb(BigInt(request.value.reward))} CKB service charge is also preserved, minus network fees.`;
+    amounts = Object.freeze([]);
+    deadlinePledged = pledged;
     immutableTerms = Object.freeze([
-      `Recipient address lock ${request.value.successLockHash}`,
-      `Refund address commitment ${build.intent.refundCommitment}`,
-      `Condition amount ${request.value.target} shannons at block ${request.value.deadlineBlock}`,
-      `${request.value.reward} shannons automation service payment`,
-      `Recovery wallet lock ${request.value.cancelLockHash}`,
+      payRecipient
+        ? "Pay the recipient at the scheduled time"
+        : "Return the amount at the scheduled time",
+      `${shannonsToCkb(pledged)} CKB recipient amount`,
+      `${shannonsToCkb(BigInt(request.value.reward))} CKB fixed service charge`,
     ]);
     normalizedIntent = build.intent;
+    jobId = build.jobId;
   }
 
   const completion = await verifyOwnerCompletion(
@@ -405,7 +406,16 @@ export async function verifyCreationReview(
     maximumFee,
     context,
   );
+  if (deadlinePledged !== undefined) {
+    const charges = totalLocked - deadlinePledged + completion.fee;
+    amounts = Object.freeze([
+      { label: "Recipient amount", value: `${shannonsToCkb(deadlinePledged)} CKB` },
+      { label: "Charges", value: `${shannonsToCkb(charges)} CKB` },
+      { label: "Total amount to pay", value: `${shannonsToCkb(totalLocked + completion.fee)} CKB` },
+    ]);
+  }
   return Object.freeze({
+    jobId,
     operation: request.operation,
     title,
     summary,

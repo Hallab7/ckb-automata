@@ -13,6 +13,7 @@ import { Button, InlineNotice } from "@ckb-automata/ui";
 
 import { useWalletSession } from "../ccc/session.tsx";
 import { browserWebEnvironment } from "../environment.ts";
+import { automationTitle, writeAutomationTitle } from "./automation-title.ts";
 import {
   creationReviewKey,
   type CreationReviewResult,
@@ -278,11 +279,12 @@ export function CreationApproval({
             signedValidationBody(review, transaction) as Parameters<typeof api.validateSigned>[0],
           ),
       });
+      writeAutomationTitle(window.localStorage, review.model.jobId, automationTitle(draft));
       update({ key, outcome, status: "submitted" });
     } catch (error) {
       update({ error: submissionMessage(error), key, status: "error" });
     }
-  }, [key, review, session, state.status, template, update]);
+  }, [draft, key, review, session, state.status, template, update]);
 
   if (review === undefined) {
     return (

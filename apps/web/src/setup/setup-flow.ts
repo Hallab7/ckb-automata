@@ -8,6 +8,8 @@ export const SETUP_STEPS = [
   { id: "result", label: "Result" },
 ] as const;
 
+export const DEADLINE_SETUP_STEPS = SETUP_STEPS.filter((step) => step.id !== "funding");
+
 export type SetupStepId = (typeof SETUP_STEPS)[number]["id"];
 export type SetupTemplateId = "deadline" | "recurring";
 export type SetupDraft = Readonly<Record<string, string>>;
@@ -47,6 +49,9 @@ export function parseStoredDraft(value: string | null): SetupDraft | undefined {
   }
 }
 
-export function stepIndex(step: SetupStepId): number {
-  return SETUP_STEPS.findIndex((candidate) => candidate.id === step);
+export function stepIndex(
+  step: SetupStepId,
+  steps: readonly Readonly<{ id: SetupStepId; label: string }>[] = SETUP_STEPS,
+): number {
+  return steps.findIndex((candidate) => candidate.id === step);
 }

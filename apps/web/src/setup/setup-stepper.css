@@ -17,11 +17,60 @@
 
 .setup-progress ol {
   display: grid;
-  grid-template-columns: repeat(7, minmax(7rem, 1fr));
+  grid-template-columns: repeat(var(--setup-step-count, 7), minmax(7rem, 1fr));
   list-style: none;
   margin: 0;
   min-width: 49rem;
   padding: 0;
+}
+
+.setup-outcome {
+  border: 0;
+  display: grid;
+  gap: var(--ui-space-2);
+  margin: 0;
+  padding: 0;
+}
+
+.setup-outcome legend {
+  font-size: 0.875rem;
+  font-weight: 650;
+  margin-bottom: var(--ui-space-2);
+}
+
+.setup-outcome > div {
+  background: var(--ui-color-surface-subtle);
+  border: 1px solid var(--ui-color-border-strong);
+  border-radius: var(--ui-radius-md);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 0.2rem;
+}
+
+.setup-outcome button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: calc(var(--ui-radius-md) - 2px);
+  color: var(--ui-color-text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-weight: 650;
+  gap: var(--ui-space-2);
+  justify-content: center;
+  min-height: var(--ui-control-height);
+  padding: 0.5rem 0.75rem;
+}
+
+.setup-outcome button[aria-checked="true"] {
+  background: var(--ui-color-surface);
+  box-shadow: var(--ui-shadow-sm);
+  color: var(--ui-color-accent);
+}
+
+.setup-outcome[data-invalid="true"] > div {
+  border-color: var(--ui-color-danger);
 }
 
 .setup-progress li {
@@ -600,6 +649,10 @@
 
 @media (max-width: 36rem) {
   .setup-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .setup-outcome > div {
     grid-template-columns: minmax(0, 1fr);
   }
 

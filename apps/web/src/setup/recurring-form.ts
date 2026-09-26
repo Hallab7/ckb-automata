@@ -11,6 +11,7 @@ import {
 } from "@ckb-automata/core";
 
 import { ckbToShannons, shannonsToCkb } from "./ckb-amount.ts";
+import { validateAutomationTitle } from "./automation-title.ts";
 import type { SetupDraft, SetupErrors, SetupStepId } from "./setup-flow.ts";
 
 const MAX_ABSOLUTE_BLOCK = (1n << 56n) - 1n;
@@ -26,6 +27,7 @@ export const RECURRING_INITIAL_DRAFT: SetupDraft = Object.freeze({
   recipientAddress: "",
   rewardCkb: "61",
   runCount: "",
+  title: "",
 });
 
 export interface RecurringValidationContext {
@@ -191,6 +193,8 @@ export async function validateRecurringStep(
 ): Promise<SetupErrors> {
   const errors: Record<string, string> = {};
   if (step === "details") {
+    const titleError = validateAutomationTitle(draft);
+    if (titleError !== undefined) errors["title"] = titleError;
     const resolvedRecipient = await recipient(draft, context, errors);
     const amount = validateAmount(draft, "amountCkb", "payment per run", errors);
     if (

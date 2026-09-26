@@ -1,7 +1,7 @@
 "use client";
 
-import { WalletCards } from "lucide-react";
-import { useCallback, useState } from "react";
+import { CheckCircle2, RotateCcw, WalletCards } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Button, InlineNotice, TextField } from "@ckb-automata/ui";
 
@@ -12,9 +12,9 @@ import {
   validateDeadlineStep,
   type DeadlineValidationContext,
 } from "./deadline-form.ts";
+import { DEADLINE_SETUP_STEPS } from "./setup-flow.ts";
 import type { SetupStepRenderContext } from "./setup-stepper.tsx";
 import { SetupStepper } from "./setup-stepper.tsx";
-import { ReadonlyField } from "./readonly-field.tsx";
 import {
   CreationReview,
   creationReviewKey,
@@ -39,9 +39,19 @@ function DeadlineDetails(context: SetupStepRenderContext) {
     <div className="setup-step__group">
       <div>
         <h2>Recipient payment</h2>
-        <p>Choose the recipient amount, the condition amount, and where the payment should go.</p>
+        <p>Name this automation and choose where the payment or refund should go.</p>
       </div>
       <div className="setup-form-grid">
+        <TextField
+          {...error(context, "title")}
+          hint="Optional. This name is shown on this browser's dashboard."
+          label="Automation title"
+          maxLength={80}
+          name="title"
+          onChange={(event) => context.setField("title", event.target.value)}
+          placeholder="September supplier payment"
+          value={context.draft["title"] ?? ""}
+        />
         <TextField
           {...error(context, "pledgeCkb")}
           hint="This is the amount the recipient can receive. The app checks the minimum required by both addresses."
@@ -54,20 +64,9 @@ function DeadlineDetails(context: SetupStepRenderContext) {
           value={context.draft["pledgeCkb"] ?? ""}
         />
         <TextField
-          {...error(context, "targetCkb")}
-          hint="The recipient is paid when the recipient amount is at least this value."
-          inputMode="decimal"
-          label="Condition amount (CKB)"
-          name="targetCkb"
-          onChange={(event) => context.setField("targetCkb", event.target.value)}
-          placeholder="150"
-          required
-          value={context.draft["targetCkb"] ?? ""}
-        />
-        <TextField
           {...error(context, "successAddress")}
           autoComplete="off"
-          hint="Receives the recipient amount when the condition is met."
+          hint="Receives the amount when Pay recipient is selected."
           label="Recipient address"
           name="successAddress"
           onChange={(event) => context.setField("successAddress", event.target.value)}
@@ -78,7 +77,7 @@ function DeadlineDetails(context: SetupStepRenderContext) {
         <TextField
           {...error(context, "refundAddress")}
           autoComplete="off"
-          hint="Receives the recipient amount when the condition is not met."
+          hint="Receives the amount when Refund amount is selected."
           label="Refund address"
           name="refundAddress"
           onChange={(event) => context.setField("refundAddress", event.target.value)}
@@ -94,69 +93,78 @@ function DeadlineDetails(context: SetupStepRenderContext) {
           value={context.draft["refundAddress"] ?? ""}
         />
       </div>
+      <fieldset
+        className="setup-outcome"
+        data-field-name="outcome"
+        data-invalid={context.errors["outcome"] === undefined ? undefined : "true"}
+        tabIndex={context.errors["outcome"] === undefined ? undefined : -1}
+      >
+        <legend>At the scheduled time</legend>
+        <div aria-label="Scheduled outcome" role="radiogroup">
+          <button
+            aria-checked={context.draft["outcome"] === "success"}
+            onClick={() => context.setField("outcome", "success")}
+            role="radio"
+            type="button"
+          >
+            <CheckCircle2 aria-hidden="true" size={17} />
+            Pay recipient
+          </button>
+          <button
+            aria-checked={context.draft["outcome"] === "refund"}
+            onClick={() => context.setField("outcome", "refund")}
+            role="radio"
+            type="button"
+          >
+            <RotateCcw aria-hidden="true" size={17} />
+            Refund amount
+          </button>
+        </div>
+        {context.errors["outcome"] === undefined ? null : (
+          <span className="ui-field__error" role="alert">
+            {context.errors["outcome"]}
+          </span>
+        )}
+      </fieldset>
     </div>
   );
 }
 
 function DeadlineTiming(context: SetupStepRenderContext) {
-  return (
-    <div className="setup-step__group">
-      <div>
-        <h2>Payment deadline</h2>
-        <p>The payment is checked when the testnet reaches this block.</p>
-      </div>
-      <TextField
-        {...error(context, "deadlineBlock")}
-        hint="Enter a future CKB Pudge Testnet block number."
-        inputMode="numeric"
-        label="Deadline block"
-        name="deadlineBlock"
-        onChange={(event) => context.setField("deadlineBlock", event.target.value)}
-        placeholder="15000000"
-        required
-        value={context.draft["deadlineBlock"] ?? ""}
-      />
-    </div>
-  );
-}
-
-function DeadlineFunding(context: SetupStepRenderContext) {
   const session = useWalletSession();
-  const ownerAddress = session.address ?? "No testnet wallet connected";
+  const [minimum, setMinimum] = useState("");
+  useEffect(() => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset() + 1, 0, 0);
+    setMinimum(now.toISOString().slice(0, 16));
+  }, []);
   return (
     <div className="setup-step__group">
       <div>
-        <h2>Automation payment and recovery</h2>
-        <p>This payment goes to the service that completes the automation.</p>
+        <h2>Schedule date</h2>
+        <p>Choose when the automation should process the selected outcome.</p>
       </div>
       <TextField
-        {...error(context, "rewardCkb")}
-        hint="The minimum payment for the automation service is 61 CKB."
-        inputMode="decimal"
-        label="Automation service payment (CKB)"
-        name="rewardCkb"
-        onChange={(event) => context.setField("rewardCkb", event.target.value)}
+        {...error(context, "scheduleAt")}
+        hint="Times in the past are not allowed. Network timing can vary slightly."
+        label="Date and time"
+        min={minimum || undefined}
+        name="scheduleAt"
+        onChange={(event) => context.setField("scheduleAt", event.target.value)}
         required
-        value={context.draft["rewardCkb"] ?? ""}
+        type="datetime-local"
+        value={context.draft["scheduleAt"] ?? ""}
       />
-      <ReadonlyField
-        code
-        error={context.errors["ownerAddress"]}
-        label="Recovery wallet"
-        name="ownerAddress"
-      >
-        {ownerAddress}
-      </ReadonlyField>
       {session.status === "ready" ? (
-        <InlineNotice title="Recovery wallet confirmed" tone="success">
+        <InlineNotice title="Refund wallet confirmed" tone="success">
           <p>
-            {session.walletName ?? "Connected wallet"}: {shortenCkbAddress(ownerAddress)}. This
-            wallet can cancel the automation or recover its remaining funds.
+            {session.walletName ?? "Connected wallet"}: {shortenCkbAddress(session.address ?? "")}.
+            This wallet can cancel or recover the automation.
           </p>
         </InlineNotice>
       ) : (
-        <InlineNotice title="Recovery wallet required" tone="warning">
-          <p>Connect a supported CKB testnet wallet before continuing.</p>
+        <InlineNotice title="Wallet required" tone="warning">
+          <p>Connect a CKB testnet wallet to pay and retain recovery control.</p>
           <Button
             icon={<WalletCards aria-hidden="true" size={17} />}
             name="ownerAddress"
@@ -184,7 +192,6 @@ function DeadlineStep({
 }>) {
   if (context.step === "details") return <DeadlineDetails {...context} />;
   if (context.step === "timing") return <DeadlineTiming {...context} />;
-  if (context.step === "funding") return <DeadlineFunding {...context} />;
   if (context.step === "review") {
     return (
       <CreationReview
@@ -241,6 +248,7 @@ export function DeadlineSetup() {
         />
       )}
       template="deadline"
+      steps={DEADLINE_SETUP_STEPS}
       validateStep={(step, draft) => {
         if (step === "review") {
           const message = reviewStateError(

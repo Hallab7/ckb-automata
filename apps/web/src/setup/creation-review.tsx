@@ -20,6 +20,8 @@ import { Button, InlineNotice } from "@ckb-automata/ui";
 import { useWalletSession } from "../ccc/session.tsx";
 import { browserWebEnvironment } from "../environment.ts";
 import { ckbToShannons } from "./ckb-amount.ts";
+import { DEADLINE_SERVICE_CHARGE_CKB, deadlineTarget, scheduleToBlock } from "./deadline-form.ts";
+import { automationTitle } from "./automation-title.ts";
 import {
   reviewTechnicalDetailsJson,
   verifyCreationReview,
@@ -122,6 +124,7 @@ async function requestFromDraft(
   hashLock: (script: ScriptIdentity) => string,
   selectDeadlinePledge: ReturnType<typeof useWalletSession>["selectDeadlinePledge"],
   creatorNonce: string,
+  tipBlock?: string,
 ): Promise<CreationSubmissionRequest> {
   if (template === "recurring") {
     const ownerLock = await getOwnerLock(ownerLockHash);
@@ -156,11 +159,11 @@ async function requestFromDraft(
         amount: ckbToShannons(draft["pledgeCkb"] ?? ""),
       },
     ],
-    target: ckbToShannons(draft["targetCkb"] ?? ""),
-    deadlineBlock: draft["deadlineBlock"] ?? "",
+    target: deadlineTarget(draft["pledgeCkb"] ?? "", draft["outcome"] ?? ""),
+    deadlineBlock: scheduleToBlock(draft["scheduleAt"] ?? "", tipBlock ?? ""),
     successLockHash: hashLock(successLock),
     cancelLockHash: hashLock(ownerLock),
-    reward: ckbToShannons(draft["rewardCkb"] ?? ""),
+    reward: ckbToShannons(DEADLINE_SERVICE_CHARGE_CKB),
     creatorNonce,
   });
   return {
@@ -193,6 +196,11 @@ async function loadReview(
   ) {
     throw new Error("Connect a supported CKB testnet wallet before building the review.");
   }
+  const api = browserApiClient();
+  const network =
+    template === "deadline"
+      ? ((await api.network()) as { readonly tip: { readonly blockNumber: string } })
+      : undefined;
   const request = await requestFromDraft(
     template,
     draft,
@@ -202,8 +210,8 @@ async function loadReview(
     session.reviewLockHash,
     session.selectDeadlinePledge,
     creatorNonce,
+    network?.tip.blockNumber,
   );
-  const api = browserApiClient();
   const artifact = (
     request.operation === "create_recurring_job"
       ? await api.createRecurringJob(request.value)
@@ -260,7 +268,7 @@ export function ReviewSummary({
     <div className="setup-review" data-review-status="verified">
       <div className="setup-review__heading">
         <div>
-          <h2>{model.title}</h2>
+          <h2>{automationTitle(draft) ?? model.title}</h2>
           <p>{model.summary}</p>
         </div>
         <span className="setup-review__verified">
@@ -270,12 +278,24 @@ export function ReviewSummary({
       </div>
 
       <section className="setup-review__section" aria-labelledby="review-timing">
-        <h3 id="review-timing">Timing</h3>
-        <p>{model.timing}</p>
+        <h3 id="review-timing">
+          {model.operation === "create_deadline_job" ? "Schedule" : "Timing"}
+        </h3>
+        <p>
+          {model.operation === "create_deadline_job" && draft["scheduleAt"]
+            ? new Intl.DateTimeFormat(undefined, { dateStyle: "full", timeStyle: "short" }).format(
+                new Date(draft["scheduleAt"]),
+              )
+            : model.timing}
+        </p>
       </section>
 
       <section className="setup-review__section" aria-labelledby="review-amounts">
-        <h3 id="review-amounts">Amounts and wallet effects</h3>
+        <h3 id="review-amounts">
+          {model.operation === "create_deadline_job"
+            ? "Payment summary"
+            : "Amounts and wallet effects"}
+        </h3>
         <dl className="setup-review__values">
           {model.amounts.map((line) => (
             <div key={line.label}>
@@ -283,18 +303,22 @@ export function ReviewSummary({
               <dd>{line.value}</dd>
             </div>
           ))}
-          <div>
-            <dt>Exact network fee</dt>
-            <dd>{model.fee}</dd>
-          </div>
-          <div>
-            <dt>Reviewed fee ceiling</dt>
-            <dd>{model.maximumFee}</dd>
-          </div>
-          <div>
-            <dt>Wallet change</dt>
-            <dd>{model.change}</dd>
-          </div>
+          {model.operation === "create_recurring_job" ? (
+            <>
+              <div>
+                <dt>Exact network fee</dt>
+                <dd>{model.fee}</dd>
+              </div>
+              <div>
+                <dt>Reviewed fee ceiling</dt>
+                <dd>{model.maximumFee}</dd>
+              </div>
+              <div>
+                <dt>Wallet change</dt>
+                <dd>{model.change}</dd>
+              </div>
+            </>
+          ) : null}
         </dl>
       </section>
 
@@ -327,34 +351,44 @@ export function ReviewSummary({
         </dl>
       </section>
 
-      <section className="setup-review__section" aria-labelledby="review-terms">
-        <h3 id="review-terms">Immutable terms</h3>
-        <ul>
-          {model.immutableTerms.map((term) => (
-            <li key={term}>{term}</li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="setup-review__section" aria-labelledby="review-recovery">
-        <h3 id="review-recovery">Cancellation and recovery</h3>
-        <p>{model.recovery}</p>
-      </section>
-
-      <InlineNotice title="Review warnings" tone="warning">
-        <ul className="setup-review__warnings">
-          {model.warnings.map((warning) => (
-            <li key={warning}>{warning}</li>
-          ))}
-        </ul>
-      </InlineNotice>
+      {model.operation === "create_deadline_job" ? (
+        <InlineNotice title="Recoverable amount" tone="info">
+          <p>{model.recovery}</p>
+        </InlineNotice>
+      ) : (
+        <>
+          <section className="setup-review__section" aria-labelledby="review-terms">
+            <h3 id="review-terms">Immutable terms</h3>
+            <ul>
+              {model.immutableTerms.map((term) => (
+                <li key={term}>{term}</li>
+              ))}
+            </ul>
+          </section>
+          <section className="setup-review__section" aria-labelledby="review-recovery">
+            <h3 id="review-recovery">Cancellation and recovery</h3>
+            <p>{model.recovery}</p>
+          </section>
+          <InlineNotice title="Review warnings" tone="warning">
+            <ul className="setup-review__warnings">
+              {model.warnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          </InlineNotice>
+        </>
+      )}
 
       <div className="setup-review__network">
         <ShieldCheck aria-hidden="true" size={18} />
         <div>
           <strong>{model.network}</strong>
-          <span>Snapshot block {model.snapshotBlock}</span>
-          <code>{model.genesisHash}</code>
+          <span>
+            {model.operation === "create_deadline_job"
+              ? "Testnet transaction"
+              : `Snapshot block ${model.snapshotBlock}`}
+          </span>
+          {model.operation === "create_recurring_job" ? <code>{model.genesisHash}</code> : null}
         </div>
       </div>
 

@@ -13,6 +13,7 @@ import { useWalletSession } from "../ccc/session.tsx";
 import { createLiveDataProvider, LIVE_DATA_LABEL } from "../data-provider.ts";
 import { browserWebEnvironment } from "../environment.ts";
 import { requestErrorMessage } from "../request-errors.ts";
+import { readAutomationTitles } from "../setup/automation-title.ts";
 import {
   AutomationDashboardView,
   type DashboardLoadState,
@@ -63,6 +64,9 @@ export function AutomationDashboard() {
   const [error, setError] = useState<string>();
   const [loadingNextPage, setLoadingNextPage] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [titles, setTitles] = useState<Readonly<Record<string, string>>>({});
+
+  useEffect(() => setTitles(readAutomationTitles(window.localStorage)), [items]);
 
   const query = useMemo<ApiQuery<"JobsController_list">>(
     () => ({
@@ -194,6 +198,7 @@ export function AutomationDashboard() {
       onTemplateChange={setTemplateFilter}
       stateFilter={stateFilter}
       templateFilter={templateFilter}
+      titles={titles}
     />
   );
 }

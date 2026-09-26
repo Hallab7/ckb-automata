@@ -11,6 +11,7 @@ import {
 } from "@ckb-automata/api-client";
 
 import { browserWebEnvironment } from "../environment.ts";
+import { readAutomationTitles } from "../setup/automation-title.ts";
 import { detailRequestError } from "../request-errors.ts";
 import { decodeDetailStreamEvent } from "../stream-reducers.ts";
 import { JobDetailView, type JobDetailLoadState } from "./job-detail-view.tsx";
@@ -51,6 +52,11 @@ export function AutomationDetail({ jobId }: Readonly<{ jobId: string }>) {
   const [loadingNextPage, setLoadingNextPage] = useState(false);
   const [error, setError] = useState<string>();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [automationTitle, setAutomationTitle] = useState<string>();
+
+  useEffect(() => {
+    setAutomationTitle(readAutomationTitles(window.localStorage)[jobId]);
+  }, [jobId]);
 
   const load = useCallback(
     async (api: AutomataApiClient) => {
@@ -173,6 +179,7 @@ export function AutomationDetail({ jobId }: Readonly<{ jobId: string }>) {
 
   return (
     <JobDetailView
+      {...(automationTitle === undefined ? {} : { automationTitle })}
       {...(error === undefined ? {} : { error })}
       events={events}
       hasNextPage={nextCursor !== null}

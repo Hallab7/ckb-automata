@@ -4,7 +4,12 @@ import test from "node:test";
 
 import { parseHash32 } from "@ckb-automata/core";
 
-import { clientAcceptsDeadlineRequest, validateDeadlineStep } from "./deadline-form.ts";
+import {
+  clientAcceptsDeadlineRequest,
+  deadlineTarget,
+  scheduleToBlock,
+  validateDeadlineStep,
+} from "./deadline-form.ts";
 import { ckbToShannons } from "./ckb-amount.ts";
 
 const STANDARD_LOCK = Object.freeze({
@@ -51,23 +56,16 @@ test("deadline form converts CKB without floating-point loss", () => {
   assert.throws(() => ckbToShannons("01"));
 });
 
-test("deadline form reports the exact one-shannon target minimum", async () => {
-  const errors = await validateDeadlineStep(
-    "details",
-    {
-      pledgeCkb: "61",
-      targetCkb: "0",
-      successAddress: "success",
-      refundAddress: "refund",
-    },
-    {
-      ownerLockHash: undefined,
-      resolveLock: async () => STANDARD_LOCK,
-      resolveLockHash: async () => `0x${"22".repeat(32)}`,
-      walletReady: false,
-    },
-  );
-  assert.equal(errors["targetCkb"], "condition amount must be at least 0.00000001 CKB.");
+test("deadline outcome derives the hidden target without exposing condition amounts", () => {
+  assert.equal(deadlineTarget("61", "success"), "6100000000");
+  assert.equal(deadlineTarget("61", "refund"), "6100000001");
+  assert.throws(() => deadlineTarget("61", "unknown"), /Choose whether/);
+});
+
+test("deadline schedule converts future local time from the current tip", () => {
+  const now = Date.parse("2026-09-26T10:00:00.000Z");
+  assert.equal(scheduleToBlock("2026-09-26T10:02:00.000Z", "100", now), "112");
+  assert.throws(() => scheduleToBlock("2026-09-26T09:59:59.000Z", "100", now), /future/);
 });
 
 test("deadline form rejects the connected wallet as the recipient", async () => {
@@ -76,7 +74,7 @@ test("deadline form rejects the connected wallet as the recipient", async () => 
     "details",
     {
       pledgeCkb: "61",
-      targetCkb: "100",
+      outcome: "success",
       successAddress: "owner",
       refundAddress: "refund",
     },
@@ -99,7 +97,7 @@ test("deadline form uses the larger recipient or refund address minimum", async 
     "details",
     {
       pledgeCkb: "61",
-      targetCkb: "61",
+      outcome: "success",
       successAddress: "recipient",
       refundAddress: "refund",
     },
@@ -140,12 +138,11 @@ test("deadline client rejects every invalid API fixture", async () => {
 test("deadline form asks for addresses and never raw scripts or hashes", async () => {
   const source = await readFile(new URL("./deadline-setup.tsx", import.meta.url), "utf8");
   for (const field of [
+    "title",
     "pledgeCkb",
-    "targetCkb",
     "successAddress",
     "refundAddress",
-    "deadlineBlock",
-    "rewardCkb",
+    "scheduleAt",
     "ownerAddress",
   ]) {
     assert.match(source, new RegExp(`name="${field}"`));
@@ -154,4 +151,7 @@ test("deadline form asks for addresses and never raw scripts or hashes", async (
   assert.equal(source.match(/label: "Use mine"/g)?.length, 1);
   assert.match(source, /endAction=\{\{/);
   assert.doesNotMatch(source, /Use connected wallet/);
+  assert.doesNotMatch(source, /name="(?:targetCkb|deadlineBlock|rewardCkb)"/);
+  assert.match(source, /Pay recipient/);
+  assert.match(source, /Refund amount/);
 });

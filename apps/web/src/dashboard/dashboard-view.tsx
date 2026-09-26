@@ -92,10 +92,12 @@ function AutomationRows({
   checkpointBlock,
   items,
   recipientAmounts,
+  titles,
 }: Readonly<{
   checkpointBlock: string | undefined;
   items: readonly DashboardJob[];
   recipientAmounts: RecipientAmountsByJob;
+  titles: Readonly<Record<string, string>>;
 }>) {
   return (
     <div className="automation-list">
@@ -120,7 +122,8 @@ function AutomationRows({
           >
             <div className="automation-row__identity">
               <strong>
-                {job.template === "deadline" ? "Deadline finalization" : "Recurring distribution"}
+                {titles[job.jobId] ??
+                  (job.template === "deadline" ? "Scheduled payment" : "Recurring distribution")}
               </strong>
               <code title={job.jobId}>{shortJobId(job.jobId)}</code>
             </div>
@@ -163,6 +166,7 @@ export interface AutomationDashboardViewProperties {
   readonly onTemplateChange: (template: string) => void;
   readonly stateFilter: string;
   readonly templateFilter: string;
+  readonly titles?: Readonly<Record<string, string>> | undefined;
 }
 
 export function AutomationDashboardView({
@@ -183,6 +187,7 @@ export function AutomationDashboardView({
   onTemplateChange,
   stateFilter,
   templateFilter,
+  titles = {},
 }: AutomationDashboardViewProperties) {
   return (
     <section className="app-page automation-dashboard" aria-labelledby="page-title">
@@ -287,6 +292,7 @@ export function AutomationDashboardView({
           checkpointBlock={checkpointBlock}
           items={items}
           recipientAmounts={recipientAmounts}
+          titles={titles}
         />
       ) : null}
       {hasNextPage ? (

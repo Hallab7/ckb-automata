@@ -215,6 +215,7 @@ function LoadingDetail() {
 }
 
 export interface JobDetailViewProperties {
+  readonly automationTitle?: string;
   readonly error?: string;
   readonly events: ApiJobEvents["items"];
   readonly hasNextPage?: boolean;
@@ -228,6 +229,7 @@ export interface JobDetailViewProperties {
 }
 
 export function JobDetailView({
+  automationTitle,
   error,
   events,
   hasNextPage = false,
@@ -279,7 +281,7 @@ export function JobDetailView({
         <div className="job-detail__title-row">
           <div>
             <p>{job.network.replaceAll("_", " ")}</p>
-            <h1 id="job-detail-title">{presentation.policyName}</h1>
+            <h1 id="job-detail-title">{automationTitle ?? presentation.policyName}</h1>
             <code>{job.jobId}</code>
           </div>
           <DetailStatus label={presentation.statusLabel} status={presentation.status} />

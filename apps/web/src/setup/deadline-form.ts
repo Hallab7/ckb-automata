@@ -1,26 +1,43 @@
 import {
   CONTRACT_CAPACITY,
-  isAbsoluteBlockDeadline,
   minimumPlainCellCapacity,
-  parseBlockNumber,
   parseDeadlineCreationRequest,
   parseHash32,
   type ScriptIdentity,
 } from "@ckb-automata/core";
 
 import { ckbToShannons, shannonsToCkb } from "./ckb-amount.ts";
+import { validateAutomationTitle } from "./automation-title.ts";
 import type { SetupDraft, SetupErrors, SetupStepId } from "./setup-flow.ts";
 
-const SYNTHETIC_PLEDGE_OUT_POINT = `0x${"11".repeat(32)}`;
-
 export const DEADLINE_INITIAL_DRAFT: SetupDraft = Object.freeze({
-  deadlineBlock: "",
+  outcome: "success",
   pledgeCkb: "",
   refundAddress: "",
   rewardCkb: "61",
+  scheduleAt: "",
   successAddress: "",
-  targetCkb: "",
+  title: "",
 });
+
+export const DEADLINE_SERVICE_CHARGE_CKB = "61";
+
+export function deadlineTarget(pledgeCkb: string, outcome: string): string {
+  const pledged = BigInt(ckbToShannons(pledgeCkb));
+  if (outcome === "success") return pledged.toString();
+  if (outcome === "refund") return (pledged + 1n).toString();
+  throw new TypeError("Choose whether the recipient is paid or the amount is refunded.");
+}
+
+export function scheduleToBlock(scheduleAt: string, tipBlock: string, now = Date.now()): string {
+  const scheduled = new Date(scheduleAt).getTime();
+  if (!Number.isFinite(scheduled) || scheduled <= now) {
+    throw new RangeError("Choose a future date and time.");
+  }
+  const remainingSeconds = BigInt(Math.ceil((scheduled - now) / 1_000));
+  const blocks = (remainingSeconds + 9n) / 10n;
+  return (BigInt(tipBlock) + (blocks > 0n ? blocks : 1n)).toString();
+}
 
 export interface DeadlineValidationContext {
   readonly ownerLockHash: string | undefined;
@@ -102,6 +119,8 @@ export async function validateDeadlineStep(
 ): Promise<SetupErrors> {
   const errors: Record<string, string> = {};
   if (step === "details") {
+    const titleError = validateAutomationTitle(draft);
+    if (titleError !== undefined) errors["title"] = titleError;
     const pledge = amount(
       draft,
       "pledgeCkb",
@@ -109,7 +128,9 @@ export async function validateDeadlineStep(
       CONTRACT_CAPACITY.plainWalletCell,
       errors,
     );
-    amount(draft, "targetCkb", "condition amount", 1n, errors);
+    if (draft["outcome"] !== "success" && draft["outcome"] !== "refund") {
+      errors["outcome"] = "Choose whether to pay the recipient or refund the amount.";
+    }
     const [success, refund] = await Promise.all([
       address(draft, "successAddress", "recipient address", context, errors),
       address(draft, "refundAddress", "refund address", context, errors),
@@ -134,93 +155,16 @@ export async function validateDeadlineStep(
   }
 
   if (step === "timing") {
-    const value = required(draft, "deadlineBlock", "Enter the deadline block.", errors);
+    const value = required(draft, "scheduleAt", "Choose the schedule date and time.", errors);
     if (value) {
       try {
-        const block = parseBlockNumber(value);
-        if (!isAbsoluteBlockDeadline(block)) throw new RangeError();
+        scheduleToBlock(value, "1");
       } catch {
-        errors["deadlineBlock"] = "Enter a non-zero absolute CKB block number.";
+        errors["scheduleAt"] = "Choose a date and time in the future.";
       }
-    }
-  }
-
-  if (step === "funding") {
-    const pledge = amount(
-      draft,
-      "pledgeCkb",
-      "recipient amount",
-      CONTRACT_CAPACITY.plainWalletCell,
-      errors,
-    );
-    const target = amount(draft, "targetCkb", "condition amount", 1n, errors);
-    const reward = amount(
-      draft,
-      "rewardCkb",
-      "automation service payment",
-      CONTRACT_CAPACITY.plainWalletCell,
-      errors,
-    );
-    let deadline: string | undefined;
-    try {
-      deadline = parseBlockNumber(draft["deadlineBlock"] ?? "").toString();
-      if (!isAbsoluteBlockDeadline(parseBlockNumber(deadline))) deadline = undefined;
-    } catch {
-      deadline = undefined;
     }
     if (!context.walletReady || context.ownerLockHash === undefined) {
       errors["ownerAddress"] = "Connect a supported CKB testnet wallet for recovery authority.";
-    }
-    const [success, refund] = await Promise.all([
-      address(draft, "successAddress", "recipient address", context, errors),
-      address(draft, "refundAddress", "refund address", context, errors),
-    ]);
-    if (success !== undefined && success.lockHash === context.ownerLockHash) {
-      errors["successAddress"] = "Recipient address must be different from your connected wallet.";
-    }
-    const requiredCapacity =
-      success === undefined || refund === undefined
-        ? undefined
-        : success.minimumCapacity > refund.minimumCapacity
-          ? success.minimumCapacity
-          : refund.minimumCapacity;
-    if (
-      pledge !== undefined &&
-      requiredCapacity !== undefined &&
-      BigInt(pledge) < requiredCapacity
-    ) {
-      errors["pledgeCkb"] =
-        `Recipient amount must be at least ${shannonsToCkb(requiredCapacity)} CKB for the selected recipient and refund addresses.`;
-    }
-    if (
-      pledge !== undefined &&
-      target !== undefined &&
-      reward !== undefined &&
-      deadline !== undefined &&
-      success !== undefined &&
-      refund !== undefined &&
-      context.ownerLockHash !== undefined &&
-      errors["successAddress"] === undefined
-    ) {
-      try {
-        parseDeadlineCreationRequest({
-          pledges: [
-            {
-              outPoint: { txHash: SYNTHETIC_PLEDGE_OUT_POINT, index: "0" },
-              refundLockHash: refund.lockHash,
-              amount: pledge,
-            },
-          ],
-          target,
-          deadlineBlock: deadline,
-          successLockHash: success.lockHash,
-          cancelLockHash: context.ownerLockHash,
-          reward,
-          creatorNonce: "0",
-        });
-      } catch {
-        errors["rewardCkb"] = "These funding values cannot create a valid deadline automation.";
-      }
     }
   }
   return Object.freeze(errors);

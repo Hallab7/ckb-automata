@@ -462,10 +462,14 @@ test("typed deadline transaction exposes outcome and recovery commitments", asyn
       resolveInput: async () => ({ capacity: inputCapacity, lockHash: ownerLockHash }),
     },
   );
-  assert.equal(model.title, "Deadline finalization");
-  assert.equal(model.amounts[0]?.value, "100 CKB");
-  assert.equal(model.amounts[1]?.value, "150 CKB");
-  assert.match(model.recovery, new RegExp(ownerLockHash));
+  assert.equal(model.title, "Scheduled payment");
+  assert.deepEqual(model.amounts, [
+    { label: "Recipient amount", value: "100 CKB" },
+    { label: "Charges", value: "715.000018 CKB" },
+    { label: "Total amount to pay", value: "815.000018 CKB" },
+  ]);
+  assert.match(model.recovery, /381 CKB/);
+  assert.match(model.recovery, /61 CKB/);
   assert.match(model.timing, /block 220/);
 });
 

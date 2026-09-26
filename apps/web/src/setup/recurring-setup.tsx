@@ -45,6 +45,16 @@ function RecurringDetails(context: SetupStepRenderContext) {
       </div>
       <div className="setup-form-grid">
         <TextField
+          {...error(context, "title")}
+          hint="Optional. This name is shown on this browser's dashboard."
+          label="Automation title"
+          maxLength={80}
+          name="title"
+          onChange={(event) => context.setField("title", event.target.value)}
+          placeholder="Monthly operations payment"
+          value={context.draft["title"] ?? ""}
+        />
+        <TextField
           {...error(context, "recipientAddress")}
           autoComplete="off"
           hint="The recipient cannot change after wallet approval."

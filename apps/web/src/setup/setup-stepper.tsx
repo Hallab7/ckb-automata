@@ -2,7 +2,14 @@
 
 import { ArrowLeft, ArrowRight, Check, Circle } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 
 import { Button, InlineNotice } from "@ckb-automata/ui";
 
@@ -33,6 +40,7 @@ export interface SetupStepperProperties {
   readonly initialDraft?: SetupDraft;
   readonly renderStep?: (context: SetupStepRenderContext) => ReactNode;
   readonly storageId?: string;
+  readonly steps?: readonly Readonly<{ id: SetupStepId; label: string }>[];
   readonly template: SetupTemplateId;
   readonly validateStep?: (
     step: SetupStepId,
@@ -109,6 +117,7 @@ export function SetupStepper({
   initialDraft = EMPTY_DRAFT,
   renderStep,
   storageId,
+  steps = SETUP_STEPS,
   template,
   validateStep = () => ({}),
 }: SetupStepperProperties) {
@@ -116,8 +125,9 @@ export function SetupStepper({
   const router = useRouter();
   const searchParams = useSearchParams();
   const rawStep = searchParams.get("step");
-  const currentStep = parseSetupStep(rawStep);
-  const currentIndex = stepIndex(currentStep);
+  const parsedStep = parseSetupStep(rawStep);
+  const currentStep = steps.some((step) => step.id === parsedStep) ? parsedStep : FIRST_SETUP_STEP;
+  const currentIndex = stepIndex(currentStep, steps);
   const [draft, setDraft] = useState<SetupDraft>(initialDraft);
   const [errors, setErrors] = useState<SetupErrors>({});
   const [hydrated, setHydrated] = useState(false);
@@ -221,15 +231,15 @@ export function SetupStepper({
         focusFirstError(validation);
         return;
       }
-      const next = SETUP_STEPS[currentIndex + 1];
+      const next = steps[currentIndex + 1];
       if (next !== undefined) goTo(next.id);
     } finally {
       setValidating(false);
     }
-  }, [currentIndex, currentStep, draft, goTo, validateStep, validating]);
+  }, [currentIndex, currentStep, draft, goTo, steps, validateStep, validating]);
 
-  const previous = SETUP_STEPS[currentIndex - 1];
-  const next = SETUP_STEPS[currentIndex + 1];
+  const previous = steps[currentIndex - 1];
+  const next = steps[currentIndex + 1];
   const context = useMemo<SetupStepRenderContext>(
     () => ({ draft, errors, setField, step: currentStep, template }),
     [currentStep, draft, errors, setField, template],
@@ -245,17 +255,17 @@ export function SetupStepper({
         <div className="app-page-header__copy">
           <p className="setup-flow__eyebrow">CKB Pudge Testnet</p>
           <h1 id="page-title">
-            {template === "deadline" ? "Deadline finalization" : "Recurring distribution"}
+            {template === "deadline" ? "Scheduled payment" : "Recurring distribution"}
           </h1>
           <p>
-            Step {currentIndex + 1} of {SETUP_STEPS.length}
+            Step {currentIndex + 1} of {steps.length}
           </p>
         </div>
       </header>
 
       <nav aria-label="Automation setup progress" className="setup-progress">
-        <ol>
-          {SETUP_STEPS.map((step, index) => {
+        <ol style={{ "--setup-step-count": steps.length } as CSSProperties}>
+          {steps.map((step, index) => {
             const complete = index < currentIndex;
             const active = step.id === currentStep;
             const available = step.id === "template" || index <= maxReached;

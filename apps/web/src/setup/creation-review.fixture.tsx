@@ -6,6 +6,7 @@ const HASH_B = `0x${"22".repeat(32)}`;
 const ADDRESS = "ckt1qfixturepaymentrecipient000000000000000000000000000000000000";
 
 const MODEL: CreationReviewModel = Object.freeze({
+  jobId: HASH_A,
   operation: "create_recurring_job",
   title: "Recurring distribution",
   summary: "100 CKB will be available to the fixed recipient on each of 3 eligible runs.",

@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
+  DEADLINE_SETUP_STEPS,
   FIRST_SETUP_STEP,
   SETUP_STEPS,
   parseSetupStep,
@@ -16,6 +17,10 @@ test("setup progress uses canonical URL-safe step identifiers", () => {
     ["template", "details", "timing", "funding", "review", "approval", "result"],
   );
   assert.equal(FIRST_SETUP_STEP, "details");
+  assert.deepEqual(
+    DEADLINE_SETUP_STEPS.map((step) => step.id),
+    ["template", "details", "timing", "review", "approval", "result"],
+  );
   assert.equal(parseSetupStep("funding"), "funding");
   assert.equal(parseSetupStep("template"), "details");
   assert.equal(parseSetupStep("../../approval"), "details");
