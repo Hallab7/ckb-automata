@@ -72,7 +72,9 @@ test("dashboard derives every lifecycle and operational status from canonical re
     ).status,
     "recovery_required",
   );
-  assert.equal(dashboardJobPresentation(job("spent"), "110", null).status, "completed");
+  const completed = dashboardJobPresentation(job("spent"), "110", null);
+  assert.equal(completed.status, "completed");
+  assert.equal(completed.runsRemaining, "0");
   assert.equal(dashboardJobPresentation(job("orphaned"), "110", null).status, "reorged");
 });
 

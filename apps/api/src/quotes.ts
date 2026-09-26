@@ -23,7 +23,7 @@ import {
 } from "@nestjs/swagger";
 import { WitnessArgs, type ClientTransactionResponse } from "@ckb-ccc/shell";
 import { scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
-import { and, eq, lte } from "drizzle-orm";
+import { and, desc, eq, lte, ne } from "drizzle-orm";
 
 import {
   CONTRACT_CAPACITY,
@@ -42,7 +42,7 @@ import { CampaignDataV1, RecurringPayloadV1 } from "@ckb-automata/molecule";
 
 import type { CkbReadClient } from "./ckb-client.ts";
 import type { AutomataDatabase } from "./database/client.ts";
-import { indexerCheckpoints, jobs } from "./database/schema.ts";
+import { indexerCheckpoints, jobs, jobVersions } from "./database/schema.ts";
 
 const HASH_PATTERN = /^0x[0-9a-f]{64}$/;
 const MAX_LINEAGE_DEPTH = 128;
@@ -113,7 +113,33 @@ export interface JobQuote {
   readonly assumptions: (typeof JOB_QUOTE_ASSUMPTIONS)[keyof typeof JOB_QUOTE_ASSUMPTIONS];
 }
 
+export interface JobTerms {
+  readonly jobId: string;
+  readonly network: string;
+  readonly template: "deadline" | "recurring";
+  readonly payout: {
+    readonly perExecution: string;
+    readonly total: string;
+  };
+  readonly schedule: {
+    readonly totalExecutions: string;
+  };
+  readonly source: {
+    readonly payloadHash: string;
+    readonly outPoint: { readonly txHash: string; readonly index: string };
+  };
+}
+
 type JobRow = typeof jobs.$inferSelect;
+
+interface EvidenceSource {
+  readonly blockHash: string;
+  readonly capacity: string;
+  readonly data: Buffer;
+  readonly outpointIndex: string;
+  readonly outpointTxHash: string;
+  readonly policyKind: string;
+}
 
 interface QuoteEvidence {
   readonly payoutPerExecution: bigint;
@@ -167,7 +193,10 @@ export function stableJobQuoteId(body: Omit<JobQuote, "quoteId">): string {
   });
 }
 
-function sourceTransactionMatches(row: JobRow, response: ClientTransactionResponse): boolean {
+function sourceTransactionMatches(
+  row: EvidenceSource,
+  response: ClientTransactionResponse,
+): boolean {
   if (response.status !== "committed" || response.blockHash !== row.blockHash) return false;
   const index = BigInt(row.outpointIndex);
   if (index > BigInt(Number.MAX_SAFE_INTEGER)) return false;
@@ -180,7 +209,7 @@ function sourceTransactionMatches(row: JobRow, response: ClientTransactionRespon
 }
 
 async function resolveEvidence(
-  row: JobRow,
+  row: EvidenceSource,
   client: QuoteChainClient,
   inspection: Extract<ReturnType<typeof inspectJobData>, { status: "ok" }>,
 ): Promise<QuoteEvidence> {
@@ -399,6 +428,34 @@ function quoteBody(
   });
 }
 
+export function canonicalJobTerms(input: {
+  readonly jobId: string;
+  readonly network: string;
+  readonly template: "deadline" | "recurring";
+  readonly payoutPerExecution: bigint;
+  readonly sequence: bigint;
+  readonly remainingRuns: bigint;
+  readonly payloadHash: string;
+  readonly outPoint: { readonly txHash: string; readonly index: string };
+}): JobTerms {
+  const totalExecutions =
+    input.template === "recurring" ? input.sequence + input.remainingRuns : 1n;
+  return Object.freeze({
+    jobId: input.jobId,
+    network: input.network,
+    template: input.template,
+    payout: Object.freeze({
+      perExecution: input.payoutPerExecution.toString(),
+      total: (input.payoutPerExecution * totalExecutions).toString(),
+    }),
+    schedule: Object.freeze({ totalExecutions: totalExecutions.toString() }),
+    source: Object.freeze({
+      payloadHash: input.payloadHash,
+      outPoint: Object.freeze({ ...input.outPoint }),
+    }),
+  });
+}
+
 export class JobQuoteService {
   readonly #database: AutomataDatabase;
   readonly #network: string;
@@ -408,6 +465,103 @@ export class JobQuoteService {
     this.#database = database;
     this.#network = network;
     this.#chain = chain;
+  }
+
+  async terms(jobIdInput: string): Promise<JobTerms> {
+    const jobId = parseJobId(jobIdInput);
+    const indexed = await this.#database.transaction(
+      async (tx) => {
+        const [checkpoint] = await tx
+          .select({ blockNumber: indexerCheckpoints.blockNumber })
+          .from(indexerCheckpoints)
+          .where(eq(indexerCheckpoints.networkId, this.#network))
+          .limit(1);
+        if (checkpoint === undefined) {
+          throw new ServiceUnavailableException({
+            status: "unavailable",
+            code: "TERMS_SNAPSHOT_UNAVAILABLE",
+          });
+        }
+        const [row] = await tx
+          .select()
+          .from(jobs)
+          .where(
+            and(
+              eq(jobs.networkId, this.#network),
+              eq(jobs.jobId, jobId),
+              lte(jobs.blockNumber, checkpoint.blockNumber),
+            ),
+          )
+          .limit(1);
+        const [version] = await tx
+          .select()
+          .from(jobVersions)
+          .where(
+            and(
+              eq(jobVersions.networkId, this.#network),
+              eq(jobVersions.jobId, jobId),
+              ne(jobVersions.status, "orphaned"),
+              lte(jobVersions.observedBlockNumber, checkpoint.blockNumber),
+            ),
+          )
+          .orderBy(desc(jobVersions.sequence), desc(jobVersions.id))
+          .limit(1);
+        return { row, version };
+      },
+      { accessMode: "read only", isolationLevel: "repeatable read" },
+    );
+    if (indexed.row === undefined) {
+      throw new NotFoundException({ status: "not_found", code: "JOB_NOT_FOUND" });
+    }
+    if (indexed.row.state === "orphaned") {
+      throw new ConflictException({ status: "conflict", code: "JOB_NOT_CANONICAL" });
+    }
+    if (indexed.version === undefined) {
+      throw new ServiceUnavailableException({
+        status: "unavailable",
+        code: "TERMS_EVIDENCE_UNAVAILABLE",
+      });
+    }
+
+    try {
+      const inspection = inspectJobData(indexed.version.data);
+      if (inspection.status !== "ok") throw new Error("indexed job data is not decodable");
+      const evidence = await resolveEvidence(
+        {
+          blockHash: indexed.version.observedBlockHash,
+          capacity: indexed.version.capacity,
+          data: indexed.version.data,
+          outpointIndex: indexed.version.outpointIndex,
+          outpointTxHash: indexed.version.outpointTxHash,
+          policyKind: indexed.row.policyKind,
+        },
+        this.#chain,
+        inspection,
+      );
+      const template = indexed.row.policyKind;
+      if (template !== "deadline" && template !== "recurring") {
+        throw new Error("indexed job has an unsupported terms template");
+      }
+      return canonicalJobTerms({
+        jobId,
+        network: indexed.row.networkId,
+        template,
+        payoutPerExecution: evidence.payoutPerExecution,
+        sequence: inspection.job.sequence,
+        remainingRuns: inspection.job.remainingRuns,
+        payloadHash: inspection.job.payloadHash,
+        outPoint: {
+          txHash: indexed.version.outpointTxHash,
+          index: indexed.version.outpointIndex,
+        },
+      });
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) throw error;
+      throw new ServiceUnavailableException(
+        { status: "unavailable", code: "TERMS_EVIDENCE_UNAVAILABLE" },
+        { cause: error },
+      );
+    }
   }
 
   async quote(jobIdInput: string): Promise<JobQuote> {
@@ -494,6 +648,10 @@ export class JobQuoteController {
   get(jobId: string): Promise<JobQuote> {
     return this.#quotes.quote(jobId);
   }
+
+  terms(jobId: string): Promise<JobTerms> {
+    return this.#quotes.terms(jobId);
+  }
 }
 
 const hashSchema = { type: "string", pattern: "^0x[0-9a-f]{64}$" };
@@ -512,6 +670,79 @@ Get(":jobId/quote")(
   JobQuoteController.prototype,
   "get",
   Object.getOwnPropertyDescriptor(JobQuoteController.prototype, "get")!,
+);
+Get(":jobId/terms")(
+  JobQuoteController.prototype,
+  "terms",
+  Object.getOwnPropertyDescriptor(JobQuoteController.prototype, "terms")!,
+);
+Param("jobId")(JobQuoteController.prototype, "terms", 0);
+ApiOperation({ summary: "Read canonical immutable job terms" })(
+  JobQuoteController.prototype,
+  "terms",
+  Object.getOwnPropertyDescriptor(JobQuoteController.prototype, "terms")!,
+);
+ApiParam({ name: "jobId", schema: hashSchema })(
+  JobQuoteController.prototype,
+  "terms",
+  Object.getOwnPropertyDescriptor(JobQuoteController.prototype, "terms")!,
+);
+ApiOkResponse({
+  schema: {
+    type: "object",
+    required: ["jobId", "network", "template", "payout", "schedule", "source"],
+    properties: {
+      jobId: hashSchema,
+      network: { type: "string" },
+      template: { type: "string", enum: ["deadline", "recurring"] },
+      payout: {
+        type: "object",
+        required: ["perExecution", "total"],
+        properties: { perExecution: decimalSchema, total: decimalSchema },
+      },
+      schedule: {
+        type: "object",
+        required: ["totalExecutions"],
+        properties: { totalExecutions: decimalSchema },
+      },
+      source: {
+        type: "object",
+        required: ["payloadHash", "outPoint"],
+        properties: {
+          payloadHash: hashSchema,
+          outPoint: {
+            type: "object",
+            required: ["txHash", "index"],
+            properties: { txHash: hashSchema, index: decimalSchema },
+          },
+        },
+      },
+    },
+  },
+})(
+  JobQuoteController.prototype,
+  "terms",
+  Object.getOwnPropertyDescriptor(JobQuoteController.prototype, "terms")!,
+);
+ApiBadRequestResponse({ description: "Malformed job identifier" })(
+  JobQuoteController.prototype,
+  "terms",
+  Object.getOwnPropertyDescriptor(JobQuoteController.prototype, "terms")!,
+);
+ApiNotFoundResponse({ description: "Job not found" })(
+  JobQuoteController.prototype,
+  "terms",
+  Object.getOwnPropertyDescriptor(JobQuoteController.prototype, "terms")!,
+);
+ApiConflictResponse({ description: "Job is not canonical" })(
+  JobQuoteController.prototype,
+  "terms",
+  Object.getOwnPropertyDescriptor(JobQuoteController.prototype, "terms")!,
+);
+ApiServiceUnavailableResponse({ description: "Canonical terms evidence is unavailable" })(
+  JobQuoteController.prototype,
+  "terms",
+  Object.getOwnPropertyDescriptor(JobQuoteController.prototype, "terms")!,
 );
 Param("jobId")(JobQuoteController.prototype, "get", 0);
 ApiOperation({ summary: "Quote the remaining committed job schedule" })(

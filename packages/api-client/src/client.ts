@@ -36,6 +36,7 @@ export type ApiJob = ApiSuccess<"JobsController_detail">;
 export type ApiJobEvents = ApiSuccess<"JobEventsController_list">;
 export type ApiActivity = ApiSuccess<"ActivityController_list">;
 export type ApiJobQuote = ApiSuccess<"JobQuoteController_get">;
+export type ApiJobTerms = ApiSuccess<"JobQuoteController_terms">;
 export type ApiTemplates = ApiSuccess<"TemplatesController_list">;
 export type ApiTransactionBuild = ApiSuccess<"TransactionController_createDeadline">;
 export type ApiTransactionValidation = ApiSuccess<"TransactionController_validateSigned">;
@@ -235,6 +236,10 @@ export class AutomataApiClient {
 
   getJobQuote(jobId: string): Promise<ApiJobQuote> {
     return this.#request(`v1/jobs/${encodeURIComponent(jobId)}/quote`);
+  }
+
+  getJobTerms(jobId: string): Promise<ApiJobTerms> {
+    return this.#request(`v1/jobs/${encodeURIComponent(jobId)}/terms`);
   }
 
   createDeadlineJob(

@@ -32,8 +32,8 @@ async function loadRecipientAmounts(
   const entries = await Promise.all(
     jobs.map(async (job) => {
       try {
-        const quote = await api.getJobQuote(job.jobId);
-        return [job.jobId, quote.amounts.payout] as const;
+        const terms = await api.getJobTerms(job.jobId);
+        return [job.jobId, terms.payout] as const;
       } catch {
         return [job.jobId, null] as const;
       }

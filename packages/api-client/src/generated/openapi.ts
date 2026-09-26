@@ -207,6 +207,23 @@ export type paths = {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/v1/jobs/{jobId}/terms": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /** Read canonical immutable job terms */
+        readonly get: operations["JobQuoteController_terms"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/v1/metrics": {
         readonly parameters: {
             readonly query?: never;
@@ -1360,6 +1377,74 @@ export interface operations {
                 content?: never;
             };
             /** @description Canonical quote evidence is unavailable */
+            readonly 503: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly JobQuoteController_terms: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly jobId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        readonly jobId: string;
+                        readonly network: string;
+                        readonly payout: {
+                            readonly perExecution: string;
+                            readonly total: string;
+                        };
+                        readonly schedule: {
+                            readonly totalExecutions: string;
+                        };
+                        readonly source: {
+                            readonly outPoint: {
+                                readonly index: string;
+                                readonly txHash: string;
+                            };
+                            readonly payloadHash: string;
+                        };
+                        /** @enum {string} */
+                        readonly template: "deadline" | "recurring";
+                    };
+                };
+            };
+            /** @description Malformed job identifier */
+            readonly 400: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Job not found */
+            readonly 404: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Job is not canonical */
+            readonly 409: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Canonical terms evidence is unavailable */
             readonly 503: {
                 headers: {
                     readonly [name: string]: unknown;

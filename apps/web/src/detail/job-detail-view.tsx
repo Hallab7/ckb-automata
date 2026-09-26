@@ -299,7 +299,7 @@ export function JobDetailView({
         </div>
         <div>
           <dt>Runs remaining</dt>
-          <dd>{job.remainingRuns}</dd>
+          <dd>{presentation.runsRemaining}</dd>
         </div>
         <div>
           <dt>Next execution</dt>

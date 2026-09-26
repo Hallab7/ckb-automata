@@ -80,7 +80,9 @@ test("detail presentation covers waiting, eligible, completed, and funding state
     ).status,
     "eligible",
   );
-  assert.equal(jobDetailPresentation(job({ state: "spent" }), []).status, "completed");
+  const completed = jobDetailPresentation(job({ state: "spent" }), []);
+  assert.equal(completed.status, "completed");
+  assert.equal(completed.runsRemaining, "0");
   assert.equal(
     jobDetailPresentation(job({ funds: { ...job().funds, remainingBudget: "0" } }), []).status,
     "needs_funding",

@@ -131,7 +131,7 @@ function AutomationRows({
             <div className="automation-row__detail">
               <span className="automation-row__mobile-label">Next eligibility</span>
               <strong>{presentation.nextEligibility}</strong>
-              <span>{job.remainingRuns} runs remaining</span>
+              <span>{presentation.runsRemaining} runs remaining</span>
             </div>
             <div className="automation-row__amount">
               <span className="automation-row__mobile-label">Recipient amount</span>

@@ -12,6 +12,7 @@ export {
   type ApiJobEvents,
   type ApiJobList,
   type ApiJobQuote,
+  type ApiJobTerms,
   type ApiNotificationPreferences,
   type ApiQuery,
   type ApiRequestBody,

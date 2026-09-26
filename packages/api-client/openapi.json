@@ -1357,6 +1357,73 @@
         "tags": ["job quotes"]
       }
     },
+    "/v1/jobs/{jobId}/terms": {
+      "get": {
+        "operationId": "JobQuoteController_terms",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "jobId": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                    "network": { "type": "string" },
+                    "payout": {
+                      "properties": {
+                        "perExecution": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                        "total": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" }
+                      },
+                      "required": ["perExecution", "total"],
+                      "type": "object"
+                    },
+                    "schedule": {
+                      "properties": {
+                        "totalExecutions": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" }
+                      },
+                      "required": ["totalExecutions"],
+                      "type": "object"
+                    },
+                    "source": {
+                      "properties": {
+                        "outPoint": {
+                          "properties": {
+                            "index": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                            "txHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+                          },
+                          "required": ["txHash", "index"],
+                          "type": "object"
+                        },
+                        "payloadHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+                      },
+                      "required": ["payloadHash", "outPoint"],
+                      "type": "object"
+                    },
+                    "template": { "enum": ["deadline", "recurring"], "type": "string" }
+                  },
+                  "required": ["jobId", "network", "template", "payout", "schedule", "source"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": { "description": "Malformed job identifier" },
+          "404": { "description": "Job not found" },
+          "409": { "description": "Job is not canonical" },
+          "503": { "description": "Canonical terms evidence is unavailable" }
+        },
+        "summary": "Read canonical immutable job terms",
+        "tags": ["job quotes"]
+      }
+    },
     "/v1/metrics": {
       "get": {
         "operationId": "MetricsController_get",

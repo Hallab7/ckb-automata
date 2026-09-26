@@ -42,8 +42,9 @@ test("encodes path and query parameters", async () => {
     previousBlockNumber: "100",
     previousBlockHash: `0x${"12".repeat(32)}`,
   });
+  await client.getJobTerms("job/value");
 
-  assert.equal(requests.length, 3);
+  assert.equal(requests.length, 4);
   assert.equal(
     requests[0]?.url,
     "https://api.example.test/root/v1/jobs/job%2Fvalue/events?cursor=next+value&limit=20&source=indexed",
@@ -59,6 +60,8 @@ test("encodes path and query parameters", async () => {
     `https://api.example.test/root/v1/transactions/tx%2Fvalue/progress?submittedAt=2026-09-24T10%3A00%3A00.000Z&previousBlockNumber=100&previousBlockHash=0x${"12".repeat(32)}`,
   );
   assert.equal(requests[2]?.method, "GET");
+  assert.equal(requests[3]?.url, "https://api.example.test/root/v1/jobs/job%2Fvalue/terms");
+  assert.equal(requests[3]?.method, "GET");
 });
 
 test("serializes generated transaction request bodies", async () => {

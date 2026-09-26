@@ -15,6 +15,7 @@ export interface DashboardJobPresentation {
   readonly recipientAmount: string;
   readonly nextAction: string;
   readonly nextEligibility: string;
+  readonly runsRemaining: string;
   readonly status: DashboardStatus;
 }
 
@@ -46,6 +47,7 @@ export function dashboardJobPresentation(
       recipientAmount: formattedRecipientAmount,
       nextAction: "Wait for canonical replay",
       nextEligibility: "Canonical status pending",
+      runsRemaining: job.remainingRuns,
       status: "reorged",
     };
   }
@@ -54,6 +56,7 @@ export function dashboardJobPresentation(
       recipientAmount: formattedRecipientAmount,
       nextAction: "Review execution history",
       nextEligibility: "No further execution",
+      runsRemaining: "0",
       status: "completed",
     };
   }
@@ -92,6 +95,7 @@ export function dashboardJobPresentation(
     recipientAmount: formattedRecipientAmount,
     nextAction,
     nextEligibility,
+    runsRemaining: job.remainingRuns,
     status,
   };
 }

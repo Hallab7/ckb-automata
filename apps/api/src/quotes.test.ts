@@ -5,7 +5,12 @@ import type { LoggerService } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 import { createApiApplication } from "./bootstrap.ts";
-import { JOB_QUOTE_ASSUMPTIONS, stableJobQuoteId, type JobQuote } from "./quotes.ts";
+import {
+  JOB_QUOTE_ASSUMPTIONS,
+  canonicalJobTerms,
+  stableJobQuoteId,
+  type JobQuote,
+} from "./quotes.ts";
 
 const quietLogger: LoggerService = {
   log: () => undefined,
@@ -99,6 +104,32 @@ test("quote identity ignores tip movement but binds job and amount state", () =>
   );
 });
 
+test("canonical terms preserve the original recurring payout after the final run", () => {
+  assert.deepEqual(
+    canonicalJobTerms({
+      jobId: `0x${"1".repeat(64)}`,
+      network: "ckb_testnet",
+      template: "recurring",
+      payoutPerExecution: 6_300_000_000n,
+      sequence: 2n,
+      remainingRuns: 1n,
+      payloadHash: `0x${"2".repeat(64)}`,
+      outPoint: { txHash: `0x${"3".repeat(64)}`, index: "2" },
+    }),
+    {
+      jobId: `0x${"1".repeat(64)}`,
+      network: "ckb_testnet",
+      template: "recurring",
+      payout: { perExecution: "6300000000", total: "18900000000" },
+      schedule: { totalExecutions: "3" },
+      source: {
+        payloadHash: `0x${"2".repeat(64)}`,
+        outPoint: { txHash: `0x${"3".repeat(64)}`, index: "2" },
+      },
+    },
+  );
+});
+
 test("quote route documents every chain integer as a decimal string", async () => {
   const result = await createApiApplication(environment(), { logger: quietLogger });
   try {
@@ -129,6 +160,21 @@ test("quote route documents every chain integer as a decimal string", async () =
     const earliestBlock = schedule.properties?.["earliestBlock"];
     assert.ok(earliestBlock && !("$ref" in earliestBlock));
     assert.equal(earliestBlock.type, "string");
+
+    const termsResponse = document.paths["/v1/jobs/{jobId}/terms"]?.get?.responses?.["200"];
+    assert.ok(termsResponse && "content" in termsResponse);
+    const termsSchema = termsResponse.content?.["application/json"]?.schema;
+    assert.ok(termsSchema && !("$ref" in termsSchema));
+    const payout = termsSchema.properties?.["payout"];
+    assert.ok(payout && !("$ref" in payout));
+    const perExecution = payout.properties?.["perExecution"];
+    assert.ok(perExecution && !("$ref" in perExecution));
+    assert.equal(perExecution.type, "string");
+    const termsSchedule = termsSchema.properties?.["schedule"];
+    assert.ok(termsSchedule && !("$ref" in termsSchedule));
+    const totalExecutions = termsSchedule.properties?.["totalExecutions"];
+    assert.ok(totalExecutions && !("$ref" in totalExecutions));
+    assert.equal(totalExecutions.type, "string");
 
     const fastify = result.app.getHttpAdapter().getInstance() as {
       inject(input: {

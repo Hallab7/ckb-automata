@@ -24,6 +24,7 @@ export interface JobDetailPresentation {
   readonly nextExecution: string;
   readonly policyName: string;
   readonly recipientAmount: string;
+  readonly runsRemaining: string;
   readonly automationReserve: string;
   readonly remainingBudget: string;
   readonly executorReward: string;
@@ -133,6 +134,7 @@ export function jobDetailPresentation(
           : "Unknown policy",
     recipientAmount:
       recipientAmount === undefined ? "Unavailable" : formatCkbBalance(BigInt(recipientAmount)),
+    runsRemaining: job.state === "spent" ? "0" : job.remainingRuns,
     automationReserve: formatCkbBalance(BigInt(job.funds.capacity)),
     remainingBudget: formatCkbBalance(remainingBudget),
     executorReward: formatCkbBalance(reward),
