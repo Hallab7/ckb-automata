@@ -5,7 +5,11 @@ import type {
   ApiTransactionBuild,
   ApiTransactionValidation,
 } from "@ckb-automata/api-client";
-import type { ScriptIdentity, UnsignedDeadlineTransaction } from "@ckb-automata/core";
+import {
+  CREATION_REVIEW_WINDOW_BLOCKS,
+  type ScriptIdentity,
+  type UnsignedDeadlineTransaction,
+} from "@ckb-automata/core";
 
 export type OwnerAction = "cancel" | "recover" | "top_up";
 export type RecoveryReason =
@@ -26,7 +30,11 @@ export interface OwnerActionReview {
   readonly action: OwnerAction;
   readonly artifact: ApiTransactionBuild;
   readonly request: OwnerActionRequest;
-  readonly snapshot: { readonly blockHash: string; readonly blockNumber: string };
+  readonly snapshot: {
+    readonly blockHash: string;
+    readonly blockNumber: string;
+    readonly expiresAfterBlock: string;
+  };
   readonly sourceOutPoint: { readonly index: string; readonly txHash: string };
   readonly transaction: UnsignedDeadlineTransaction;
   readonly transactionHash: string;
@@ -62,9 +70,11 @@ function text(value: unknown, label: string): string {
 function snapshot(artifact: ApiTransactionBuild) {
   const value = record(artifact.chainSnapshot, "Chain snapshot");
   const tip = record(value["tip"], "Chain snapshot tip");
+  const block = text(tip["blockNumber"], "Snapshot block number");
   return Object.freeze({
     blockHash: text(tip["blockHash"], "Snapshot block hash"),
-    blockNumber: text(tip["blockNumber"], "Snapshot block number"),
+    blockNumber: block,
+    expiresAfterBlock: (BigInt(block) + CREATION_REVIEW_WINDOW_BLOCKS).toString(),
   });
 }
 

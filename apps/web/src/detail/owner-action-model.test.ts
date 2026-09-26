@@ -125,7 +125,9 @@ function dependencies(
 
 test("owner action refreshes the job, quote, build, and inputs before signing", async () => {
   const calls: string[] = [];
-  const result = await submitOwnerAction(await review(), dependencies(calls));
+  const reviewed = await review();
+  assert.equal(reviewed.snapshot.expiresAfterBlock, "130");
+  const result = await submitOwnerAction(reviewed, dependencies(calls));
   assert.deepEqual(calls, ["job", "quote", "build", "live-input", "sign", "validate", "broadcast"]);
   assert.equal(result.action, "recover");
   assert.equal(result.transactionHash, HASH_A);
