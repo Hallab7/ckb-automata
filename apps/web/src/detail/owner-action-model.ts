@@ -81,7 +81,11 @@ function outPointEqual(
   left: { readonly index: string; readonly txHash: string },
   right: { readonly index: string; readonly txHash: string },
 ): boolean {
-  return left.index === right.index && left.txHash === right.txHash;
+  try {
+    return BigInt(left.index) === BigInt(right.index) && left.txHash === right.txHash;
+  } catch {
+    return false;
+  }
 }
 
 function reviewedInputExists(

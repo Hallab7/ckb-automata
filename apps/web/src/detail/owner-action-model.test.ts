@@ -32,7 +32,7 @@ const ownerLock = {
 const transaction = {
   cellDeps: [],
   headerDeps: [],
-  inputs: [{ previousOutput: { index: "0", txHash: HASH_A }, since: "0x0" }],
+  inputs: [{ previousOutput: { index: "0x1", txHash: HASH_A }, since: "0x0" }],
   outputs: [],
   outputsData: [],
   version: "0x0",
@@ -43,7 +43,7 @@ const quote = {
   jobId: HASH_B,
   quoteId: "55".repeat(32),
   snapshot: {
-    jobOutPoint: { index: "0", txHash: HASH_A },
+    jobOutPoint: { index: "1", txHash: HASH_A },
     tip: { blockHash: HASH_B, blockNumber: "100" },
   },
 } as ApiJobQuote;
