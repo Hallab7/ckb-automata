@@ -76,6 +76,10 @@ test("connector runtime stays inside the dedicated client boundary", async () =>
   assert.match(provider, /name: AUTOMATA_CCC_IDENTITY\.name/);
   assert.match(provider, /const signer = ccc\.useSigner\(\)/);
   assert.match(provider, /class FixtureSigner extends ccc\.Signer/);
+  assert.match(provider, /function restoreInputlessWitness\(/);
+  assert.match(provider, /shiftedIndex = completed\.inputs\.length/);
+  assert.match(provider, /CCC changed the reviewed witness while selecting funding inputs/);
+  assert.match(provider, /restoreInputlessWitness\(transaction, completed\)/);
   assert.match(provider, /Automata Zero Balance/);
   assert.match(provider, /Automata Rejected Request/);
   assert.match(provider, /Automata Missing Extension/);

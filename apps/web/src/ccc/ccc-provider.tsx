@@ -88,6 +88,38 @@ function cccTransaction(transaction: UnsignedDeadlineTransaction): ccc.Transacti
   return ccc.Transaction.from(cccTransactionLike(transaction));
 }
 
+function restoreInputlessWitness(
+  source: UnsignedDeadlineTransaction,
+  completed: ccc.Transaction,
+): void {
+  if (source.inputs.length !== 0 || source.witnesses.length === 0) return;
+  const sourceWitness = source.witnesses[0];
+  if (sourceWitness === undefined) return;
+  if (source.witnesses.length !== 1 || completed.inputs.length === 0) {
+    throw new Error("CCC returned an unsupported inputless witness layout");
+  }
+
+  const shiftedIndex = completed.inputs.length;
+  const shiftedWitness = completed.witnesses[shiftedIndex];
+  if (shiftedWitness !== sourceWitness) {
+    throw new Error("CCC changed the reviewed witness while selecting funding inputs");
+  }
+
+  const reviewed = ccc.WitnessArgs.fromBytes(sourceWitness);
+  const funding = completed.getWitnessArgs(0) ?? ccc.WitnessArgs.from({});
+  for (const field of ["lock", "inputType", "outputType"] as const) {
+    const required = reviewed[field];
+    const actual = funding[field];
+    if (required === undefined) continue;
+    if (actual !== undefined && actual !== required) {
+      throw new Error(`CCC changed the reviewed witness ${field} field`);
+    }
+    funding[field] = required;
+  }
+  completed.setWitness(0, funding.toBytes());
+  completed.witnesses.splice(shiftedIndex, 1);
+}
+
 function installConnectorClientGuard(): void {
   const prototype = ccc.SignersController.prototype as ccc.SignersController &
     Record<symbol, unknown>;
@@ -301,6 +333,7 @@ function WalletSessionBridge({ children }: Readonly<{ children: ReactNode }>) {
         await completed.completeFeeBy(currentSigner, undefined, undefined, {
           maxFeeRate: REVIEW_FEE_RATE_MAXIMUM,
         });
+        restoreInputlessWitness(transaction, completed);
         return Object.freeze({
           hash: completed.hash(),
           transaction: reviewedTransaction(completed),
