@@ -1,6 +1,6 @@
 import type { AutomataQueue } from "@ckb-automata/telemetry";
 
-import { DurableQueueRegistry, type DeadLetterPayload, type QueueJobEnvelope } from "./queues.ts";
+import type { DeadLetterPayload, QueueEnqueuer, QueueJobEnvelope } from "./queues.ts";
 
 export type DeadLetterSourceQueue = Exclude<AutomataQueue, "dead-letter">;
 export type DeadLetterActionKind = "inspect" | "replay" | "close";
@@ -125,9 +125,9 @@ export function parseDeadLetterPayload(value: unknown): DeadLetterPayload {
 
 export class DeadLetterOperations {
   readonly #store: DeadLetterStore;
-  readonly #queues: DurableQueueRegistry;
+  readonly #queues: QueueEnqueuer;
 
-  constructor(store: DeadLetterStore, queues: DurableQueueRegistry) {
+  constructor(store: DeadLetterStore, queues: QueueEnqueuer) {
     this.#store = store;
     this.#queues = queues;
   }

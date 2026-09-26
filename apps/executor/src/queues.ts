@@ -65,6 +65,16 @@ export interface QueueJobEnvelope<T = unknown> {
   readonly payload: T;
 }
 
+export interface QueueEnqueuer {
+  enqueue<T>(
+    queue: AutomataQueue,
+    operation: string,
+    idempotencyKey: string,
+    payload: T,
+    options?: { readonly delay?: number },
+  ): Promise<Job<QueueJobEnvelope<T>>>;
+}
+
 export interface DeadLetterPayload {
   readonly sourceQueue: Exclude<AutomataQueue, "dead-letter">;
   readonly sourceJobId: string;
@@ -158,6 +168,26 @@ function assertDelay(delay: number): number {
   return delay;
 }
 
+export function enqueueQueueJob<T>(
+  queue: Pick<Queue, "add">,
+  queueName: AutomataQueue,
+  operation: string,
+  idempotencyKey: string,
+  payload: T,
+  options: { readonly delay?: number } = {},
+  telemetry?: Pick<TelemetryRuntime, "inject">,
+): Promise<Job<QueueJobEnvelope<T>>> {
+  const trace = telemetry ? createQueueTraceEnvelope(telemetry) : Object.freeze({});
+  return queue.add(
+    assertOperation(operation),
+    Object.freeze({ schemaVersion: 1 as const, trace, payload }),
+    {
+      jobId: stableQueueJobId(queueName, idempotencyKey),
+      delay: assertDelay(options.delay ?? 0),
+    },
+  ) as Promise<Job<QueueJobEnvelope<T>>>;
+}
+
 export class DurableQueueRegistry {
   readonly #queues: ReadonlyMap<AutomataQueue, Queue>;
   readonly #readinessTimeoutMs: number;
@@ -214,15 +244,15 @@ export class DurableQueueRegistry {
     payload: T,
     options: { readonly delay?: number } = {},
   ): Promise<Job<QueueJobEnvelope<T>>> {
-    const trace = this.#telemetry ? createQueueTraceEnvelope(this.#telemetry) : Object.freeze({});
-    return this.queue(queue).add(
-      assertOperation(operation),
-      Object.freeze({ schemaVersion: 1 as const, trace, payload }),
-      {
-        jobId: stableQueueJobId(queue, idempotencyKey),
-        delay: assertDelay(options.delay ?? 0),
-      },
-    ) as Promise<Job<QueueJobEnvelope<T>>>;
+    return enqueueQueueJob(
+      this.queue(queue),
+      queue,
+      operation,
+      idempotencyKey,
+      payload,
+      options,
+      this.#telemetry,
+    );
   }
 
   deadLetter(

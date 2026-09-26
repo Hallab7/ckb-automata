@@ -1,15 +1,7 @@
-import { Queue } from "bullmq";
-
-import { AUTOMATA_QUEUES } from "@ckb-automata/telemetry";
-
+import { DeadLetterReplayDispatcher } from "./dead-letter-dispatcher.ts";
 import { PostgresDeadLetterStore } from "./dead-letter-store.ts";
 import { DeadLetterOperations } from "./dead-letter.ts";
-import {
-  DEFAULT_QUEUE_PREFIX,
-  DurableQueueRegistry,
-  executorQueuePrefix,
-  parseRedisConnection,
-} from "./queues.ts";
+import { DEFAULT_QUEUE_PREFIX, executorQueuePrefix } from "./queues.ts";
 
 interface Command {
   readonly action: "inspect" | "replay" | "close";
@@ -45,7 +37,7 @@ function parseCommand(arguments_: readonly string[]): Command {
   return Object.freeze({ action, id, operator, ...(reason === undefined ? {} : { reason }) });
 }
 
-function requiredEnvironment(input: NodeJS.ProcessEnv, name: "DATABASE_URL" | "REDIS_URL"): string {
+function requiredEnvironment(input: NodeJS.ProcessEnv, name: "DATABASE_URL"): string {
   const value = input[name];
   if (!value) throw new Error(`${name} is required`);
   return value;
@@ -57,28 +49,19 @@ export async function runDeadLetterCommand(
 ): Promise<unknown> {
   const command = parseCommand(arguments_);
   const databaseUrl = requiredEnvironment(environment, "DATABASE_URL");
-  const redisUrl = requiredEnvironment(environment, "REDIS_URL");
   const queuePrefix =
     executorQueuePrefix(environment["EXECUTOR_INSTANCE_ID"]) ?? DEFAULT_QUEUE_PREFIX;
-  const queues = AUTOMATA_QUEUES.map(
-    (name) =>
-      new Queue(name, {
-        connection: parseRedisConnection(redisUrl),
-        prefix: queuePrefix,
-      }),
-  );
-  const registry = new DurableQueueRegistry(queues);
+  const dispatcher = new DeadLetterReplayDispatcher(environment["REDIS_URL"], queuePrefix);
   const store = new PostgresDeadLetterStore(databaseUrl);
-  const operations = new DeadLetterOperations(store, registry);
+  const operations = new DeadLetterOperations(store, dispatcher);
   try {
-    await registry.ready();
     if (command.action === "inspect") return operations.inspect(command.id, command.operator);
     if (command.action === "replay") {
       return operations.replay(command.id, command.operator, command.reason!);
     }
     return operations.close(command.id, command.operator, command.reason!);
   } finally {
-    await Promise.all([store.closeConnection(), ...queues.map((queue) => queue.close())]);
+    await Promise.all([store.closeConnection(), dispatcher.close()]);
   }
 }
 
