@@ -5,6 +5,7 @@ import type { LoggerService } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 import { createApiApplication } from "./bootstrap.ts";
+import { JOB_QUOTE_ASSUMPTIONS, stableJobQuoteId, type JobQuote } from "./quotes.ts";
 
 const quietLogger: LoggerService = {
   log: () => undefined,
@@ -26,6 +27,77 @@ function environment() {
     WEBHOOK_ENCRYPTION_KEY: "A".repeat(43),
   };
 }
+
+function quoteBody(): Omit<JobQuote, "quoteId"> {
+  return {
+    jobId: `0x${"1".repeat(64)}`,
+    network: "ckb_testnet",
+    template: "deadline",
+    amounts: {
+      occupiedCapacity: {
+        jobCell: "38100000000",
+        applicationCell: "27300000000",
+        total: "65400000000",
+      },
+      payout: { perExecution: "6300000000", total: "6300000000" },
+      rewards: { perExecution: "6100000000", total: "6100000000" },
+      remainingBudget: "6100000000",
+      residualRefund: "38100000000",
+      retainedTerminalCapacity: "27300000000",
+      currentLockedTotal: "115900000000",
+      estimatedFee: { minimum: "700", maximum: "409600" },
+    },
+    schedule: {
+      executionsRemaining: "1",
+      earliestBlock: "100",
+      latestBlock: null,
+      blocksUntilEligible: "0",
+      approximateSecondsUntilEligible: "0",
+      estimateBasis: "ckb_target_block_interval",
+    },
+    snapshot: {
+      tip: { blockNumber: "110", blockHash: `0x${"2".repeat(64)}` },
+      indexCheckpoint: { blockNumber: "109", blockHash: `0x${"3".repeat(64)}` },
+      jobOutPoint: { txHash: `0x${"4".repeat(64)}`, index: "1" },
+      jobDataHash: "5".repeat(64),
+    },
+    expiry: { afterBlock: "110", condition: "tip_or_job_snapshot_change" },
+    assumptions: JOB_QUOTE_ASSUMPTIONS.deadline,
+  };
+}
+
+test("quote identity ignores tip movement but binds job and amount state", () => {
+  const original = quoteBody();
+  const advanced = {
+    ...original,
+    schedule: {
+      ...original.schedule,
+      blocksUntilEligible: "0",
+      approximateSecondsUntilEligible: "0",
+    },
+    snapshot: {
+      ...original.snapshot,
+      tip: { blockNumber: "111", blockHash: `0x${"6".repeat(64)}` },
+      indexCheckpoint: { blockNumber: "111", blockHash: `0x${"6".repeat(64)}` },
+    },
+    expiry: { ...original.expiry, afterBlock: "111" },
+  } satisfies Omit<JobQuote, "quoteId">;
+  assert.equal(stableJobQuoteId(advanced), stableJobQuoteId(original));
+  assert.notEqual(
+    stableJobQuoteId({
+      ...original,
+      snapshot: { ...original.snapshot, jobDataHash: "7".repeat(64) },
+    }),
+    stableJobQuoteId(original),
+  );
+  assert.notEqual(
+    stableJobQuoteId({
+      ...original,
+      amounts: { ...original.amounts, remainingBudget: "6100000001" },
+    }),
+    stableJobQuoteId(original),
+  );
+});
 
 test("quote route documents every chain integer as a decimal string", async () => {
   const result = await createApiApplication(environment(), { logger: quietLogger });

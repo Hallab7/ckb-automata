@@ -419,6 +419,13 @@ function policyCriticalContext(input: {
   readonly quoteExpiry: unknown;
   readonly transaction: UnsignedDeadlineTransaction;
 }) {
+  if (input.operation !== "create_deadline_job" && input.operation !== "create_recurring_job") {
+    return Object.freeze({
+      operation: input.operation,
+      intentHash: input.intentHash,
+      transaction: input.transaction,
+    });
+  }
   return Object.freeze({
     operation: input.operation,
     intentHash: input.intentHash,

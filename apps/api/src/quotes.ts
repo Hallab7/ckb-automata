@@ -148,6 +148,25 @@ function stableHash(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
+export function stableJobQuoteId(body: Omit<JobQuote, "quoteId">): string {
+  return stableHash({
+    jobId: body.jobId,
+    network: body.network,
+    template: body.template,
+    amounts: body.amounts,
+    schedule: {
+      executionsRemaining: body.schedule.executionsRemaining,
+      earliestBlock: body.schedule.earliestBlock,
+      latestBlock: body.schedule.latestBlock,
+    },
+    snapshot: {
+      jobOutPoint: body.snapshot.jobOutPoint,
+      jobDataHash: body.snapshot.jobDataHash,
+    },
+    assumptions: body.assumptions,
+  });
+}
+
 function sourceTransactionMatches(row: JobRow, response: ClientTransactionResponse): boolean {
   if (response.status !== "committed" || response.blockHash !== row.blockHash) return false;
   const index = BigInt(row.outpointIndex);
@@ -439,7 +458,7 @@ export class JobQuoteService {
         resolveEvidence(indexed.row, this.#chain, inspection),
       ]);
       const body = quoteBody(indexed.row, indexed.checkpoint, tip, evidence);
-      return Object.freeze({ quoteId: stableHash(body), ...body });
+      return Object.freeze({ quoteId: stableJobQuoteId(body), ...body });
     } catch (error) {
       if (error instanceof ServiceUnavailableException) throw error;
       throw new ServiceUnavailableException(

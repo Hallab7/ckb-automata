@@ -139,12 +139,7 @@ export async function createOwnerActionReview(
   if (quote.jobId !== request.jobId || artifact.intentHash.length === 0) {
     throw new Error("The quote does not belong to this automation.");
   }
-  const artifactSnapshot = snapshot(artifact);
-  if (
-    !outPointEqual(artifactOutPoint(artifact), quote.snapshot.jobOutPoint) ||
-    artifactSnapshot.blockHash !== quote.snapshot.tip.blockHash ||
-    artifactSnapshot.blockNumber !== quote.snapshot.tip.blockNumber
-  ) {
+  if (!outPointEqual(artifactOutPoint(artifact), quote.snapshot.jobOutPoint)) {
     throw new Error("The transaction build does not match the quoted job snapshot.");
   }
   const transaction = artifact.transaction as unknown as UnsignedDeadlineTransaction;
@@ -175,16 +170,15 @@ function assertFreshArtifact(
   if (
     !outPointEqual(quote.snapshot.jobOutPoint, review.sourceOutPoint) ||
     !outPointEqual(artifactOutPoint(artifact), review.sourceOutPoint) ||
-    quote.snapshot.tip.blockHash !== review.snapshot.blockHash ||
-    quote.snapshot.tip.blockNumber !== review.snapshot.blockNumber ||
-    nextSnapshot.blockHash !== review.snapshot.blockHash ||
-    nextSnapshot.blockNumber !== review.snapshot.blockNumber ||
     artifact.operation !== review.artifact.operation ||
     artifact.intentHash !== review.artifact.intentHash ||
     artifact.policyCriticalHash !== review.artifact.policyCriticalHash ||
     JSON.stringify(artifact.transaction) !== JSON.stringify(review.artifact.transaction)
   ) {
     throw new Error("The job outpoint, quote, or chain snapshot changed. Build a fresh review.");
+  }
+  if (BigInt(nextSnapshot.blockNumber) < BigInt(review.snapshot.blockNumber)) {
+    throw new Error("The chain snapshot moved backwards. Build a fresh review.");
   }
 }
 

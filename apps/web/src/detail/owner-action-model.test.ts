@@ -148,24 +148,32 @@ test("a lost race stops before quote refresh or wallet invocation", async () => 
   assert.deepEqual(calls, ["job"]);
 });
 
-test("a stale tip stops before live-input checks and signing", async () => {
+test("ordinary tip advancement does not invalidate an unchanged owner action", async () => {
   const calls: string[] = [];
-  await assert.rejects(
-    submitOwnerAction(
-      await review(),
-      dependencies(calls, {
-        getQuote: async () => {
-          calls.push("quote");
-          return {
-            ...quote,
-            snapshot: { ...quote.snapshot, tip: { ...quote.snapshot.tip, blockNumber: "101" } },
-          };
-        },
-      }),
-    ),
-    /chain snapshot changed/,
+  const result = await submitOwnerAction(
+    await review(),
+    dependencies(calls, {
+      getQuote: async () => {
+        calls.push("quote");
+        return {
+          ...quote,
+          snapshot: { ...quote.snapshot, tip: { ...quote.snapshot.tip, blockNumber: "101" } },
+        };
+      },
+      build: async () => {
+        calls.push("build");
+        return {
+          ...artifact,
+          chainSnapshot: {
+            ...quote.snapshot,
+            tip: { ...quote.snapshot.tip, blockNumber: "101" },
+          },
+        };
+      },
+    }),
   );
-  assert.deepEqual(calls, ["job", "quote", "build"]);
+  assert.equal(result.transactionHash, HASH_A);
+  assert.deepEqual(calls, ["job", "quote", "build", "live-input", "sign", "validate", "broadcast"]);
 });
 
 test("a rejected signature never validates or broadcasts", async () => {
