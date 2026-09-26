@@ -87,6 +87,7 @@
   gap: var(--ui-space-4);
   grid-template-columns: auto minmax(0, 1fr);
   padding: var(--ui-space-5);
+  box-shadow: var(--ui-shadow-sm);
 }
 
 .nervdao-concept > svg {
@@ -136,6 +137,7 @@
   display: grid;
   gap: var(--ui-space-5);
   padding: var(--ui-space-6);
+  box-shadow: var(--ui-shadow-sm);
 }
 
 .nervdao-calculator__fields {
@@ -197,7 +199,8 @@
 
 .nervdao-return-warning {
   background: var(--ui-color-warning-bg);
-  border-block: 1px solid var(--ui-color-warning);
+  border: 1px solid color-mix(in srgb, var(--ui-color-warning) 38%, var(--ui-color-border));
+  border-radius: var(--ui-radius-lg);
   display: grid;
   gap: var(--ui-space-4);
   padding: var(--ui-space-5);
@@ -242,7 +245,9 @@
 }
 
 .nervdao-sources__list {
-  border-block: 1px solid var(--ui-color-border);
+  background: var(--ui-color-surface);
+  border: 1px solid var(--ui-color-border);
+  border-radius: var(--ui-radius-lg);
   display: grid;
 }
 
@@ -252,7 +257,7 @@
   display: flex;
   gap: var(--ui-space-4);
   justify-content: space-between;
-  padding: var(--ui-space-4) 0;
+  padding: var(--ui-space-4) var(--ui-space-5);
   text-decoration: none;
 }
 

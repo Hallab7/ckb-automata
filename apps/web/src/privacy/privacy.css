@@ -4,7 +4,7 @@
   border: 1px solid var(--ui-color-border-strong);
   border-radius: var(--ui-radius-lg);
   bottom: var(--ui-space-4);
-  box-shadow: var(--ui-shadow-lg);
+  box-shadow: var(--ui-shadow-dialog);
   display: grid;
   gap: var(--ui-space-3);
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -75,7 +75,9 @@ body:has(.analytics-consent) .app-sidebar {
 }
 
 .limitations-list {
-  border-top: 1px solid var(--ui-color-border);
+  background: var(--ui-color-surface);
+  border: 1px solid var(--ui-color-border);
+  border-radius: var(--ui-radius-lg);
 }
 
 .limitations-list > section {
@@ -84,7 +86,11 @@ body:has(.analytics-consent) .app-sidebar {
   display: grid;
   gap: var(--ui-space-4);
   grid-template-columns: 1.5rem minmax(0, 1fr);
-  padding: var(--ui-space-5) 0;
+  padding: var(--ui-space-5);
+}
+
+.limitations-list > section:last-child {
+  border-bottom: 0;
 }
 
 .limitations-list svg {

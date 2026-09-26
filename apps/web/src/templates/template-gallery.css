@@ -22,6 +22,15 @@
   gap: var(--ui-space-4);
   min-width: 0;
   padding: var(--ui-space-5);
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
+}
+
+.template-card:hover {
+  box-shadow: var(--ui-shadow-sm);
+  transform: translateY(-1px);
 }
 
 .template-card[data-capability="executable"] {
@@ -46,7 +55,7 @@
   align-items: center;
   background: var(--ui-color-surface-subtle);
   border-radius: var(--ui-radius-md);
-  color: var(--ui-color-text);
+  color: var(--ui-color-accent);
   display: inline-flex;
   flex: 0 0 auto;
   height: 2.5rem;

@@ -84,7 +84,10 @@ function ProductMark() {
       <span aria-hidden="true" className="app-brand__mark">
         <Network size={19} />
       </span>
-      <span>CKB Automata</span>
+      <span className="app-brand__copy">
+        <strong>CKB Automata</strong>
+        <small>Non-custodial automation</small>
+      </span>
     </Link>
   );
 }
@@ -171,6 +174,9 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
             <MobileNavigation />
           </div>
         </header>
+        <div className="app-mobile-wallet">
+          <WalletArea />
+        </div>
         <main className="app-main" id="main-content" tabIndex={-1}>
           <NetworkNotice />
           {children}

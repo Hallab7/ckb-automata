@@ -5,7 +5,8 @@
 .demo-boundary {
   align-items: flex-start;
   background: var(--ui-color-info-bg);
-  border-block: 1px solid var(--ui-color-info);
+  border: 1px solid color-mix(in srgb, var(--ui-color-info) 35%, var(--ui-color-border));
+  border-radius: var(--ui-radius-lg);
   color: var(--ui-color-text);
   display: flex;
   gap: var(--ui-space-3);
@@ -27,7 +28,7 @@
 }
 
 .demo-boundary span {
-  color: var(--ui-color-text-muted);
+  color: var(--ui-color-text);
   font-size: 0.8125rem;
   line-height: 1.45;
 }
@@ -40,6 +41,7 @@
 .demo-scenario-switcher {
   background: var(--ui-color-surface-subtle);
   border: 1px solid var(--ui-color-border);
+  border-radius: var(--ui-radius-lg);
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   padding: var(--ui-space-1);
@@ -55,6 +57,7 @@
   min-height: 3.25rem;
   padding: var(--ui-space-2) var(--ui-space-3);
   text-align: left;
+  border-radius: var(--ui-radius-md);
 }
 
 .demo-scenario-switcher button[aria-pressed="true"] {
@@ -88,6 +91,13 @@
   display: grid;
   gap: var(--ui-space-5);
   min-width: 0;
+}
+
+.demo-scenario {
+  background: var(--ui-color-surface);
+  border: 1px solid var(--ui-color-border);
+  border-radius: var(--ui-radius-lg);
+  padding: var(--ui-space-6);
 }
 
 .demo-guide {
@@ -193,6 +203,7 @@
 .demo-guide__step {
   background: var(--ui-color-surface-subtle);
   border-left: 3px solid var(--ui-color-info);
+  border-radius: 0 var(--ui-radius-md) var(--ui-radius-md) 0;
   display: grid;
   gap: var(--ui-space-2);
   min-height: 8rem;

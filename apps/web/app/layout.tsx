@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import "@fontsource-variable/manrope";
+import "@fontsource/ibm-plex-mono/500.css";
+import "@fontsource/ibm-plex-mono/600.css";
+
 import { CccProvider } from "../src/ccc/ccc-provider.tsx";
 import { AnalyticsConsent } from "../src/privacy/analytics-consent.tsx";
 

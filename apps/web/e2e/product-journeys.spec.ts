@@ -16,7 +16,7 @@ test("completes both deterministic setup journeys", async ({ page }) => {
       field: "Deadline automation name",
       name: "Milestone release",
       path: "/fixtures/setup-deadline",
-      title: "Deadline finalization",
+      title: "Scheduled payment",
     },
     {
       field: "Recurring automation name",

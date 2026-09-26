@@ -22,24 +22,24 @@
 }
 
 .app-sidebar {
-  background: var(--ui-color-surface);
-  border-right: 1px solid var(--ui-color-border);
+  background: #12271f;
+  border-right: 0;
   display: flex;
   flex-direction: column;
   gap: var(--ui-space-5);
   height: 100dvh;
   overflow-y: auto;
-  padding: var(--ui-space-5) var(--ui-space-4);
+  padding: var(--ui-space-6) var(--ui-space-4) var(--ui-space-5);
   position: sticky;
   top: 0;
 }
 
 .app-brand {
   align-items: center;
-  color: var(--ui-color-text);
+  color: #f2f7f4;
   display: inline-flex;
   font-size: 1rem;
-  font-weight: 760;
+  font-weight: 800;
   gap: var(--ui-space-3);
   line-height: 1.2;
   min-width: 0;
@@ -48,25 +48,42 @@
 
 .app-brand__mark {
   align-items: center;
-  background: var(--ui-color-text);
+  background: var(--ui-color-accent);
   border-radius: var(--ui-radius-md);
   color: #ffffff;
   display: inline-flex;
   flex: 0 0 auto;
-  height: 2rem;
+  height: 2.125rem;
   justify-content: center;
-  width: 2rem;
+  width: 2.125rem;
+}
+
+.app-brand__copy {
+  display: grid;
+  min-width: 0;
+}
+
+.app-brand__copy strong {
+  font-size: 0.9375rem;
+  line-height: 1.2;
+}
+
+.app-brand__copy small {
+  color: #8ca79a;
+  font-size: 0.625rem;
+  font-weight: 600;
+  margin-top: 0.2rem;
 }
 
 .app-network-badge {
   align-items: center;
-  background: var(--ui-color-warning-bg);
-  border: 1px solid var(--ui-color-warning);
+  background: rgb(225 180 87 / 10%);
+  border: 1px solid rgb(225 180 87 / 26%);
   border-radius: 999px;
-  color: var(--ui-color-warning);
+  color: #f0d28e;
   display: inline-flex;
   font-size: 0.75rem;
-  font-weight: 750;
+  font-weight: 800;
   gap: var(--ui-space-2);
   line-height: 1;
   min-height: 1.75rem;
@@ -82,9 +99,9 @@
 }
 
 .app-network-badge[data-mode="demo"] {
-  background: var(--ui-color-info-bg);
-  border-color: var(--ui-color-info);
-  color: var(--ui-color-info);
+  background: rgb(102 183 198 / 12%);
+  border-color: rgb(102 183 198 / 28%);
+  color: #9ed6df;
 }
 
 .app-network-badge[data-mode="demo"] .app-network-badge__dot {
@@ -102,14 +119,14 @@
 }
 
 .app-nav__divider {
-  border-top: 1px solid var(--ui-color-border);
+  border-top: 1px solid rgb(255 255 255 / 10%);
   margin: var(--ui-space-3) 0;
 }
 
 .app-nav__link {
   align-items: center;
   border-radius: var(--ui-radius-md);
-  color: var(--ui-color-text-muted);
+  color: #abc0b6;
   display: flex;
   font-size: 0.875rem;
   font-weight: 650;
@@ -121,18 +138,19 @@
 }
 
 .app-nav__link:hover {
-  background: var(--ui-color-surface-subtle);
-  color: var(--ui-color-text);
+  background: rgb(255 255 255 / 6%);
+  color: #ffffff;
 }
 
 .app-nav__link[aria-current="page"] {
-  background: var(--ui-color-info-bg);
-  color: var(--ui-color-info);
+  background: #1a392e;
+  box-shadow: inset 3px 0 #38b991;
+  color: #ffffff;
 }
 
 .app-wallet-control {
-  border-top: 1px solid var(--ui-color-border);
-  color: var(--ui-color-text-muted);
+  border-top: 1px solid rgb(255 255 255 / 12%);
+  color: #9db3a8;
   display: grid;
   gap: var(--ui-space-2);
   margin-top: auto;
@@ -162,8 +180,8 @@
   font-size: 0.75rem;
 }
 
-.app-wallet-control strong {
-  color: var(--ui-color-text);
+.app-sidebar .app-wallet-control strong {
+  color: #edf5f1;
   font-size: 0.875rem;
   overflow-wrap: anywhere;
 }
@@ -181,6 +199,17 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.app-sidebar .app-wallet-control .ui-icon-button,
+.app-sidebar .app-wallet-control .ui-button--ghost {
+  color: #b5c8bf;
+}
+
+.app-sidebar .app-wallet-control .ui-button--secondary {
+  background: rgb(255 255 255 / 7%);
+  border-color: rgb(255 255 255 / 18%);
+  color: #f1f6f3;
 }
 
 .app-wallet-control__address .ui-icon-button {
@@ -202,8 +231,8 @@
 }
 
 .app-wallet-control--demo {
-  background: var(--ui-color-info-bg);
-  border-color: var(--ui-color-info);
+  background: rgb(102 183 198 / 8%);
+  border-color: rgb(102 183 198 / 24%);
 }
 
 .app-wallet-control--disconnected > .ui-button,
@@ -227,7 +256,7 @@
   margin: 0 auto;
   max-width: var(--ui-content-max);
   min-width: 0;
-  padding: var(--ui-space-8);
+  padding: var(--ui-space-8) clamp(var(--ui-space-6), 3vw, var(--ui-space-10));
   width: 100%;
 }
 
@@ -235,9 +264,13 @@
   display: none;
 }
 
+.app-mobile-wallet {
+  display: none;
+}
+
 .app-page {
   display: grid;
-  gap: var(--ui-space-8);
+  gap: var(--ui-space-6);
   min-width: 0;
 }
 
@@ -255,14 +288,16 @@
 
 .app-page-header h1,
 .app-page > h1 {
-  font-size: 1.75rem;
-  line-height: 1.25;
+  font-size: 1.875rem;
+  font-weight: 800;
+  line-height: 1.2;
   margin: 0;
 }
 
 .app-page-header p {
   color: var(--ui-color-text-muted);
   line-height: 1.5;
+  font-size: 0.875rem;
   margin: var(--ui-space-2) 0 0;
 }
 
@@ -401,16 +436,84 @@
 
   .app-mobile-header {
     align-items: center;
-    background: var(--ui-color-surface);
-    border-bottom: 1px solid var(--ui-color-border);
+    background: #12271f;
+    border-bottom: 1px solid rgb(255 255 255 / 9%);
     display: flex;
     gap: var(--ui-space-4);
     justify-content: space-between;
-    min-height: 4rem;
+    min-height: 4.25rem;
     padding: var(--ui-space-2) var(--ui-space-5);
     position: sticky;
     top: 0;
     z-index: 40;
+  }
+
+  .app-mobile-header .app-network-badge {
+    margin: 0;
+  }
+
+  .app-mobile-header .app-mobile-menu-button {
+    background: rgb(255 255 255 / 6%);
+    border-color: rgb(255 255 255 / 16%);
+    color: #f3f8f5;
+  }
+
+  .app-mobile-wallet {
+    background: var(--ui-color-surface);
+    border-bottom: 1px solid var(--ui-color-border);
+    display: block;
+  }
+
+  .app-mobile-wallet .app-wallet-control {
+    align-items: center;
+    border: 0;
+    display: flex;
+    gap: var(--ui-space-3);
+    margin: 0;
+    min-height: 3.25rem;
+    padding: var(--ui-space-2) var(--ui-space-5);
+  }
+
+  .app-mobile-wallet .app-wallet-control__heading {
+    flex: 0 0 auto;
+  }
+
+  .app-mobile-wallet .app-wallet-control__heading > svg,
+  .app-mobile-wallet .app-wallet-control__heading > .ui-icon-button,
+  .app-mobile-wallet .app-wallet-control__label,
+  .app-mobile-wallet .app-wallet-control__address .ui-icon-button,
+  .app-mobile-wallet .app-wallet-control__address a,
+  .app-mobile-wallet .app-wallet-control__footer strong,
+  .app-mobile-wallet .app-wallet-control > p {
+    display: none;
+  }
+
+  .app-mobile-wallet .app-wallet-control__address {
+    min-width: 0;
+  }
+
+  .app-mobile-wallet .app-wallet-control__address code,
+  .app-mobile-wallet .app-wallet-control__footer {
+    font-size: 0.6875rem;
+  }
+
+  .app-mobile-wallet .app-wallet-control strong {
+    color: var(--ui-color-text);
+  }
+
+  .app-mobile-wallet .app-wallet-control__footer {
+    margin-left: auto;
+  }
+
+  .app-mobile-wallet .app-wallet-control--disconnected,
+  .app-mobile-wallet .app-wallet-control--warning {
+    align-items: stretch;
+    display: grid;
+  }
+
+  .app-mobile-wallet .app-wallet-control--disconnected > strong {
+    color: var(--ui-color-text-muted);
+    font-size: 0.6875rem;
   }
 
   .app-mobile-header__actions {
@@ -444,7 +547,7 @@
   }
 
   .app-main {
-    padding: var(--ui-space-5) var(--ui-space-4);
+    padding: var(--ui-space-5) var(--ui-space-4) var(--ui-space-8);
   }
 
   .app-page {
@@ -459,12 +562,15 @@
 
   .app-page-header h1,
   .app-page > h1 {
-    font-size: 1.5rem;
+    font-size: 1.625rem;
   }
 
   .app-page-header__actions,
-  .app-page-header__actions > *,
-  .app-page-header__actions .ui-button {
+  .app-page-header__actions > * {
+    width: auto;
+  }
+
+  .app-page-header__actions {
     width: 100%;
   }
 

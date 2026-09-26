@@ -1,25 +1,27 @@
 :root {
   color-scheme: light;
-  --ui-color-canvas: #f4f6f8;
+  --ui-color-canvas: #f3f5f0;
   --ui-color-surface: #ffffff;
-  --ui-color-surface-subtle: #eef1f4;
+  --ui-color-surface-subtle: #f7f9f6;
   --ui-color-surface-raised: #ffffff;
-  --ui-color-border: #cbd2d9;
-  --ui-color-border-strong: #87929d;
-  --ui-color-text: #17212b;
-  --ui-color-text-muted: #586573;
-  --ui-color-accent: #0b6bcb;
-  --ui-color-accent-hover: #0759aa;
-  --ui-color-focus: #006adc;
-  --ui-color-success: #147d52;
-  --ui-color-success-bg: #e6f6ed;
-  --ui-color-warning: #8a5700;
-  --ui-color-warning-bg: #fff3cd;
-  --ui-color-danger: #b42318;
-  --ui-color-danger-bg: #feeceb;
-  --ui-color-info: #126782;
-  --ui-color-info-bg: #e5f4f8;
-  --ui-shadow-dialog: 0 18px 48px rgb(23 33 43 / 22%);
+  --ui-color-border: #dbe2dc;
+  --ui-color-border-strong: #b8c4bc;
+  --ui-color-text: #17211e;
+  --ui-color-text-muted: #66736d;
+  --ui-color-accent: #0b7459;
+  --ui-color-accent-hover: #085f4a;
+  --ui-color-focus: #11886b;
+  --ui-color-success: #087354;
+  --ui-color-success-bg: #dff3e9;
+  --ui-color-warning: #8a5b07;
+  --ui-color-warning-bg: #fff1cb;
+  --ui-color-danger: #aa3f35;
+  --ui-color-danger-bg: #fdeae7;
+  --ui-color-info: #316b76;
+  --ui-color-info-bg: #e4f1f3;
+  --ui-shadow-sm: 0 1px 3px rgb(20 40 32 / 10%);
+  --ui-shadow-dialog: 0 24px 64px rgb(20 40 32 / 22%);
+  --ui-focus-ring: 3px solid color-mix(in srgb, var(--ui-color-focus) 35%, transparent);
   --ui-space-1: 0.25rem;
   --ui-space-2: 0.5rem;
   --ui-space-3: 0.75rem;
@@ -34,9 +36,8 @@
   --ui-control-height: 2.5rem;
   --ui-content-max: 80rem;
   --ui-drawer-width: 30rem;
-  --ui-font-sans:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --ui-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --ui-font-sans: "Manrope Variable", ui-sans-serif, system-ui, sans-serif;
+  --ui-font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
 }
 
 *,
@@ -50,11 +51,13 @@ html {
   color: var(--ui-color-text);
   font-family: var(--ui-font-sans);
   letter-spacing: 0;
+  text-rendering: optimizeLegibility;
 }
 
 body {
   margin: 0;
   min-width: 20rem;
+  -webkit-font-smoothing: antialiased;
 }
 
 button,
@@ -78,7 +81,7 @@ textarea {
   cursor: pointer;
   display: inline-flex;
   flex: 0 0 auto;
-  font-weight: 650;
+  font-weight: 750;
   justify-content: center;
   transition:
     background-color 120ms ease,
@@ -104,6 +107,7 @@ textarea {
 .ui-button--primary {
   background: var(--ui-color-accent);
   color: #ffffff;
+  box-shadow: 0 3px 8px rgb(11 116 89 / 16%);
 }
 
 .ui-button--primary:hover {
@@ -114,6 +118,11 @@ textarea {
   background: var(--ui-color-surface);
   border-color: var(--ui-color-border);
   color: var(--ui-color-text);
+}
+
+.ui-button--secondary,
+.ui-icon-button--secondary {
+  box-shadow: 0 1px 2px rgb(20 40 32 / 4%);
 }
 
 .ui-button--secondary:hover,
@@ -175,7 +184,7 @@ textarea {
   border: 1px solid var(--ui-color-border);
   border-radius: var(--ui-radius-lg);
   min-width: 0;
-  padding: var(--ui-space-5);
+  padding: var(--ui-space-6);
 }
 
 .ui-code-value {
@@ -191,11 +200,11 @@ textarea {
 
 .ui-status {
   align-items: center;
-  border: 1px solid currentColor;
+  border: 1px solid transparent;
   border-radius: 999px;
   display: inline-flex;
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 800;
   gap: 0.35rem;
   line-height: 1.25;
   max-width: 100%;
@@ -234,7 +243,7 @@ textarea {
 
 .ui-notice {
   align-items: flex-start;
-  border: 1px solid currentColor;
+  border: 1px solid color-mix(in srgb, currentColor 32%, var(--ui-color-border));
   border-radius: var(--ui-radius-md);
   display: grid;
   gap: var(--ui-space-3);
@@ -277,7 +286,7 @@ textarea {
 .ui-checkbox__label {
   color: var(--ui-color-text);
   font-size: 0.875rem;
-  font-weight: 650;
+  font-weight: 700;
 }
 
 .ui-field__hint,
@@ -303,6 +312,23 @@ textarea {
   color: var(--ui-color-text);
   min-width: 0;
   width: 100%;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.ui-input:hover,
+.ui-select:hover,
+.ui-textarea:hover {
+  border-color: color-mix(in srgb, var(--ui-color-accent) 36%, var(--ui-color-border-strong));
+}
+
+.ui-input:focus,
+.ui-select:focus,
+.ui-textarea:focus {
+  border-color: var(--ui-color-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-color-focus) 12%, transparent);
+  outline: 0;
 }
 
 .ui-input,
@@ -361,7 +387,7 @@ textarea {
 
 .ui-input::placeholder,
 .ui-textarea::placeholder {
-  color: #6f7b86;
+  color: #7d8983;
 }
 
 .ui-field[data-invalid="true"] :where(.ui-input, .ui-select, .ui-textarea) {
@@ -456,7 +482,8 @@ textarea {
   background: var(--ui-color-surface-subtle);
   color: var(--ui-color-text-muted);
   font-size: 0.75rem;
-  font-weight: 750;
+  font-weight: 800;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
