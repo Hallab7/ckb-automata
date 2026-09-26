@@ -15,7 +15,7 @@ export const TEMPLATE_CATALOG: readonly TemplateCatalogItem[] = Object.freeze([
   Object.freeze({
     action: Object.freeze({ href: "/automations/new/deadline", label: "Start setup" }),
     approval:
-      "The owner wallet signs creation. An executor may finalize only after the committed block.",
+      "The owner wallet signs creation. The automation can process only after the scheduled time.",
     capability: "executable",
     description: "Finalize a test campaign into its committed release or refund outcome.",
     id: "deadline",
@@ -28,7 +28,7 @@ export const TEMPLATE_CATALOG: readonly TemplateCatalogItem[] = Object.freeze([
     approval:
       "The owner wallet signs once. Each run pays only the committed recipient and executor.",
     capability: "executable",
-    description: "Pay one fixed recipient on a block interval for a bounded number of runs.",
+    description: "Pay one fixed recipient on a time interval for a chosen number of runs.",
     id: "recurring",
     name: "Recurring distribution",
     recoverability: "The owner may cancel a live job or recover a stalled or unsupported job.",

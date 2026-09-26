@@ -1,6 +1,12 @@
 import type { ApiJobList } from "@ckb-automata/api-client";
 
 import { formatCkbBalance } from "../ccc/wallet-display.ts";
+import {
+  estimateBlockDate,
+  formatBlockDate,
+  formatBlockDuration,
+  formatDateTime,
+} from "../time/chain-time.ts";
 
 export type DashboardJob = ApiJobList["items"][number];
 export interface RecipientAmounts {
@@ -9,14 +15,16 @@ export interface RecipientAmounts {
 }
 export type RecipientAmountsByJob = Readonly<Record<string, RecipientAmounts | null>>;
 export type DashboardStatus =
-  "completed" | "eligible" | "needs_funding" | "recovery_required" | "reorged" | "waiting";
+  "completed" | "needs_funding" | "processing" | "recovery_required" | "reorged" | "waiting";
 
 export interface DashboardJobPresentation {
   readonly recipientAmount: string;
   readonly nextAction: string;
-  readonly nextEligibility: string;
+  readonly nextSchedule: string;
   readonly runsRemaining: string;
+  readonly scheduledAt?: string;
   readonly status: DashboardStatus;
+  readonly timeRemaining: string;
 }
 
 export interface DashboardSummary {
@@ -27,14 +35,11 @@ export interface DashboardSummary {
   readonly total: number;
 }
 
-function blockLabel(value: bigint): string {
-  return `Block #${value.toLocaleString("en-US")}`;
-}
-
 export function dashboardJobPresentation(
   job: DashboardJob,
   checkpointBlock: string | undefined,
   recipientAmounts: RecipientAmounts | null | undefined,
+  checkpointAt = job.updatedAt,
 ): DashboardJobPresentation {
   const formattedRecipientAmount =
     recipientAmounts === undefined
@@ -42,61 +47,80 @@ export function dashboardJobPresentation(
       : recipientAmounts === null
         ? "Unavailable"
         : formatCkbBalance(BigInt(recipientAmounts.perExecution));
+  const checkpoint = checkpointBlock === undefined ? undefined : BigInt(checkpointBlock);
+  const notBefore = BigInt(job.trigger.notBefore);
+  const notAfter = BigInt(job.trigger.notAfter);
+  const scheduledAt =
+    checkpoint === undefined
+      ? undefined
+      : estimateBlockDate(notBefore, checkpoint, checkpointAt)?.toISOString();
   if (job.state === "orphaned") {
     return {
       recipientAmount: formattedRecipientAmount,
       nextAction: "Wait for canonical replay",
-      nextEligibility: "Canonical status pending",
+      nextSchedule: "Schedule being rechecked",
       runsRemaining: job.remainingRuns,
+      ...(scheduledAt === undefined ? {} : { scheduledAt }),
       status: "reorged",
+      timeRemaining: "Rechecking",
     };
   }
   if (job.state === "spent") {
     return {
       recipientAmount: formattedRecipientAmount,
       nextAction: "Review execution history",
-      nextEligibility: "No further execution",
+      nextSchedule: `Completed ${formatDateTime(job.updatedAt)}`,
       runsRemaining: "0",
+      ...(scheduledAt === undefined ? {} : { scheduledAt }),
       status: "completed",
+      timeRemaining: "Complete",
     };
   }
 
-  const checkpoint = checkpointBlock === undefined ? undefined : BigInt(checkpointBlock);
-  const notBefore = BigInt(job.trigger.notBefore);
-  const notAfter = BigInt(job.trigger.notAfter);
   const remainingBudget = BigInt(job.funds.remainingBudget);
   const reward = BigInt(job.funds.executorReward);
   let status: DashboardStatus;
   let nextAction: string;
-  let nextEligibility: string;
+  let nextSchedule: string;
+  let timeRemaining: string;
 
   if (checkpoint !== undefined && notAfter !== 0n && checkpoint > notAfter) {
     status = "recovery_required";
     nextAction = "Recover remaining funds";
-    nextEligibility = "Execution window closed";
+    nextSchedule = "Scheduled window ended";
+    timeRemaining = "Action needed";
   } else if (remainingBudget < reward) {
     status = "needs_funding";
     nextAction = "Top up executor budget";
-    nextEligibility = "Blocked by funding";
+    nextSchedule = "Payment needs service funds";
+    timeRemaining = "Action needed";
   } else if (checkpoint !== undefined && checkpoint >= notBefore) {
-    status = "eligible";
-    nextAction = "Monitor executor submission";
-    nextEligibility = `Eligible at ${blockLabel(notBefore)}`;
+    status = "processing";
+    nextAction = "Payment execution is in progress";
+    nextSchedule =
+      scheduledAt === undefined
+        ? "Processing now"
+        : `Processing since ${formatBlockDate(notBefore, checkpoint, checkpointAt)}`;
+    timeRemaining = "Now";
   } else {
     status = "waiting";
-    nextAction = "Wait for chain eligibility";
-    nextEligibility =
+    nextAction = "Waiting for the scheduled time";
+    nextSchedule =
       checkpoint === undefined
-        ? blockLabel(notBefore)
-        : `${blockLabel(notBefore)} (${(notBefore - checkpoint).toLocaleString("en-US")} blocks)`;
+        ? "Schedule time syncing"
+        : formatBlockDate(notBefore, checkpoint, checkpointAt);
+    timeRemaining =
+      checkpoint === undefined ? "Syncing" : formatBlockDuration(notBefore - checkpoint);
   }
 
   return {
     recipientAmount: formattedRecipientAmount,
     nextAction,
-    nextEligibility,
+    nextSchedule,
     runsRemaining: job.remainingRuns,
+    ...(scheduledAt === undefined ? {} : { scheduledAt }),
     status,
+    timeRemaining,
   };
 }
 

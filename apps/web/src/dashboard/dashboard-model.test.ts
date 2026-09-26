@@ -44,7 +44,7 @@ function job(state: DashboardJob["state"], overrides: Partial<DashboardJob> = {}
 test("dashboard derives every lifecycle and operational status from canonical reads", () => {
   const amounts = { perExecution: "10000000000", total: "30000000000" };
   assert.equal(dashboardJobPresentation(job("live"), "100", amounts).status, "waiting");
-  assert.equal(dashboardJobPresentation(job("live"), "110", amounts).status, "eligible");
+  assert.equal(dashboardJobPresentation(job("live"), "110", amounts).status, "processing");
   assert.equal(
     dashboardJobPresentation(
       job("live", {

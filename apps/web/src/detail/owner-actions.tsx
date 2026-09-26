@@ -142,7 +142,7 @@ function ReviewFacts({ review }: Readonly<{ review: OwnerActionReview }>) {
       </div>
       <div>
         <dt>Snapshot</dt>
-        <dd>Block #{BigInt(review.snapshot.blockNumber).toLocaleString("en-US")}</dd>
+        <dd>Latest testnet state</dd>
       </div>
       {maximumFee === undefined ? null : (
         <div>

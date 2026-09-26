@@ -9,14 +9,13 @@ const MODEL: CreationReviewModel = Object.freeze({
   jobId: HASH_A,
   operation: "create_recurring_job",
   title: "Recurring distribution",
-  summary: "100 CKB will be available to the fixed recipient on each of 3 eligible runs.",
+  summary: "100 CKB will be available to the fixed recipient on each of 3 scheduled runs.",
   network: "ckb_testnet",
   snapshotBlock: "14999940",
   snapshotHash: HASH_A,
   genesisHash: HASH_B,
   manifestSha256: "33".repeat(32),
-  timing:
-    "Earliest at block 15000000, roughly 10 minutes after the API snapshot if blocks average 10 seconds. Actual block timing varies.",
+  timing: "Expected in about 10 minutes. Network timing can vary slightly.",
   amounts: Object.freeze([
     { label: "Payment per run", value: "100 CKB" },
     { label: "Executions", value: "3" },
@@ -32,13 +31,13 @@ const MODEL: CreationReviewModel = Object.freeze({
   immutableTerms: Object.freeze([
     `Recipient lock ${HASH_A}`,
     "10000000000 shannons per run for 3 runs",
-    "First block 15000000, every 100 blocks",
+    "First payment expected in about 10 minutes. Repeats about every 17 minutes.",
     "6100000000 shannons executor reward per run",
     `Owner and final refund lock ${HASH_B}`,
   ]),
   warnings: Object.freeze([
     "This transaction is for a non-mainnet deployment.",
-    "Block estimates are approximate; eligibility does not guarantee immediate execution or confirmation.",
+    "Schedule times are approximate; processing does not guarantee immediate confirmation.",
     "Changing any input, committed output, policy payload, fee, or change requires a new review.",
   ]),
   intentHash: HASH_A,

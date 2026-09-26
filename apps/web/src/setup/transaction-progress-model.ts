@@ -30,7 +30,7 @@ const TRANSACTION_PROGRESS_PRESENTATIONS = {
   },
   proposed: {
     title: "Proposed",
-    detail: "The transaction is in the proposal window and is waiting for block inclusion.",
+    detail: "The transaction is in the proposal window and is waiting for chain confirmation.",
     tone: "neutral",
   },
   committed: {

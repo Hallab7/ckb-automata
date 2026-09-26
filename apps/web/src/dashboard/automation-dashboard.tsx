@@ -58,6 +58,7 @@ export function AutomationDashboard() {
   const [templateFilter, setTemplateFilter] = useState("");
   const [items, setItems] = useState<ApiJobList["items"]>([]);
   const [recipientAmounts, setRecipientAmounts] = useState<RecipientAmountsByJob>({});
+  const [checkpointAt, setCheckpointAt] = useState<string>();
   const [checkpointBlock, setCheckpointBlock] = useState<string>();
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<DashboardLoadState>("loading");
@@ -115,6 +116,7 @@ export function AutomationDashboard() {
     setError(undefined);
     setItems([]);
     setRecipientAmounts({});
+    setCheckpointAt(undefined);
     setCheckpointBlock(undefined);
     setNextCursor(null);
     setLoadState("loading");
@@ -126,6 +128,7 @@ export function AutomationDashboard() {
       .then((response) => {
         if (!active) return;
         setItems(response.items);
+        setCheckpointAt(new Date().toISOString());
         setCheckpointBlock(response.indexCheckpoint?.blockNumber);
         setNextCursor(response.page.nextCursor);
         setLoadState("ready");
@@ -163,6 +166,7 @@ export function AutomationDashboard() {
     void request
       .then((response) => {
         setItems((current) => [...current, ...response.items]);
+        setCheckpointAt(new Date().toISOString());
         setCheckpointBlock(response.indexCheckpoint?.blockNumber);
         setNextCursor(response.page.nextCursor);
         void loadRecipientAmounts(apiResult.api!, response.items).then((amounts) => {
@@ -178,6 +182,7 @@ export function AutomationDashboard() {
 
   return (
     <AutomationDashboardView
+      checkpointAt={checkpointAt}
       checkpointBlock={checkpointBlock}
       dataSourceLabel={LIVE_DATA_LABEL}
       error={error}

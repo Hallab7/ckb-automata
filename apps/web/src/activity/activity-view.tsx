@@ -65,13 +65,13 @@ function ActivityItem({ event }: Readonly<{ event: ActivityEvent }>) {
           <dd>{activityOutcome(event).replaceAll("_", " ")}</dd>
         </div>
         <div>
-          <dt>Block reference</dt>
+          <dt>Confirmation time</dt>
           <dd>
             {event.block === null ? (
-              "No canonical block"
+              "Not confirmed yet"
             ) : (
               <a href={ckbTestnetBlockUrl(event.block.number)} rel="noreferrer" target="_blank">
-                #{BigInt(event.block.number).toLocaleString("en-US")}
+                {formatDate(event.occurredAt)} UTC
                 <ExternalLink aria-hidden="true" size={13} />
               </a>
             )}
@@ -156,7 +156,7 @@ export function ActivityView({
           <p>
             {checkpointBlock === undefined
               ? "Transaction and execution evidence"
-              : `Canonical through block #${BigInt(checkpointBlock).toLocaleString("en-US")}`}
+              : "Live testnet activity shown in readable UTC time"}
           </p>
         </div>
       </header>
@@ -189,7 +189,7 @@ export function ActivityView({
 
       <InlineNotice title="Evidence remains separate" tone="info">
         <p>
-          Operational attempts describe executor activity. Only indexed events with block references
+          Operational attempts describe executor activity. Only indexed events with confirmed times
           describe canonical chain results.
         </p>
       </InlineNotice>

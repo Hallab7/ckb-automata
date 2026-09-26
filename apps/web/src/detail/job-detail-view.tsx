@@ -12,11 +12,11 @@ import {
   ExternalLink,
   FileCheck2,
   History,
+  LoaderCircle,
   RefreshCw,
   RotateCcw,
   ShieldAlert,
   TriangleAlert,
-  Zap,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -27,9 +27,11 @@ import { CANONICAL_TRANSACTION_STATES, type CanonicalTransactionState } from "@c
 import { Amount, Button, InlineNotice, StatusBadge } from "@ckb-automata/ui";
 
 import { ckbTestnetBlockUrl, ckbTestnetTransactionUrl } from "../ccc/wallet-display.ts";
+import { formatDateTime } from "../time/chain-time.ts";
 import {
   eventLabel,
   jobDetailPresentation,
+  jobScheduleDate,
   type DetailEvent,
   type JobDetailStatus,
 } from "./job-detail-model.ts";
@@ -46,7 +48,7 @@ const detailStatuses: Readonly<Record<JobDetailStatus, DetailStatusPresentation>
   completed: { icon: CheckCircle2, tone: "neutral" },
   conflicted: { icon: ShieldAlert, tone: "danger" },
   dropped: { icon: CircleX, tone: "danger" },
-  eligible: { icon: Zap, tone: "success" },
+  processing: { icon: LoaderCircle, tone: "success" },
   needs_funding: { icon: CircleDollarSign, tone: "warning" },
   recovery_required: { icon: ShieldAlert, tone: "danger" },
   reorged: { icon: RotateCcw, tone: "warning" },
@@ -119,7 +121,7 @@ function EventTimelineItem({ event }: Readonly<{ event: DetailEvent }>) {
         ) : (
           <div className="job-event__links">
             <ExplorerLink href={ckbTestnetBlockUrl(event.block.number)}>
-              Block #{BigInt(event.block.number).toLocaleString("en-US")}
+              Confirmed {formatDateTime(event.occurredAt)}
             </ExplorerLink>
             <ExplorerLink href={ckbTestnetTransactionUrl(event.block.transactionHash)}>
               Transaction
@@ -216,6 +218,7 @@ function LoadingDetail() {
 
 export interface JobDetailViewProperties {
   readonly automationTitle?: string;
+  readonly checkpointAt?: string;
   readonly error?: string;
   readonly events: ApiJobEvents["items"];
   readonly hasNextPage?: boolean;
@@ -230,6 +233,7 @@ export interface JobDetailViewProperties {
 
 export function JobDetailView({
   automationTitle,
+  checkpointAt,
   error,
   events,
   hasNextPage = false,
@@ -271,7 +275,7 @@ export function JobDetailView({
     );
   }
 
-  const presentation = jobDetailPresentation(job, events, recipientAmount);
+  const presentation = jobDetailPresentation(job, events, recipientAmount, checkpointAt);
   return (
     <article className="app-page job-detail" aria-labelledby="job-detail-title">
       <header className="job-detail__header">
@@ -323,19 +327,19 @@ export function JobDetailView({
               <dd>{presentation.policyName}</dd>
             </div>
             <div>
-              <dt>Trigger metric</dt>
-              <dd>{job.trigger.metric}</dd>
+              <dt>Schedule type</dt>
+              <dd>{job.trigger.metric === "block" ? "Date and time" : job.trigger.metric}</dd>
             </div>
             <div>
-              <dt>Not before</dt>
-              <dd>Block #{BigInt(job.trigger.notBefore).toLocaleString("en-US")}</dd>
+              <dt>Scheduled for</dt>
+              <dd>{jobScheduleDate(job, job.trigger.notBefore, checkpointAt)}</dd>
             </div>
             <div>
-              <dt>Not after</dt>
+              <dt>Schedule ends</dt>
               <dd>
                 {job.trigger.notAfter === "0"
-                  ? "No upper bound"
-                  : `Block #${BigInt(job.trigger.notAfter).toLocaleString("en-US")}`}
+                  ? "No end date"
+                  : jobScheduleDate(job, job.trigger.notAfter, checkpointAt)}
               </dd>
             </div>
           </dl>
@@ -382,8 +386,8 @@ export function JobDetailView({
           <h2 id="timeline-heading">Event timeline</h2>
           <p>
             {job.source.indexCheckpoint === null
-              ? "Indexer checkpoint unavailable"
-              : `Canonical through block #${BigInt(job.source.indexCheckpoint.blockNumber).toLocaleString("en-US")}`}
+              ? "Latest sync time unavailable"
+              : `Updated ${formatDateTime(job.updatedAt)}`}
           </p>
         </div>
         {error === undefined ? null : (
@@ -445,7 +449,7 @@ export function JobDetailView({
             <dd>{job.protocol.rawData}</dd>
           </div>
           <div>
-            <dt>Source block hash</dt>
+            <dt>Source confirmation hash</dt>
             <dd>{job.source.block.hash}</dd>
           </div>
           <div>

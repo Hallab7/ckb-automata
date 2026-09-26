@@ -205,15 +205,46 @@
   margin-top: var(--ui-space-4);
 }
 
-.automation-next__icon {
+.automation-date-tile {
   align-items: center;
-  background: #12271f;
+  background: #f0f4f0;
+  border: 1px solid #dfe5df;
   border-radius: var(--ui-radius-md);
-  color: #ffffff;
-  display: inline-flex;
-  height: 3.5rem;
+  color: var(--ui-color-text);
+  display: inline-grid;
+  height: 2.5rem;
   justify-content: center;
+  line-height: 1;
+  text-align: center;
+  width: 2.5rem;
+}
+
+.automation-date-tile small {
+  color: var(--ui-color-text-muted);
+  font-size: 0.5rem;
+  font-weight: 800;
+}
+
+.automation-date-tile strong {
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.automation-date-tile--large {
+  background: #12271f;
+  border-color: #12271f;
+  color: #ffffff;
+  height: 3.5rem;
   width: 3.5rem;
+}
+
+.automation-date-tile--large small {
+  color: #b8cdc3;
+}
+
+.automation-date-tile--large strong {
+  color: #ffffff;
+  font-size: 1.125rem;
 }
 
 .automation-next h2,
@@ -393,15 +424,7 @@
 }
 
 .automation-row__template {
-  align-items: center;
-  background: #f0f4f0;
-  border: 1px solid #dfe5df;
-  border-radius: var(--ui-radius-md);
-  color: #405049;
-  display: inline-flex;
-  height: 2.5rem;
-  justify-content: center;
-  width: 2.5rem;
+  justify-self: start;
 }
 
 .automation-row__identity,
@@ -650,7 +673,7 @@
     gap: var(--ui-space-3);
   }
 
-  .automation-next__icon {
+  .automation-date-tile--large {
     height: 3rem;
     width: 3rem;
   }

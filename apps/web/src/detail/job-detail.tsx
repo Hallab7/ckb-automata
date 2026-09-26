@@ -53,6 +53,7 @@ export function AutomationDetail({ jobId }: Readonly<{ jobId: string }>) {
   const [error, setError] = useState<string>();
   const [refreshKey, setRefreshKey] = useState(0);
   const [automationTitle, setAutomationTitle] = useState<string>();
+  const [checkpointAt, setCheckpointAt] = useState<string>();
 
   useEffect(() => {
     setAutomationTitle(readAutomationTitles(window.localStorage)[jobId]);
@@ -66,6 +67,7 @@ export function AutomationDetail({ jobId }: Readonly<{ jobId: string }>) {
         api.getJobTerms(jobId).catch(() => undefined),
       ]);
       setJob(nextJob);
+      setCheckpointAt(new Date().toISOString());
       setEvents(timeline.items);
       setNextCursor(timeline.page.nextCursor);
       setTerms(nextTerms);
@@ -112,6 +114,7 @@ export function AutomationDetail({ jobId }: Readonly<{ jobId: string }>) {
         ]);
         if (stopped) return;
         setJob(nextJob);
+        setCheckpointAt(new Date().toISOString());
         setEvents((current) => mergeTimeline(current, timeline.items));
         setTerms(nextTerms);
       } catch {
@@ -144,7 +147,10 @@ export function AutomationDetail({ jobId }: Readonly<{ jobId: string }>) {
       void apiResult
         .api!.getJob(jobId)
         .then((nextJob) => {
-          if (!stopped) setJob(nextJob);
+          if (!stopped) {
+            setJob(nextJob);
+            setCheckpointAt(new Date().toISOString());
+          }
         })
         .catch(() => {
           source.close();
@@ -180,6 +186,7 @@ export function AutomationDetail({ jobId }: Readonly<{ jobId: string }>) {
   return (
     <JobDetailView
       {...(automationTitle === undefined ? {} : { automationTitle })}
+      {...(checkpointAt === undefined ? {} : { checkpointAt })}
       {...(error === undefined ? {} : { error })}
       events={events}
       hasNextPage={nextCursor !== null}

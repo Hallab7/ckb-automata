@@ -101,6 +101,7 @@ export function AutomationDashboardFixture() {
         ))}
       </div>
       <AutomationDashboardView
+        checkpointAt="2026-09-23T00:00:00.000Z"
         checkpointBlock={fixtureState === "ready" ? CHECKPOINT_BLOCK : undefined}
         error={loadState === "error" ? "Fixture API outage" : undefined}
         hasNextPage={loadState === "ready"}

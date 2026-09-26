@@ -16,17 +16,17 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = Object.freeze([
     id: "scheduled",
     name: "Scheduled payout",
     status: "Waiting",
-    summary: "A recurring contributor payout is funded and waiting for its next block boundary.",
+    summary: "A recurring contributor payout is funded and waiting for its next scheduled time.",
     tone: "info",
     facts: Object.freeze([
       { label: "Template", value: "Recurring distribution" },
       { label: "Recipient amount", value: "100 CKB" },
-      { label: "Next execution", value: "Block #15,843,200" },
+      { label: "Next execution", value: "Sep 27, 2026, 10:30 AM UTC" },
       { label: "Runs remaining", value: "4" },
     ]),
     timeline: Object.freeze([
       { detail: "Policy and funding recorded", label: "Automation created", state: "Confirmed" },
-      { detail: "Next bound is 280 blocks away", label: "Schedule observed", state: "Waiting" },
+      { detail: "Starts in about 47 minutes", label: "Schedule observed", state: "Waiting" },
     ]),
     walkthrough: Object.freeze([
       {
@@ -40,18 +40,18 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = Object.freeze([
         title: "Check committed funds",
       },
       {
-        body: "The executor cannot spend before the next absolute block bound encoded in the job.",
+        body: "The executor cannot spend before the next scheduled time encoded in the job.",
         label: "Schedule",
-        title: "Wait for eligibility",
+        title: "Wait for the scheduled time",
       },
     ]),
   },
   {
     id: "ready",
     name: "Ready to execute",
-    status: "Eligible",
+    status: "Processing",
     summary:
-      "A deadline finalization reached its committed block and is ready for permissionless execution.",
+      "A scheduled payment reached its committed time and is being processed by the automation service.",
     tone: "success",
     facts: Object.freeze([
       { label: "Template", value: "Deadline finalization" },
@@ -65,7 +65,7 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = Object.freeze([
         label: "Campaign funded",
         state: "Confirmed",
       },
-      { detail: "Committed deadline reached", label: "Execution eligible", state: "Ready" },
+      { detail: "Committed schedule reached", label: "Payment processing", state: "Processing" },
       { detail: "No transaction has been submitted", label: "Executor attempt", state: "Pending" },
     ]),
     walkthrough: Object.freeze([

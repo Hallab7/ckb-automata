@@ -56,7 +56,7 @@ const STEP_EMPTY_COPY: Record<Exclude<SetupStepId, "template">, readonly [string
   funding: ["Funding", "No funding quote has been requested."],
   result: ["Result", "No transaction has been submitted."],
   review: ["Review", "No automation details are ready for review."],
-  timing: ["Timing", "No block timing has been entered."],
+  timing: ["Timing", "No schedule has been entered."],
 };
 
 function DefaultStep({

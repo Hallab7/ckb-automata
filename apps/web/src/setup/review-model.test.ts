@@ -254,9 +254,8 @@ test("typed recurring transaction produces the complete human-readable review", 
     },
     {
       title: "Recurring distribution",
-      summary: "100 CKB will be available to the fixed recipient on each of 3 eligible runs.",
-      timing:
-        "Earliest at block 160, roughly 10 minutes after the API snapshot if blocks average 10 seconds. Actual block timing varies.",
+      summary: "100 CKB will be available to the fixed recipient on each of 3 scheduled runs.",
+      timing: "Expected in about 10 minutes. Network timing can vary slightly.",
       amounts: [
         { label: "Payment per run", value: "100 CKB" },
         { label: "Executions", value: "3" },
@@ -272,7 +271,7 @@ test("typed recurring transaction produces the complete human-readable review", 
       immutableTerms: [
         `Recipient lock ${ownerLockHash}`,
         "10000000000 shannons per run for 3 runs",
-        "First block 160, every 30 blocks",
+        "The first payment is expected in about 10 minutes, then about every 5 minutes.",
         "6100000000 shannons executor reward per run",
         `Owner and final refund lock ${ownerLockHash}`,
       ],
@@ -470,7 +469,7 @@ test("typed deadline transaction exposes outcome and recovery commitments", asyn
   ]);
   assert.match(model.recovery, /381 CKB/);
   assert.match(model.recovery, /61 CKB/);
-  assert.match(model.timing, /block 220/);
+  assert.match(model.timing, /about 20 minutes/);
 });
 
 test("review uses CCC completion without invoking a wallet signature", async () => {

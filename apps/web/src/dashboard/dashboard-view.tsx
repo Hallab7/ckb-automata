@@ -2,21 +2,22 @@
 
 import {
   ArrowUpRight,
-  CalendarClock,
   CircleCheck,
   CircleDollarSign,
   Clock3,
+  LoaderCircle,
+  MoreHorizontal,
   Plus,
   RefreshCw,
-  Repeat2,
   RotateCcw,
   ShieldAlert,
-  Zap,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 
 import { Amount, Button, InlineNotice, SelectField } from "@ckb-automata/ui";
+
+import { calendarDateParts, formatDateTime } from "../time/chain-time.ts";
 
 import {
   dashboardJobPresentation,
@@ -38,8 +39,8 @@ interface DashboardStatusPresentation {
 
 const DASHBOARD_STATUS: Record<DashboardStatus, DashboardStatusPresentation> = {
   completed: { icon: CircleCheck, label: "Completed", tone: "neutral" },
-  eligible: { icon: Zap, label: "Eligible", tone: "success" },
   needs_funding: { icon: CircleDollarSign, label: "Needs funding", tone: "warning" },
+  processing: { icon: LoaderCircle, label: "Processing", tone: "success" },
   recovery_required: { icon: ShieldAlert, label: "Recovery required", tone: "danger" },
   reorged: { icon: RotateCcw, label: "Reorged", tone: "warning" },
   waiting: { icon: Clock3, label: "Waiting", tone: "info" },
@@ -98,37 +99,53 @@ function Summary({
 }
 
 function NextAutomation({
+  checkpointAt,
   checkpointBlock,
   items,
   recipientAmounts,
   titles,
 }: Readonly<{
+  checkpointAt: string | undefined;
   checkpointBlock: string | undefined;
   items: readonly DashboardJob[];
   recipientAmounts: RecipientAmountsByJob;
   titles: Readonly<Record<string, string>>;
 }>) {
-  const job = items.find((item) => item.state === "live") ?? items[0];
+  const liveJobs = items.filter((item) => item.state === "live");
+  const job =
+    liveJobs.find(
+      (item) =>
+        dashboardJobPresentation(item, checkpointBlock, recipientAmounts[item.jobId], checkpointAt)
+          .status === "waiting",
+    ) ??
+    liveJobs[0] ??
+    items[0];
   if (job === undefined) return null;
-  const presentation = dashboardJobPresentation(job, checkpointBlock, recipientAmounts[job.jobId]);
+  const presentation = dashboardJobPresentation(
+    job,
+    checkpointBlock,
+    recipientAmounts[job.jobId],
+    checkpointAt,
+  );
   const title =
     titles[job.jobId] ??
     (job.template === "deadline" ? "Scheduled payment" : "Recurring distribution");
-  const TemplateIcon = job.template === "deadline" ? CalendarClock : Repeat2;
+  const calendar = calendarDateParts(presentation.scheduledAt);
 
   return (
     <section className="automation-next" aria-labelledby="next-automation-title">
       <div className="automation-next__heading">
-        <span>Next automation</span>
+        <span>Next scheduled payment</span>
         <DashboardStatusBadge status={presentation.status} />
       </div>
       <div className="automation-next__identity">
-        <span aria-hidden="true" className="automation-next__icon">
-          <TemplateIcon size={22} />
+        <span aria-hidden="true" className="automation-date-tile automation-date-tile--large">
+          <small>{calendar.month}</small>
+          <strong>{calendar.day}</strong>
         </span>
         <div>
           <h2 id="next-automation-title">{title}</h2>
-          <p>{presentation.nextEligibility}</p>
+          <p>{presentation.nextSchedule}</p>
         </div>
       </div>
       <div className="automation-next__details">
@@ -137,8 +154,8 @@ function NextAutomation({
           <strong>{presentation.recipientAmount}</strong>
         </div>
         <div>
-          <span>Runs remaining</span>
-          <strong>{presentation.runsRemaining}</strong>
+          <span>Time remaining</span>
+          <strong>{presentation.timeRemaining}</strong>
         </div>
         <Link
           aria-label={`Open ${title}`}
@@ -164,11 +181,13 @@ function LoadingRows() {
 }
 
 function AutomationRows({
+  checkpointAt,
   checkpointBlock,
   items,
   recipientAmounts,
   titles,
 }: Readonly<{
+  checkpointAt: string | undefined;
   checkpointBlock: string | undefined;
   items: readonly DashboardJob[];
   recipientAmounts: RecipientAmountsByJob;
@@ -177,10 +196,10 @@ function AutomationRows({
   return (
     <div className="automation-list">
       <div aria-hidden="true" className="automation-list__header">
-        <span>Type</span>
+        <span>Date</span>
         <span>Automation</span>
         <span>Status</span>
-        <span>Next eligibility</span>
+        <span>Next schedule</span>
         <span>Recipient amount</span>
         <span />
       </div>
@@ -189,8 +208,9 @@ function AutomationRows({
           job,
           checkpointBlock,
           recipientAmounts[job.jobId],
+          checkpointAt,
         );
-        const TemplateIcon = job.template === "deadline" ? CalendarClock : Repeat2;
+        const calendar = calendarDateParts(presentation.scheduledAt);
         return (
           <Link
             aria-label={`Open ${job.template} automation ${job.jobId}`}
@@ -198,8 +218,9 @@ function AutomationRows({
             href={`/automations/${encodeURIComponent(job.jobId)}`}
             key={`${job.jobId}:${job.source.outPoint.txHash}:${job.source.outPoint.index}`}
           >
-            <span aria-hidden="true" className="automation-row__template">
-              <TemplateIcon size={18} />
+            <span aria-hidden="true" className="automation-row__template automation-date-tile">
+              <small>{calendar.month}</small>
+              <strong>{calendar.day}</strong>
             </span>
             <div className="automation-row__identity">
               <strong>
@@ -213,16 +234,16 @@ function AutomationRows({
               <span>{presentation.nextAction}</span>
             </div>
             <div className="automation-row__detail">
-              <span className="automation-row__mobile-label">Next eligibility</span>
-              <strong>{presentation.nextEligibility}</strong>
-              <span>{presentation.runsRemaining} runs remaining</span>
+              <span className="automation-row__mobile-label">Next schedule</span>
+              <strong>{presentation.nextSchedule}</strong>
+              <span>{job.template === "deadline" ? "Scheduled payment" : "Recurring payment"}</span>
             </div>
             <div className="automation-row__amount">
               <span className="automation-row__mobile-label">Recipient amount</span>
               <Amount>{presentation.recipientAmount}</Amount>
-              <span>Sequence {job.sequence}</span>
+              <span>{presentation.runsRemaining} runs remaining</span>
             </div>
-            <ArrowUpRight aria-hidden="true" className="automation-row__arrow" size={17} />
+            <MoreHorizontal aria-hidden="true" className="automation-row__arrow" size={17} />
           </Link>
         );
       })}
@@ -231,6 +252,7 @@ function AutomationRows({
 }
 
 export interface AutomationDashboardViewProperties {
+  readonly checkpointAt?: string | undefined;
   readonly checkpointBlock?: string | undefined;
   readonly dataSourceLabel?: string | undefined;
   readonly error?: string | undefined;
@@ -252,6 +274,7 @@ export interface AutomationDashboardViewProperties {
 }
 
 export function AutomationDashboardView({
+  checkpointAt,
   checkpointBlock,
   dataSourceLabel,
   error,
@@ -293,6 +316,7 @@ export function AutomationDashboardView({
         <div className="automation-overview">
           <Summary items={items} recipientAmounts={recipientAmounts} />
           <NextAutomation
+            checkpointAt={checkpointAt}
             checkpointBlock={checkpointBlock}
             items={items}
             recipientAmounts={recipientAmounts}
@@ -344,9 +368,15 @@ export function AutomationDashboardView({
         <header className="automation-surface__heading">
           <strong>Payment automations</strong>
           <span>
-            {checkpointBlock === undefined
-              ? "CKB Pudge Testnet job state"
-              : `Indexed through block #${BigInt(checkpointBlock).toLocaleString("en-US")}`}
+            {items.length === 0
+              ? "CKB Pudge Testnet schedule"
+              : `Synced ${formatDateTime(
+                  items.reduce(
+                    (latest, item) =>
+                      Date.parse(item.updatedAt) > Date.parse(latest) ? item.updatedAt : latest,
+                    items[0]!.updatedAt,
+                  ),
+                )}`}
           </span>
         </header>
 
@@ -388,6 +418,7 @@ export function AutomationDashboardView({
         ) : null}
         {items.length > 0 ? (
           <AutomationRows
+            checkpointAt={checkpointAt}
             checkpointBlock={checkpointBlock}
             items={items}
             recipientAmounts={recipientAmounts}

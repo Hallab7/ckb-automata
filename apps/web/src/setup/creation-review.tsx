@@ -21,6 +21,7 @@ import { useWalletSession } from "../ccc/session.tsx";
 import { browserWebEnvironment } from "../environment.ts";
 import { ckbToShannons } from "./ckb-amount.ts";
 import { DEADLINE_SERVICE_CHARGE_CKB, deadlineTarget, scheduleToBlock } from "./deadline-form.ts";
+import { intervalMinutesToBlocks } from "./recurring-form.ts";
 import { automationTitle } from "./automation-title.ts";
 import {
   reviewTechnicalDetailsJson,
@@ -133,8 +134,8 @@ async function requestFromDraft(
       ownerLockHash: hashLock(ownerLock),
       recipientLockHash: hashLock(recipientLock),
       amount: ckbToShannons(draft["amountCkb"] ?? ""),
-      intervalBlocks: draft["intervalBlocks"] ?? "",
-      firstNotBefore: draft["firstExecutionBlock"] ?? "",
+      intervalBlocks: intervalMinutesToBlocks(draft["intervalMinutes"] ?? ""),
+      firstNotBefore: scheduleToBlock(draft["firstExecutionAt"] ?? "", tipBlock ?? ""),
       totalRuns: draft["runCount"] ?? "",
       reward: ckbToShannons(draft["rewardCkb"] ?? ""),
       creatorNonce,
@@ -197,10 +198,7 @@ async function loadReview(
     throw new Error("Connect a supported CKB testnet wallet before building the review.");
   }
   const api = browserApiClient();
-  const network =
-    template === "deadline"
-      ? ((await api.network()) as { readonly tip: { readonly blockNumber: string } })
-      : undefined;
+  const network = (await api.network()) as { readonly tip: { readonly blockNumber: string } };
   const request = await requestFromDraft(
     template,
     draft,
@@ -386,7 +384,7 @@ export function ReviewSummary({
           <span>
             {model.operation === "create_deadline_job"
               ? "Testnet transaction"
-              : `Snapshot block ${model.snapshotBlock}`}
+              : "Current testnet snapshot"}
           </span>
           {model.operation === "create_recurring_job" ? <code>{model.genesisHash}</code> : null}
         </div>

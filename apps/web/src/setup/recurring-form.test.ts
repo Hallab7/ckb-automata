@@ -6,6 +6,7 @@ import { parseHash32 } from "@ckb-automata/core";
 
 import {
   clientAcceptsRecurringRequest,
+  intervalMinutesToBlocks,
   recurringFundingPreview,
   validateRecurringStep,
 } from "./recurring-form.ts";
@@ -19,8 +20,8 @@ const STANDARD_LOCK = Object.freeze({
 const CCC_LOCK = Object.freeze({ ...STANDARD_LOCK, args: `0x${"22".repeat(22)}` as const });
 const VALID_DRAFT = {
   amountCkb: "100",
-  firstExecutionBlock: "15000000",
-  intervalBlocks: "100",
+  firstExecutionAt: "2099-09-24T10:00",
+  intervalMinutes: "17",
   recipientAddress: "recipient",
   rewardCkb: "61",
   runCount: "3",
@@ -51,6 +52,12 @@ test("recurring preview exposes every component of the locked total", () => {
   assert.equal(preview.totalLockedCkb, "864");
 });
 
+test("recurring intervals convert readable minutes to the internal schedule cadence", () => {
+  assert.equal(intervalMinutesToBlocks("1"), "6");
+  assert.equal(intervalMinutesToBlocks("60"), "360");
+  assert.throws(() => intervalMinutesToBlocks("0"), /at least 1 minute/);
+});
+
 test("recurring validation rejects invalid addresses, intervals, and run counts", async () => {
   const addressErrors = await validateRecurringStep("details", VALID_DRAFT, {
     ...CONTEXT,
@@ -62,10 +69,10 @@ test("recurring validation rejects invalid addresses, intervals, and run counts"
 
   const intervalErrors = await validateRecurringStep(
     "timing",
-    { ...VALID_DRAFT, intervalBlocks: "0" },
+    { ...VALID_DRAFT, intervalMinutes: "0" },
     CONTEXT,
   );
-  assert.match(intervalErrors["intervalBlocks"] ?? "", /at least 1 block/);
+  assert.match(intervalErrors["intervalMinutes"] ?? "", /at least 1 minute/);
 
   const runErrors = await validateRecurringStep(
     "timing",
@@ -127,8 +134,8 @@ test("recurring form asks for plain-language values and no raw scripts", async (
   for (const field of [
     "recipientAddress",
     "amountCkb",
-    "firstExecutionBlock",
-    "intervalBlocks",
+    "firstExecutionAt",
+    "intervalMinutes",
     "runCount",
     "rewardCkb",
     "ownerAddress",

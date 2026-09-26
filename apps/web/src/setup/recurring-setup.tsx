@@ -1,7 +1,7 @@
 "use client";
 
 import { WalletCards } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Button, InlineNotice, TextField } from "@ckb-automata/ui";
 
@@ -41,7 +41,7 @@ function RecurringDetails(context: SetupStepRenderContext) {
     <div className="setup-step__group">
       <div>
         <h2>Payment details</h2>
-        <p>Every eligible run pays this fixed amount to one CKB testnet recipient.</p>
+        <p>Every scheduled run pays this fixed amount to one CKB testnet recipient.</p>
       </div>
       <div className="setup-form-grid">
         <TextField
@@ -82,34 +82,41 @@ function RecurringDetails(context: SetupStepRenderContext) {
 }
 
 function RecurringTiming(context: SetupStepRenderContext) {
+  const [minimum, setMinimum] = useState("");
+  useEffect(() => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset() + 1, 0, 0);
+    setMinimum(now.toISOString().slice(0, 16));
+  }, []);
   return (
     <div className="setup-step__group">
       <div>
         <h2>Payment schedule</h2>
-        <p>Each execution becomes eligible at a fixed absolute block interval.</p>
+        <p>Choose the first payment time and how often the payment should repeat.</p>
       </div>
       <div className="setup-form-grid setup-form-grid--three">
         <TextField
-          {...error(context, "firstExecutionBlock")}
-          hint="Use a future CKB Pudge Testnet block."
-          inputMode="numeric"
-          label="First execution block"
-          name="firstExecutionBlock"
-          onChange={(event) => context.setField("firstExecutionBlock", event.target.value)}
-          placeholder="15000000"
+          {...error(context, "firstExecutionAt")}
+          hint="Past dates and times are not allowed."
+          label="First payment date and time"
+          min={minimum || undefined}
+          name="firstExecutionAt"
+          onChange={(event) => context.setField("firstExecutionAt", event.target.value)}
           required
-          value={context.draft["firstExecutionBlock"] ?? ""}
+          type="datetime-local"
+          value={context.draft["firstExecutionAt"] ?? ""}
         />
         <TextField
-          {...error(context, "intervalBlocks")}
-          hint="The number of blocks between eligible payments."
+          {...error(context, "intervalMinutes")}
+          hint="For example, 60 means once every hour."
           inputMode="numeric"
-          label="Interval (blocks)"
-          name="intervalBlocks"
-          onChange={(event) => context.setField("intervalBlocks", event.target.value)}
-          placeholder="100"
+          label="Repeat every (minutes)"
+          min="1"
+          name="intervalMinutes"
+          onChange={(event) => context.setField("intervalMinutes", event.target.value)}
+          placeholder="60"
           required
-          value={context.draft["intervalBlocks"] ?? ""}
+          value={context.draft["intervalMinutes"] ?? ""}
         />
         <TextField
           {...error(context, "runCount")}

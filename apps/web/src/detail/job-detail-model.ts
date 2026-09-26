@@ -1,6 +1,7 @@
 import type { ApiJob, ApiJobEvents } from "@ckb-automata/api-client";
 
 import { formatCkbBalance } from "../ccc/wallet-display.ts";
+import { formatBlockDate } from "../time/chain-time.ts";
 
 export type DetailJob = ApiJob;
 export type DetailEvent = ApiJobEvents["items"][number];
@@ -10,7 +11,7 @@ export type JobDetailStatus =
   | "completed"
   | "conflicted"
   | "dropped"
-  | "eligible"
+  | "processing"
   | "needs_funding"
   | "recovery_required"
   | "reorged"
@@ -58,14 +59,11 @@ function latestAttemptStatus(events: readonly DetailEvent[]): JobDetailStatus | 
   return undefined;
 }
 
-function blockLabel(value: bigint): string {
-  return `Block #${value.toLocaleString("en-US")}`;
-}
-
 export function jobDetailPresentation(
   job: DetailJob,
   events: readonly DetailEvent[],
   recipientAmount?: string,
+  checkpointAt = job.updatedAt,
 ): JobDetailPresentation {
   const checkpoint = job.source.indexCheckpoint?.blockNumber;
   const checkpointBlock = checkpoint === undefined ? undefined : BigInt(checkpoint);
@@ -86,7 +84,7 @@ export function jobDetailPresentation(
   else if (remainingBudget < reward) status = "needs_funding";
   else if (checkpointBlock !== undefined && notAfter !== 0n && checkpointBlock > notAfter) {
     status = "recovery_required";
-  } else if (checkpointBlock !== undefined && checkpointBlock >= notBefore) status = "eligible";
+  } else if (checkpointBlock !== undefined && checkpointBlock >= notBefore) status = "processing";
   else status = "waiting";
 
   const statusLabels: Readonly<Record<JobDetailStatus, string>> = {
@@ -94,7 +92,7 @@ export function jobDetailPresentation(
     completed: "Completed",
     conflicted: "Conflicted",
     dropped: "Dropped",
-    eligible: "Eligible",
+    processing: "Processing",
     needs_funding: "Needs funding",
     recovery_required: "Recovery required",
     reorged: "Reorged",
@@ -106,7 +104,7 @@ export function jobDetailPresentation(
     completed: "Review the final canonical execution",
     conflicted: "Review the winning transaction and attempt receipt",
     dropped: "Review the dropped attempt before retrying",
-    eligible: "Monitor permissionless executor attempts",
+    processing: "Payment execution is in progress",
     needs_funding: "Top up the committed executor budget",
     recovery_required: "Recover the remaining live funds",
     reorged: "Wait for canonical replay before acting",
@@ -122,10 +120,10 @@ export function jobDetailPresentation(
       job.state !== "live"
         ? "No further scheduled execution"
         : checkpointBlock === undefined
-          ? blockLabel(notBefore)
+          ? "Schedule time syncing"
           : checkpointBlock >= notBefore
-            ? `Eligible since ${blockLabel(notBefore)}`
-            : `${blockLabel(notBefore)} (${(notBefore - checkpointBlock).toLocaleString("en-US")} blocks remaining)`,
+            ? `Processing since ${formatBlockDate(notBefore, checkpointBlock, checkpointAt)}`
+            : formatBlockDate(notBefore, checkpointBlock, checkpointAt),
     policyName:
       job.template === "deadline"
         ? "Deadline finalization"
@@ -139,6 +137,16 @@ export function jobDetailPresentation(
     remainingBudget: formatCkbBalance(remainingBudget),
     executorReward: formatCkbBalance(reward),
   });
+}
+
+export function jobScheduleDate(
+  job: DetailJob,
+  block: string,
+  checkpointAt = job.updatedAt,
+): string {
+  const checkpoint = job.source.indexCheckpoint?.blockNumber;
+  if (checkpoint === undefined) return "Schedule time syncing";
+  return formatBlockDate(block, checkpoint, checkpointAt);
 }
 
 export function eventLabel(eventType: string): string {

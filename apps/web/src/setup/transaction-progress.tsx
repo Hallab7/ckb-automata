@@ -18,6 +18,7 @@ import { createApiClient, type ApiTransactionProgress } from "@ckb-automata/api-
 import { InlineNotice } from "@ckb-automata/ui";
 
 import { ckbTestnetTransactionUrl } from "../ccc/wallet-display.ts";
+import { formatDateTime } from "../time/chain-time.ts";
 import { browserWebEnvironment } from "../environment.ts";
 import { reduceTransactionProgress, reduceTransactionProgressStream } from "../stream-reducers.ts";
 import {
@@ -120,8 +121,8 @@ export function TransactionProgressPanel({
           <dd>{transactionConfirmationLabel(progress)}</dd>
         </div>
         <div>
-          <dt>Block</dt>
-          <dd>{progress.block?.number ?? "Waiting"}</dd>
+          <dt>Last update</dt>
+          <dd>{formatDateTime(progress.observedAt)}</dd>
         </div>
       </dl>
 

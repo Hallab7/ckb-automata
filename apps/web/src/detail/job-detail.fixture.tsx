@@ -189,7 +189,7 @@ function FixtureDialog({ action }: Readonly<{ action: "cancel" | "recover" | "to
           </div>
           <div>
             <dt>Snapshot</dt>
-            <dd>Block #15,842,900</dd>
+            <dd>Sep 24, 2026, 10:00 AM UTC</dd>
           </div>
           <div>
             <dt>Maximum fee</dt>

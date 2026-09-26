@@ -220,13 +220,30 @@ function verifiedQuote(
   }
 }
 
-function timingCopy(eligibleBlock: bigint, snapshotBlock: bigint): string {
-  if (eligibleBlock <= snapshotBlock) {
-    return `Block ${eligibleBlock} was already reached at the API snapshot; execution and confirmation timing still vary.`;
+function timingCopy(scheduledBlock: bigint, snapshotBlock: bigint): string {
+  if (scheduledBlock <= snapshotBlock) {
+    return "The scheduled time has been reached. Processing and confirmation timing can still vary.";
   }
-  const seconds = (eligibleBlock - snapshotBlock) * TARGET_BLOCK_SECONDS;
+  const seconds = (scheduledBlock - snapshotBlock) * TARGET_BLOCK_SECONDS;
   const minutes = (seconds + 59n) / 60n;
-  return `Earliest at block ${eligibleBlock}, roughly ${minutes} minute${minutes === 1n ? "" : "s"} after the API snapshot if blocks average 10 seconds. Actual block timing varies.`;
+  return `Expected in about ${minutes} minute${minutes === 1n ? "" : "s"}. Network timing can vary slightly.`;
+}
+
+function recurringTimingCopy(
+  firstScheduledBlock: bigint,
+  intervalBlocks: bigint,
+  snapshotBlock: bigint,
+): string {
+  const firstDelayBlocks =
+    firstScheduledBlock > snapshotBlock ? firstScheduledBlock - snapshotBlock : 0n;
+  const firstDelayMinutes = (firstDelayBlocks * TARGET_BLOCK_SECONDS + 59n) / 60n;
+  const intervalMinutes = (intervalBlocks * TARGET_BLOCK_SECONDS + 59n) / 60n;
+  const firstPayment =
+    firstDelayMinutes === 0n
+      ? "The first payment is ready to process"
+      : `The first payment is expected in about ${firstDelayMinutes} minute${firstDelayMinutes === 1n ? "" : "s"}`;
+
+  return `${firstPayment}, then about every ${intervalMinutes} minute${intervalMinutes === 1n ? "" : "s"}.`;
 }
 
 async function verifyEnvelope(
@@ -340,7 +357,7 @@ export async function verifyCreationReview(
     ownerLockHash = request.value.ownerLockHash;
     requiredOutputCount = build.completion.requiredOutputCount;
     title = "Recurring distribution";
-    summary = `${shannonsToCkb(BigInt(request.value.amount))} CKB will be available to the fixed recipient on each of ${request.value.totalRuns} eligible runs.`;
+    summary = `${shannonsToCkb(BigInt(request.value.amount))} CKB will be available to the fixed recipient on each of ${request.value.totalRuns} scheduled runs.`;
     timing = timingCopy(BigInt(request.value.firstNotBefore), chainSnapshot.block);
     recovery =
       "After the final run, remaining Job Cell capacity returns to the connected owner. The owner also retains cancellation and recovery authority.";
@@ -357,7 +374,11 @@ export async function verifyCreationReview(
     immutableTerms = Object.freeze([
       `Recipient lock ${request.value.recipientLockHash}`,
       `${request.value.amount} shannons per run for ${request.value.totalRuns} runs`,
-      `First block ${request.value.firstNotBefore}, every ${request.value.intervalBlocks} blocks`,
+      recurringTimingCopy(
+        BigInt(request.value.firstNotBefore),
+        BigInt(request.value.intervalBlocks),
+        chainSnapshot.block,
+      ),
       `${request.value.reward} shannons executor reward per run`,
       `Owner and final refund lock ${request.value.ownerLockHash}`,
     ]);
@@ -436,7 +457,7 @@ export async function verifyCreationReview(
     immutableTerms,
     warnings: Object.freeze([
       "This transaction is for a non-mainnet deployment.",
-      "Block estimates are approximate; eligibility does not guarantee immediate execution or confirmation.",
+      "Schedule times are approximate; processing does not guarantee immediate confirmation.",
       "Changing any input, committed output, policy payload, fee, or change requires a new review.",
     ]),
     intentHash: artifact.protocolIntentHash ?? artifact.intentHash,

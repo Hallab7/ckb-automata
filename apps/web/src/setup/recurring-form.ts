@@ -12,6 +12,7 @@ import {
 
 import { ckbToShannons, shannonsToCkb } from "./ckb-amount.ts";
 import { validateAutomationTitle } from "./automation-title.ts";
+import { scheduleToBlock } from "./deadline-form.ts";
 import type { SetupDraft, SetupErrors, SetupStepId } from "./setup-flow.ts";
 
 const MAX_ABSOLUTE_BLOCK = (1n << 56n) - 1n;
@@ -22,8 +23,8 @@ const PREVIEW_FEE = Object.freeze({
 
 export const RECURRING_INITIAL_DRAFT: SetupDraft = Object.freeze({
   amountCkb: "",
-  firstExecutionBlock: "",
-  intervalBlocks: "",
+  firstExecutionAt: "",
+  intervalMinutes: "",
   recipientAddress: "",
   rewardCkb: "61",
   runCount: "",
@@ -62,6 +63,12 @@ function canonicalDecimal(value: string, name: string): bigint {
     throw new TypeError(`${name} must be a whole number without separators.`);
   }
   return BigInt(value);
+}
+
+export function intervalMinutesToBlocks(value: string): string {
+  const minutes = canonicalDecimal(value, "Repeat interval");
+  if (minutes === 0n) throw new RangeError("Repeat interval must be at least 1 minute.");
+  return (minutes * 6n).toString();
 }
 
 function ckbAmount(value: string, label: string): bigint {
@@ -143,30 +150,31 @@ function validateAmount(
 }
 
 function timingValues(draft: SetupDraft, errors: Record<string, string>) {
-  let first: bigint | undefined;
   let interval: bigint | undefined;
   let runs: bigint | undefined;
-  try {
-    first = parseBlockNumber(
-      canonicalDecimal(
-        required(draft, "firstExecutionBlock", "Enter the first execution block.", errors),
-        "First execution block",
-      ),
-    );
-    if (first === 0n || first > MAX_ABSOLUTE_BLOCK) throw new RangeError();
-  } catch {
-    errors["firstExecutionBlock"] = "Enter a non-zero absolute CKB block number.";
+  const firstExecutionAt = required(
+    draft,
+    "firstExecutionAt",
+    "Choose the first payment date and time.",
+    errors,
+  );
+  if (firstExecutionAt) {
+    try {
+      scheduleToBlock(firstExecutionAt, "1");
+    } catch {
+      errors["firstExecutionAt"] = "Choose a date and time in the future.";
+    }
   }
   try {
     interval = parseBlockNumber(
-      canonicalDecimal(
-        required(draft, "intervalBlocks", "Enter the interval.", errors),
-        "Interval",
+      BigInt(
+        intervalMinutesToBlocks(
+          required(draft, "intervalMinutes", "Enter the repeat interval.", errors),
+        ),
       ),
     );
-    if (interval === 0n) throw new RangeError();
   } catch {
-    errors["intervalBlocks"] = "Enter at least 1 block between payments.";
+    errors["intervalMinutes"] = "Enter at least 1 minute between payments.";
   }
   try {
     runs = parseRunCount(
@@ -176,14 +184,14 @@ function timingValues(draft: SetupDraft, errors: Record<string, string>) {
   } catch {
     errors["runCount"] = "Enter between 1 and 4,294,967,295 runs.";
   }
-  if (first !== undefined && interval !== undefined && runs !== undefined) {
-    const last = first + (runs - 1n) * interval;
+  if (interval !== undefined && runs !== undefined) {
+    const last = 1n + (runs - 1n) * interval;
     if (last > MAX_ABSOLUTE_BLOCK) {
-      errors["runCount"] = "The final run exceeds the supported CKB block range.";
+      errors["runCount"] = "The final payment exceeds the supported schedule range.";
       runs = undefined;
     }
   }
-  return { first, interval, runs };
+  return { interval, runs };
 }
 
 export async function validateRecurringStep(
@@ -210,7 +218,7 @@ export async function validateRecurringStep(
   if (step === "funding") {
     const amount = validateAmount(draft, "amountCkb", "payment per run", errors);
     const reward = validateAmount(draft, "rewardCkb", "executor reward", errors);
-    const { first, interval, runs } = timingValues(draft, errors);
+    const { interval, runs } = timingValues(draft, errors);
     const resolvedRecipient = await recipient(draft, context, errors);
     if (
       resolvedRecipient !== undefined &&
@@ -242,7 +250,6 @@ export async function validateRecurringStep(
     if (
       amount !== undefined &&
       reward !== undefined &&
-      first !== undefined &&
       interval !== undefined &&
       runs !== undefined &&
       resolvedRecipient !== undefined &&
@@ -254,7 +261,7 @@ export async function validateRecurringStep(
           recipientLockHash: resolvedRecipient.lockHash,
           amount: amount.toString(),
           intervalBlocks: interval.toString(),
-          firstNotBefore: first.toString(),
+          firstNotBefore: "1",
           totalRuns: runs.toString(),
           reward: reward.toString(),
           creatorNonce: "0",
