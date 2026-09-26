@@ -30,7 +30,7 @@ export class PostgresSimulationStore implements SimulationStore {
     this.#sql = postgres(connectionString, {
       connect_timeout: 5,
       idle_timeout: 20,
-      max: 2,
+      max: 1,
       onnotice: () => undefined,
     });
   }

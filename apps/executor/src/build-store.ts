@@ -57,7 +57,7 @@ export class PostgresBuildAttemptStore implements BuildAttemptStore {
     this.#sql = postgres(connectionString, {
       connect_timeout: 5,
       idle_timeout: 20,
-      max: 4,
+      max: 1,
       onnotice: () => undefined,
     });
   }

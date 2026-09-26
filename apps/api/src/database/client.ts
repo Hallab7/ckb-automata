@@ -18,7 +18,7 @@ export class DatabaseClient {
     this.#client = postgres(connectionString, {
       connect_timeout: 5,
       idle_timeout: 20,
-      max: 10,
+      max: 4,
       onnotice: () => undefined,
     });
     this.database = drizzle(this.#client, { schema });
