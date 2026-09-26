@@ -35,6 +35,14 @@ export interface RpcOutPoint {
   readonly index: `0x${string}`;
 }
 
+export interface CellDepValue {
+  readonly depType: string;
+  readonly outPoint: {
+    readonly txHash: string;
+    readonly index: IntegerInput;
+  };
+}
+
 export const MAX_UINT64 = (1n << 64n) - 1n;
 export const MAX_UINT32 = (1n << 32n) - 1n;
 export const MAX_EPOCH_NUMBER = (1n << 24n) - 1n;
@@ -167,6 +175,14 @@ export function parseOutPoint(value: unknown): OutPoint {
     txHash: parseHash32(txHash),
     index: parseOutputIndex(index),
   });
+}
+
+export function sameCellDepValue(left: CellDepValue, right: CellDepValue): boolean {
+  return (
+    left.depType === right.depType &&
+    left.outPoint.txHash === right.outPoint.txHash &&
+    BigInt(left.outPoint.index) === BigInt(right.outPoint.index)
+  );
 }
 
 export function toRpcHex(value: Uint64Value | Uint32Value | EpochValue): `0x${string}` {

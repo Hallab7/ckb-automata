@@ -12,6 +12,7 @@ import {
   parseHash32,
   parseOutPoint,
   parseShannons,
+  sameCellDepValue,
   toRpcHex,
   type Hash32,
   type IntegerInput,
@@ -370,7 +371,7 @@ export function assertTopUpCompletion(build: TopUpBuild, completed: UnsignedTran
     throw new Error("completed outputs and data lengths differ");
   }
   for (const requiredDep of build.transaction.cellDeps) {
-    if (!completed.cellDeps.some((candidate) => stable(candidate) === stable(requiredDep))) {
+    if (!completed.cellDeps.some((candidate) => sameCellDepValue(candidate, requiredDep))) {
       throw new Error("wallet completion removed a required cell dependency");
     }
   }

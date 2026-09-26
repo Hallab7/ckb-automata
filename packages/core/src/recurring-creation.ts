@@ -16,6 +16,7 @@ import {
   parseRunCount,
   parseSequence,
   parseShannons,
+  sameCellDepValue,
   toRpcHex,
   uint64ToLittleEndian,
   type Hash32,
@@ -383,7 +384,7 @@ export function assertRecurringCompletion(
     throw new Error("completed outputs and data lengths differ");
   }
   for (const requiredDep of build.transaction.cellDeps) {
-    if (!completed.cellDeps.some((candidate) => stable(candidate) === stable(requiredDep))) {
+    if (!completed.cellDeps.some((candidate) => sameCellDepValue(candidate, requiredDep))) {
       throw new Error("wallet completion removed a required cell dependency");
     }
   }

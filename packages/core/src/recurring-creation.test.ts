@@ -129,6 +129,26 @@ test("wallet funding inputs and change preserve the recurring intent", async () 
     ],
   } as UnsignedTransaction;
   assert.doesNotThrow(() => assertRecurringCompletion(build, completed));
+  assert.doesNotThrow(() =>
+    assertRecurringCompletion(build, {
+      ...completed,
+      cellDeps: completed.cellDeps.map((dependency) => ({
+        depType: dependency.depType,
+        outPoint: {
+          index: `0x0${BigInt(dependency.outPoint.index).toString(16)}`,
+          txHash: dependency.outPoint.txHash,
+        },
+      })),
+    }),
+  );
+  assert.throws(
+    () =>
+      assertRecurringCompletion(build, {
+        ...completed,
+        cellDeps: completed.cellDeps.slice(1),
+      }),
+    /removed a required cell dependency/,
+  );
   assert.throws(
     () =>
       assertRecurringCompletion(build, {
