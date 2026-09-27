@@ -21,7 +21,7 @@ import {
   ApiQuery,
   ApiTags,
 } from "@nestjs/swagger";
-import { and, desc, eq, lt, lte, or, type SQL } from "drizzle-orm";
+import { and, desc, eq, lt, or, type SQL } from "drizzle-orm";
 
 import { inspectJobData } from "@ckb-automata/core";
 
@@ -366,20 +366,11 @@ export class JobReadService {
           .from(indexerCheckpoints)
           .where(eq(indexerCheckpoints.networkId, this.#network))
           .limit(1);
-        const [row] =
-          checkpointRow === undefined
-            ? []
-            : await tx
-                .select()
-                .from(jobs)
-                .where(
-                  and(
-                    eq(jobs.networkId, this.#network),
-                    eq(jobs.jobId, jobId),
-                    lte(jobs.blockNumber, checkpointRow.blockNumber),
-                  ),
-                )
-                .limit(1);
+        const [row] = await tx
+          .select()
+          .from(jobs)
+          .where(and(eq(jobs.networkId, this.#network), eq(jobs.jobId, jobId)))
+          .limit(1);
         return { checkpoint: checkpointRow ?? null, row };
       },
       { accessMode: "read only", isolationLevel: "repeatable read" },
@@ -418,12 +409,7 @@ export class JobReadService {
           });
         }
 
-        if (checkpoint === null) return { checkpoint, rows: [] as JobRow[] };
-
-        const clauses: SQL[] = [
-          eq(jobs.networkId, this.#network),
-          lte(jobs.blockNumber, checkpoint.blockNumber),
-        ];
+        const clauses: SQL[] = [eq(jobs.networkId, this.#network)];
         if (ownerLockHash !== undefined) clauses.push(eq(jobs.ownerLockHash, ownerLockHash));
         if (query.state !== undefined) clauses.push(eq(jobs.state, query.state));
         if (query.template !== undefined) clauses.push(eq(jobs.policyKind, query.template));

@@ -3,9 +3,11 @@ import test from "node:test";
 
 import type { LoggerService } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import type { SQL } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 
 import { createApiApplication } from "./bootstrap.ts";
-import { JOB_TEMPLATE_CATALOG } from "./jobs.ts";
+import { JOB_TEMPLATE_CATALOG, JobReadService } from "./jobs.ts";
 
 const GENESIS_HASH = `0x${"5a7b2eb5a3aa224edb367eb7aba742c6f60efaddb6b9536ab2a2c20e0af6cff3"}`;
 const quietLogger: LoggerService = {
@@ -29,6 +31,35 @@ function environment() {
   };
 }
 
+function readDatabase(checkpoint: { blockNumber: string; blockHash: string } | undefined) {
+  const conditions: SQL[] = [];
+  let queryCount = 0;
+  const transaction = {
+    select: () => {
+      queryCount += 1;
+      const current = queryCount;
+      const builder = {
+        from: () => builder,
+        where: (condition: SQL) => {
+          conditions.push(condition);
+          return builder;
+        },
+        orderBy: () => builder,
+        limit: async () => (current === 1 && checkpoint !== undefined ? [checkpoint] : []),
+      };
+      return builder;
+    },
+  };
+  return {
+    conditions,
+    database: {
+      transaction: async <T>(operation: (tx: typeof transaction) => Promise<T>) =>
+        operation(transaction),
+    },
+    queryCount: () => queryCount,
+  };
+}
+
 test("template catalog describes both supported workflows without database state", () => {
   assert.deepEqual(
     JOB_TEMPLATE_CATALOG.map(({ id, execution, triggerMetric, version }) => ({
@@ -43,6 +74,20 @@ test("template catalog describes both supported workflows without database state
     ],
   );
   assert.ok(Object.isFrozen(JOB_TEMPLATE_CATALOG));
+});
+
+test("confirmed reconciliation rows remain readable ahead of the canonical checkpoint", async () => {
+  const dialect = new PgDialect();
+  const stale = readDatabase({ blockNumber: "100", blockHash: `0x${"11".repeat(32)}` });
+  const service = new JobReadService(stale.database as never, "ckb_testnet");
+
+  await service.list({ limit: 20 });
+  assert.equal(stale.queryCount(), 2);
+  assert.equal(dialect.sqlToQuery(stale.conditions[1]!).sql, '"jobs"."network_id" = $1');
+
+  const empty = readDatabase(undefined);
+  await new JobReadService(empty.database as never, "ckb_testnet").list({ limit: 20 });
+  assert.equal(empty.queryCount(), 2);
 });
 
 test("job routes publish an OpenAPI contract with decimal-string integer fields", async () => {
