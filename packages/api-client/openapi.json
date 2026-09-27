@@ -188,9 +188,10 @@
                     "page": {
                       "properties": {
                         "limit": { "type": "integer" },
-                        "nextCursor": { "nullable": true, "type": "string" }
+                        "nextCursor": { "nullable": true, "type": "string" },
+                        "totalItems": { "minimum": 0, "type": "integer" }
                       },
-                      "required": ["limit", "nextCursor"],
+                      "required": ["limit", "nextCursor", "totalItems"],
                       "type": "object"
                     }
                   },
@@ -803,9 +804,10 @@
                     "page": {
                       "properties": {
                         "limit": { "type": "integer" },
-                        "nextCursor": { "nullable": true, "type": "string" }
+                        "nextCursor": { "nullable": true, "type": "string" },
+                        "totalItems": { "minimum": 0, "type": "integer" }
                       },
-                      "required": ["limit", "nextCursor"],
+                      "required": ["limit", "nextCursor", "totalItems"],
                       "type": "object"
                     }
                   },

@@ -112,13 +112,15 @@ export function AutomationDashboardFixture() {
           items.map((item) => [item.jobId, { perExecution: "10000000000", total: "40000000000" }]),
         )}
         onConnect={() => setFixtureState("ready")}
-        onLoadNext={() => undefined}
+        onNextPage={() => undefined}
+        onPreviousPage={() => undefined}
         onModeChange={setMode}
         onRetry={() => setFixtureState("ready")}
         onStateChange={() => undefined}
         onTemplateChange={() => undefined}
         stateFilter=""
         templateFilter=""
+        totalItems={loadState === "ready" ? items.length * 2 : items.length}
       />
     </div>
   );

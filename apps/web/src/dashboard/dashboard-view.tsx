@@ -2,6 +2,8 @@
 
 import {
   ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
   CircleCheck,
   CircleDollarSign,
   Clock3,
@@ -21,6 +23,7 @@ import { calendarDateParts, formatDateTime } from "../time/chain-time.ts";
 
 import {
   dashboardJobPresentation,
+  dashboardPageRange,
   dashboardSummary,
   shortJobId,
   type DashboardJob,
@@ -60,19 +63,24 @@ function DashboardStatusBadge({ status }: Readonly<{ status: DashboardStatus }>)
 function Summary({
   items,
   recipientAmounts,
-}: Readonly<{ items: readonly DashboardJob[]; recipientAmounts: RecipientAmountsByJob }>) {
-  const summary = dashboardSummary(items, recipientAmounts);
+  totalItems,
+}: Readonly<{
+  items: readonly DashboardJob[];
+  recipientAmounts: RecipientAmountsByJob;
+  totalItems: number;
+}>) {
+  const summary = dashboardSummary(items, recipientAmounts, totalItems);
   return (
     <section className="automation-funds" aria-label="Loaded automation summary">
       <div className="automation-funds__heading">
         <div>
-          <span>Recipient amount scheduled</span>
+          <span>Recipient amount on this page</span>
           <strong>{summary.recipientTotal}</strong>
-          <small>Across the automations currently loaded</small>
+          <small>Across the automations shown below</small>
         </div>
         <div className="automation-funds__count">
           <strong>{summary.total.toLocaleString("en-US")}</strong>
-          <span>automations</span>
+          <span>matching automations</span>
         </div>
       </div>
       <div aria-hidden="true" className="automation-distribution">
@@ -257,13 +265,18 @@ export interface AutomationDashboardViewProperties {
   readonly dataSourceLabel?: string | undefined;
   readonly error?: string | undefined;
   readonly hasNextPage?: boolean | undefined;
+  readonly hasPreviousPage?: boolean | undefined;
   readonly items: readonly DashboardJob[];
   readonly loadState: DashboardLoadState;
-  readonly loadingNextPage?: boolean | undefined;
+  readonly loadingPage?: boolean | undefined;
   readonly mode: DashboardMode;
+  readonly pageIndex?: number | undefined;
+  readonly pageSize?: number | undefined;
+  readonly paginationError?: string | undefined;
   readonly recipientAmounts?: RecipientAmountsByJob | undefined;
   readonly onConnect?: (() => void) | undefined;
-  readonly onLoadNext?: (() => void) | undefined;
+  readonly onNextPage?: (() => void) | undefined;
+  readonly onPreviousPage?: (() => void) | undefined;
   readonly onModeChange: (mode: DashboardMode) => void;
   readonly onRetry?: (() => void) | undefined;
   readonly onStateChange: (state: string) => void;
@@ -271,6 +284,7 @@ export interface AutomationDashboardViewProperties {
   readonly stateFilter: string;
   readonly templateFilter: string;
   readonly titles?: Readonly<Record<string, string>> | undefined;
+  readonly totalItems?: number | undefined;
 }
 
 export function AutomationDashboardView({
@@ -279,13 +293,18 @@ export function AutomationDashboardView({
   dataSourceLabel,
   error,
   hasNextPage = false,
+  hasPreviousPage = false,
   items,
   loadState,
-  loadingNextPage = false,
+  loadingPage = false,
   mode,
+  pageIndex = 0,
+  pageSize = 12,
+  paginationError,
   recipientAmounts = {},
   onConnect,
-  onLoadNext,
+  onNextPage,
+  onPreviousPage,
   onModeChange,
   onRetry,
   onStateChange,
@@ -293,7 +312,9 @@ export function AutomationDashboardView({
   stateFilter,
   templateFilter,
   titles = {},
+  totalItems = items.length,
 }: AutomationDashboardViewProperties) {
+  const page = dashboardPageRange(pageIndex, pageSize, items.length, totalItems);
   return (
     <section className="app-page automation-dashboard" aria-labelledby="page-title">
       <header className="app-page-header">
@@ -314,7 +335,7 @@ export function AutomationDashboardView({
 
       {items.length > 0 ? (
         <div className="automation-overview">
-          <Summary items={items} recipientAmounts={recipientAmounts} />
+          <Summary items={items} recipientAmounts={recipientAmounts} totalItems={totalItems} />
           <NextAutomation
             checkpointAt={checkpointAt}
             checkpointBlock={checkpointBlock}
@@ -425,16 +446,43 @@ export function AutomationDashboardView({
             titles={titles}
           />
         ) : null}
-        {hasNextPage ? (
+        {paginationError === undefined ? null : (
+          <div className="automation-pagination-error" role="status">
+            {paginationError}
+          </div>
+        )}
+        {totalItems > 0 ? (
           <div className="automation-pagination">
-            <Button disabled={loadingNextPage} onClick={onLoadNext} tone="secondary">
-              {loadingNextPage ? "Loading..." : "Load next page"}
-            </Button>
+            <span>
+              Showing {page.first.toLocaleString("en-US")}-{page.last.toLocaleString("en-US")} of{" "}
+              {totalItems.toLocaleString("en-US")}
+            </span>
+            <div className="automation-pagination__controls">
+              <Button
+                disabled={!hasPreviousPage || loadingPage}
+                icon={<ChevronLeft aria-hidden="true" size={16} />}
+                onClick={onPreviousPage}
+                tone="secondary"
+              >
+                Previous
+              </Button>
+              <strong aria-live="polite">
+                Page {pageIndex + 1} of {page.totalPages}
+              </strong>
+              <Button
+                disabled={!hasNextPage || loadingPage}
+                icon={<ChevronRight aria-hidden="true" size={16} />}
+                onClick={onNextPage}
+                tone="secondary"
+              >
+                {loadingPage ? "Loading..." : "Next"}
+              </Button>
+            </div>
           </div>
         ) : null}
         <footer className="automation-surface__footer">
           <span>{dataSourceLabel ?? "Live testnet index"}</span>
-          <span>{items.length.toLocaleString("en-US")} loaded</span>
+          <span>{totalItems.toLocaleString("en-US")} indexed</span>
         </footer>
       </section>
     </section>

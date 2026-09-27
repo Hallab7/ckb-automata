@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 
 import {
   BadRequestException,
-  ConflictException,
   Controller,
   Get,
   Inject,
@@ -21,7 +20,7 @@ import {
   ApiQuery,
   ApiTags,
 } from "@nestjs/swagger";
-import { and, desc, eq, lt, or, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, lt, or, type SQL } from "drizzle-orm";
 
 import { inspectJobData } from "@ckb-automata/core";
 
@@ -99,6 +98,7 @@ export interface JobListResponse {
   readonly page: {
     readonly limit: number;
     readonly nextCursor: string | null;
+    readonly totalItems: number;
   };
   readonly indexCheckpoint: JobSourceProvenance["indexCheckpoint"];
 }
@@ -141,7 +141,6 @@ interface ParsedListQuery {
 interface CursorPayload {
   readonly v: 1;
   readonly f: string;
-  readonly c: string | null;
   readonly b: string;
   readonly t: string;
   readonly o: string;
@@ -233,7 +232,6 @@ function decodeCursor(value: string): CursorPayload {
       Array.isArray(decoded) ||
       Reflect.get(decoded, "v") !== CURSOR_VERSION ||
       typeof Reflect.get(decoded, "f") !== "string" ||
-      (Reflect.get(decoded, "c") !== null && typeof Reflect.get(decoded, "c") !== "string") ||
       !["b", "t", "o"].every((key) => /^[0-9]+$/.test(String(Reflect.get(decoded, key)))) ||
       !HASH_PATTERN.test(String(Reflect.get(decoded, "j")))
     ) {
@@ -243,15 +241,18 @@ function decodeCursor(value: string): CursorPayload {
     if (
       BigInt(payload.b) > UINT64_MAX ||
       BigInt(payload.t) > UINT32_MAX ||
-      BigInt(payload.o) > UINT32_MAX ||
-      (payload.c !== null && !/^(0|[1-9][0-9]*):0x[0-9a-f]{64}$/.test(payload.c))
+      BigInt(payload.o) > UINT32_MAX
     ) {
       throw new Error("cursor value is outside its canonical range");
     }
-    if (payload.c !== null && BigInt(payload.c.slice(0, payload.c.indexOf(":"))) > UINT64_MAX) {
-      throw new Error("cursor checkpoint is outside its canonical range");
-    }
-    return payload;
+    return Object.freeze({
+      v: CURSOR_VERSION,
+      f: payload.f,
+      b: payload.b,
+      t: payload.t,
+      o: payload.o,
+      j: payload.j,
+    });
   } catch {
     throw invalidQuery("cursor is malformed");
   }
@@ -259,10 +260,6 @@ function decodeCursor(value: string): CursorPayload {
 
 function bytesToHex(value: Buffer): string {
   return `0x${value.toString("hex")}`;
-}
-
-function checkpointKey(checkpoint: Checkpoint): string | null {
-  return checkpoint === null ? null : `${checkpoint.blockNumber}:${checkpoint.blockHash}`;
 }
 
 function readModel(row: JobRow, checkpoint: Checkpoint): JobReadModel {
@@ -401,24 +398,23 @@ export class JobReadService {
           .where(eq(indexerCheckpoints.networkId, this.#network))
           .limit(1);
         const checkpoint = checkpointRow ?? null;
-        if (cursor !== undefined && cursor.c !== checkpointKey(checkpoint)) {
-          throw new ConflictException({
-            status: "conflict",
-            code: "STALE_JOB_CURSOR",
-            message: "the index checkpoint changed; restart pagination",
-          });
-        }
+        const filters: SQL[] = [eq(jobs.networkId, this.#network)];
+        if (ownerLockHash !== undefined) filters.push(eq(jobs.ownerLockHash, ownerLockHash));
+        if (query.state !== undefined) filters.push(eq(jobs.state, query.state));
+        if (query.template !== undefined) filters.push(eq(jobs.policyKind, query.template));
+        const [total] = await tx
+          .select({ totalItems: count() })
+          .from(jobs)
+          .where(and(...filters))
+          .limit(1);
+        if (total === undefined) throw new Error("job count query returned no result");
 
-        const clauses: SQL[] = [eq(jobs.networkId, this.#network)];
-        if (ownerLockHash !== undefined) clauses.push(eq(jobs.ownerLockHash, ownerLockHash));
-        if (query.state !== undefined) clauses.push(eq(jobs.state, query.state));
-        if (query.template !== undefined) clauses.push(eq(jobs.policyKind, query.template));
-        if (cursor !== undefined) clauses.push(cursorCondition(cursor));
+        const pageFilters = cursor === undefined ? filters : [...filters, cursorCondition(cursor)];
 
         const rows = await tx
           .select()
           .from(jobs)
-          .where(and(...clauses))
+          .where(and(...pageFilters))
           .orderBy(
             desc(jobs.blockNumber),
             desc(jobs.transactionIndex),
@@ -426,7 +422,7 @@ export class JobReadService {
             desc(jobs.jobId),
           )
           .limit(query.limit + 1);
-        return { checkpoint, rows };
+        return { checkpoint, rows, totalItems: total.totalItems };
       },
       { accessMode: "read only", isolationLevel: "repeatable read" },
     );
@@ -439,7 +435,6 @@ export class JobReadService {
         ? encodeCursor({
             v: CURSOR_VERSION,
             f: fingerprint,
-            c: checkpointKey(result.checkpoint),
             b: last.blockNumber,
             t: last.transactionIndex,
             o: last.outpointIndex,
@@ -449,7 +444,7 @@ export class JobReadService {
 
     return Object.freeze({
       items: Object.freeze(pageRows.map((row) => readModel(row, result.checkpoint))),
-      page: Object.freeze({ limit: query.limit, nextCursor }),
+      page: Object.freeze({ limit: query.limit, nextCursor, totalItems: result.totalItems }),
       indexCheckpoint: result.checkpoint,
     });
   }
@@ -598,8 +593,12 @@ const listSchema = {
     items: { type: "array", items: jobSchema },
     page: {
       type: "object",
-      required: ["limit", "nextCursor"],
-      properties: { limit: { type: "integer" }, nextCursor: { type: "string", nullable: true } },
+      required: ["limit", "nextCursor", "totalItems"],
+      properties: {
+        limit: { type: "integer" },
+        nextCursor: { type: "string", nullable: true },
+        totalItems: { type: "integer", minimum: 0 },
+      },
     },
     indexCheckpoint: checkpointSchema,
   },

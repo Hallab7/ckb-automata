@@ -21,6 +21,15 @@ import {
 } from "./dashboard-view.tsx";
 import type { DashboardJob, RecipientAmountsByJob } from "./dashboard-model.ts";
 
+const PAGE_SIZE = 12;
+const FIRST_PAGE_REFRESH_MS = 15_000;
+const EMPTY_ITEMS: ApiJobList["items"] = Object.freeze([]);
+
+interface LoadedDashboardPage {
+  readonly loadedAt: string;
+  readonly response: ApiJobList;
+}
+
 function browserApiClient(): AutomataApiClient {
   const environment = browserWebEnvironment();
   return createApiClient({ baseUrl: environment.apiUrl });
@@ -56,22 +65,27 @@ export function AutomationDashboard() {
   const [mode, setMode] = useState<DashboardMode>("public");
   const [stateFilter, setStateFilter] = useState("");
   const [templateFilter, setTemplateFilter] = useState("");
-  const [items, setItems] = useState<ApiJobList["items"]>([]);
+  const [pages, setPages] = useState<readonly LoadedDashboardPage[]>([]);
+  const [pageIndex, setPageIndex] = useState(0);
   const [recipientAmounts, setRecipientAmounts] = useState<RecipientAmountsByJob>({});
-  const [checkpointAt, setCheckpointAt] = useState<string>();
-  const [checkpointBlock, setCheckpointBlock] = useState<string>();
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<DashboardLoadState>("loading");
   const [error, setError] = useState<string>();
-  const [loadingNextPage, setLoadingNextPage] = useState(false);
+  const [paginationError, setPaginationError] = useState<string>();
+  const [loadingPage, setLoadingPage] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [titles, setTitles] = useState<Readonly<Record<string, string>>>({});
+
+  const currentPage = pages[pageIndex];
+  const items = currentPage?.response.items ?? EMPTY_ITEMS;
+  const checkpointAt = currentPage?.loadedAt;
+  const checkpointBlock = currentPage?.response.indexCheckpoint?.blockNumber;
+  const totalItems = currentPage?.response.page.totalItems ?? 0;
 
   useEffect(() => setTitles(readAutomationTitles(window.localStorage)), [items]);
 
   const query = useMemo<ApiQuery<"JobsController_list">>(
     () => ({
-      limit: 12,
+      limit: PAGE_SIZE,
       ...(stateFilter
         ? { state: stateFilter as NonNullable<ApiQuery<"JobsController_list">["state"]> }
         : {}),
@@ -85,27 +99,27 @@ export function AutomationDashboard() {
   useEffect(() => {
     if (apiResult.api === undefined) {
       setError(apiResult.error);
-      setItems([]);
+      setPages([]);
       setRecipientAmounts({});
       setLoadState("error");
       return;
     }
     if (mode === "owner") {
       if (session.status !== "ready") {
-        setItems([]);
+        setPages([]);
         setRecipientAmounts({});
         setLoadState("owner_required");
         return;
       }
       if (session.detailsStatus === "loading") {
-        setItems([]);
+        setPages([]);
         setRecipientAmounts({});
         setLoadState("loading");
         return;
       }
       if (session.ownerLockHash === undefined) {
         setError("The connected wallet lock could not be resolved. Retry the wallet details.");
-        setItems([]);
+        setPages([]);
         setRecipientAmounts({});
         setLoadState("error");
         return;
@@ -114,11 +128,10 @@ export function AutomationDashboard() {
 
     let active = true;
     setError(undefined);
-    setItems([]);
+    setPages([]);
+    setPageIndex(0);
     setRecipientAmounts({});
-    setCheckpointAt(undefined);
-    setCheckpointBlock(undefined);
-    setNextCursor(null);
+    setPaginationError(undefined);
     setLoadState("loading");
     const request =
       mode === "owner"
@@ -127,10 +140,7 @@ export function AutomationDashboard() {
     void request
       .then((response) => {
         if (!active) return;
-        setItems(response.items);
-        setCheckpointAt(new Date().toISOString());
-        setCheckpointBlock(response.indexCheckpoint?.blockNumber);
-        setNextCursor(response.page.nextCursor);
+        setPages([{ loadedAt: new Date().toISOString(), response }]);
         setLoadState("ready");
         void loadRecipientAmounts(apiResult.api!, response.items).then((amounts) => {
           if (active) setRecipientAmounts(amounts);
@@ -154,10 +164,49 @@ export function AutomationDashboard() {
     session.status,
   ]);
 
-  const loadNextPage = useCallback(() => {
-    if (apiResult.api === undefined || nextCursor === null || loadingNextPage) return;
+  useEffect(() => {
+    if (apiResult.api === undefined || loadState !== "ready" || pageIndex !== 0) return;
     if (mode === "owner" && session.ownerLockHash === undefined) return;
-    setLoadingNextPage(true);
+    let active = true;
+    const refresh = () => {
+      const request =
+        mode === "owner"
+          ? apiResult.api!.listAccountJobs(session.ownerLockHash!, query)
+          : apiResult.api!.listJobs(query);
+      void request
+        .then((response) => {
+          if (!active) return;
+          setPages([{ loadedAt: new Date().toISOString(), response }]);
+          void loadRecipientAmounts(apiResult.api!, response.items).then((amounts) => {
+            if (active) setRecipientAmounts((current) => ({ ...current, ...amounts }));
+          });
+        })
+        .catch(() => {
+          // Keep the last complete page when a background refresh is temporarily unavailable.
+        });
+    };
+    const timer = setInterval(refresh, FIRST_PAGE_REFRESH_MS);
+    window.addEventListener("focus", refresh);
+    return () => {
+      active = false;
+      clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [apiResult.api, loadState, mode, pageIndex, query, session.ownerLockHash]);
+
+  const loadNextPage = useCallback(() => {
+    if (apiResult.api === undefined || loadingPage) return;
+    if (mode === "owner" && session.ownerLockHash === undefined) return;
+    const cached = pages[pageIndex + 1];
+    if (cached !== undefined) {
+      setPageIndex(pageIndex + 1);
+      setPaginationError(undefined);
+      return;
+    }
+    const nextCursor = currentPage?.response.page.nextCursor;
+    if (nextCursor === undefined || nextCursor === null) return;
+    setLoadingPage(true);
+    setPaginationError(undefined);
     const cursorQuery = { ...query, cursor: nextCursor };
     const request =
       mode === "owner"
@@ -165,20 +214,26 @@ export function AutomationDashboard() {
         : apiResult.api.listJobs(cursorQuery);
     void request
       .then((response) => {
-        setItems((current) => [...current, ...response.items]);
-        setCheckpointAt(new Date().toISOString());
-        setCheckpointBlock(response.indexCheckpoint?.blockNumber);
-        setNextCursor(response.page.nextCursor);
+        setPages((current) => [
+          ...current.slice(0, pageIndex + 1),
+          { loadedAt: new Date().toISOString(), response },
+        ]);
+        setPageIndex(pageIndex + 1);
         void loadRecipientAmounts(apiResult.api!, response.items).then((amounts) => {
           setRecipientAmounts((current) => ({ ...current, ...amounts }));
         });
       })
       .catch((reason: unknown) => {
-        setError(requestErrorMessage("dashboard", reason));
-        setLoadState("error");
+        setPaginationError(requestErrorMessage("dashboard", reason));
       })
-      .finally(() => setLoadingNextPage(false));
-  }, [apiResult, loadingNextPage, mode, nextCursor, query, session.ownerLockHash]);
+      .finally(() => setLoadingPage(false));
+  }, [apiResult, currentPage, loadingPage, mode, pageIndex, pages, query, session.ownerLockHash]);
+
+  const loadPreviousPage = useCallback(() => {
+    if (loadingPage || pageIndex === 0) return;
+    setPageIndex((current) => current - 1);
+    setPaginationError(undefined);
+  }, [loadingPage, pageIndex]);
 
   return (
     <AutomationDashboardView
@@ -186,17 +241,24 @@ export function AutomationDashboard() {
       checkpointBlock={checkpointBlock}
       dataSourceLabel={LIVE_DATA_LABEL}
       error={error}
-      hasNextPage={nextCursor !== null}
+      hasNextPage={currentPage?.response.page.nextCursor != null}
+      hasPreviousPage={pageIndex > 0}
       items={items}
       loadState={loadState}
-      loadingNextPage={loadingNextPage}
+      loadingPage={loadingPage}
       mode={mode}
+      pageIndex={pageIndex}
+      pageSize={PAGE_SIZE}
+      paginationError={paginationError}
       recipientAmounts={recipientAmounts}
+      totalItems={totalItems}
       onConnect={session.open}
-      onLoadNext={loadNextPage}
+      onNextPage={loadNextPage}
+      onPreviousPage={loadPreviousPage}
       onModeChange={setMode}
       onRetry={() => {
         session.refreshDetails();
+        setPaginationError(undefined);
         setRefreshKey((current) => current + 1);
       }}
       onStateChange={setStateFilter}

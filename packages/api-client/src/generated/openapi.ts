@@ -608,6 +608,7 @@ export interface operations {
                         readonly page: {
                             readonly limit: number;
                             readonly nextCursor: string | null;
+                            readonly totalItems: number;
                         };
                     };
                 };
@@ -1049,6 +1050,7 @@ export interface operations {
                         readonly page: {
                             readonly limit: number;
                             readonly nextCursor: string | null;
+                            readonly totalItems: number;
                         };
                     };
                 };

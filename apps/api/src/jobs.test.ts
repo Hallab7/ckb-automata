@@ -35,7 +35,7 @@ function readDatabase(checkpoint: { blockNumber: string; blockHash: string } | u
   const conditions: SQL[] = [];
   let queryCount = 0;
   const transaction = {
-    select: () => {
+    select: (selection?: Readonly<Record<string, unknown>>) => {
       queryCount += 1;
       const current = queryCount;
       const builder = {
@@ -45,7 +45,11 @@ function readDatabase(checkpoint: { blockNumber: string; blockHash: string } | u
           return builder;
         },
         orderBy: () => builder,
-        limit: async () => (current === 1 && checkpoint !== undefined ? [checkpoint] : []),
+        limit: async () => {
+          if (current === 1 && checkpoint !== undefined) return [checkpoint];
+          if (selection?.["totalItems"] !== undefined) return [{ totalItems: 0 }];
+          return [];
+        },
       };
       return builder;
     },
@@ -82,12 +86,13 @@ test("confirmed reconciliation rows remain readable ahead of the canonical check
   const service = new JobReadService(stale.database as never, "ckb_testnet");
 
   await service.list({ limit: 20 });
-  assert.equal(stale.queryCount(), 2);
+  assert.equal(stale.queryCount(), 3);
   assert.equal(dialect.sqlToQuery(stale.conditions[1]!).sql, '"jobs"."network_id" = $1');
+  assert.equal(dialect.sqlToQuery(stale.conditions[2]!).sql, '"jobs"."network_id" = $1');
 
   const empty = readDatabase(undefined);
   await new JobReadService(empty.database as never, "ckb_testnet").list({ limit: 20 });
-  assert.equal(empty.queryCount(), 2);
+  assert.equal(empty.queryCount(), 3);
 });
 
 test("job routes publish an OpenAPI contract with decimal-string integer fields", async () => {
@@ -113,6 +118,15 @@ test("job routes publish an OpenAPI contract with decimal-string integer fields"
       "$ref" in parameter ? parameter.$ref : parameter.name,
     );
     assert.deepEqual(parameters.toSorted(), ["cursor", "limit", "state", "template"]);
+    const listResponse = listOperation.responses?.["200"];
+    assert.ok(listResponse && "content" in listResponse);
+    const listSchema = listResponse.content?.["application/json"]?.schema;
+    assert.ok(listSchema && !("$ref" in listSchema));
+    const page = listSchema.properties?.["page"];
+    assert.ok(page && !("$ref" in page));
+    const totalItems = page.properties?.["totalItems"];
+    assert.ok(totalItems && !("$ref" in totalItems));
+    assert.equal(totalItems.type, "integer");
 
     const detailSchema = document.paths["/v1/jobs/{jobId}"]?.get?.responses?.["200"];
     assert.ok(detailSchema && "content" in detailSchema);

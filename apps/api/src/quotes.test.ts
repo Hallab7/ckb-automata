@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { LoggerService } from "@nestjs/common";
+import { NotFoundException, type LoggerService } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import type { SQL } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 
 import { createApiApplication } from "./bootstrap.ts";
 import {
   JOB_QUOTE_ASSUMPTIONS,
+  JobQuoteService,
   canonicalJobTerms,
   stableJobQuoteId,
   type JobQuote,
@@ -128,6 +131,41 @@ test("canonical terms preserve the original recurring payout after the final run
       },
     },
   );
+});
+
+test("terms lookup accepts reconciled jobs ahead of the canonical checkpoint", async () => {
+  const conditions: SQL[] = [];
+  let queryCount = 0;
+  const transaction = {
+    select: () => {
+      queryCount += 1;
+      const builder = {
+        from: () => builder,
+        where: (condition: SQL) => {
+          conditions.push(condition);
+          return builder;
+        },
+        orderBy: () => builder,
+        limit: async () => [],
+      };
+      return builder;
+    },
+  };
+  const database = {
+    transaction: async <T>(operation: (tx: typeof transaction) => Promise<T>) =>
+      operation(transaction),
+  };
+  const service = new JobQuoteService(database as never, "ckb_testnet", {} as never);
+
+  await assert.rejects(
+    service.terms(`0x${"1".repeat(64)}`),
+    (error: unknown) => error instanceof NotFoundException,
+  );
+  assert.equal(queryCount, 2);
+  const dialect = new PgDialect();
+  for (const condition of conditions) {
+    assert.doesNotMatch(dialect.sqlToQuery(condition).sql, /block_number/);
+  }
 });
 
 test("quote route documents every chain integer as a decimal string", async () => {

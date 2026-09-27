@@ -5,6 +5,7 @@ import type { ApiJobList } from "@ckb-automata/api-client";
 
 import {
   dashboardJobPresentation,
+  dashboardPageRange,
   dashboardSummary,
   type DashboardJob,
 } from "./dashboard-model.ts";
@@ -103,4 +104,11 @@ test("dashboard summary preserves exact recipient amounts", () => {
     dashboardSummary(items, Object.fromEntries([[items[0]!.jobId, null]])).recipientTotal,
     "Unavailable",
   );
+});
+
+test("dashboard summary and page range use the complete filtered total", () => {
+  const items = [job("live", { jobId: `0x${"1".repeat(64)}` })];
+  assert.equal(dashboardSummary(items, {}, 14).total, 14);
+  assert.deepEqual(dashboardPageRange(0, 12, 12, 14), { first: 1, last: 12, totalPages: 2 });
+  assert.deepEqual(dashboardPageRange(1, 12, 2, 14), { first: 13, last: 14, totalPages: 2 });
 });

@@ -23,7 +23,7 @@ import {
 } from "@nestjs/swagger";
 import { WitnessArgs, type ClientTransactionResponse } from "@ckb-ccc/shell";
 import { scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
-import { and, desc, eq, lte, ne } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 
 import {
   CONTRACT_CAPACITY,
@@ -471,27 +471,10 @@ export class JobQuoteService {
     const jobId = parseJobId(jobIdInput);
     const indexed = await this.#database.transaction(
       async (tx) => {
-        const [checkpoint] = await tx
-          .select({ blockNumber: indexerCheckpoints.blockNumber })
-          .from(indexerCheckpoints)
-          .where(eq(indexerCheckpoints.networkId, this.#network))
-          .limit(1);
-        if (checkpoint === undefined) {
-          throw new ServiceUnavailableException({
-            status: "unavailable",
-            code: "TERMS_SNAPSHOT_UNAVAILABLE",
-          });
-        }
         const [row] = await tx
           .select()
           .from(jobs)
-          .where(
-            and(
-              eq(jobs.networkId, this.#network),
-              eq(jobs.jobId, jobId),
-              lte(jobs.blockNumber, checkpoint.blockNumber),
-            ),
-          )
+          .where(and(eq(jobs.networkId, this.#network), eq(jobs.jobId, jobId)))
           .limit(1);
         const [version] = await tx
           .select()
@@ -501,7 +484,6 @@ export class JobQuoteService {
               eq(jobVersions.networkId, this.#network),
               eq(jobVersions.jobId, jobId),
               ne(jobVersions.status, "orphaned"),
-              lte(jobVersions.observedBlockNumber, checkpoint.blockNumber),
             ),
           )
           .orderBy(desc(jobVersions.sequence), desc(jobVersions.id))
@@ -585,13 +567,7 @@ export class JobQuoteService {
         const [row] = await tx
           .select()
           .from(jobs)
-          .where(
-            and(
-              eq(jobs.networkId, this.#network),
-              eq(jobs.jobId, jobId),
-              lte(jobs.blockNumber, checkpoint.blockNumber),
-            ),
-          )
+          .where(and(eq(jobs.networkId, this.#network), eq(jobs.jobId, jobId)))
           .limit(1);
         return { checkpoint, row };
       },

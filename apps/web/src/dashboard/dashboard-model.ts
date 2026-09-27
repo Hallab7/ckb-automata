@@ -127,6 +127,7 @@ export function dashboardJobPresentation(
 export function dashboardSummary(
   items: readonly DashboardJob[],
   recipientAmounts: RecipientAmountsByJob,
+  totalItems = items.length,
 ): DashboardSummary {
   const counts = { live: 0, orphaned: 0, spent: 0 };
   let recipientTotal = 0n;
@@ -146,8 +147,29 @@ export function dashboardSummary(
         ? "Loading..."
         : formatCkbBalance(recipientTotal),
     ...counts,
-    total: items.length,
+    total: totalItems,
   };
+}
+
+export function dashboardPageRange(
+  pageIndex: number,
+  pageSize: number,
+  itemCount: number,
+  totalItems: number,
+): { readonly first: number; readonly last: number; readonly totalPages: number } {
+  if (!Number.isSafeInteger(pageIndex) || pageIndex < 0) throw new RangeError("invalid page index");
+  if (!Number.isSafeInteger(pageSize) || pageSize < 1) throw new RangeError("invalid page size");
+  if (!Number.isSafeInteger(itemCount) || itemCount < 0 || itemCount > pageSize) {
+    throw new RangeError("invalid page item count");
+  }
+  if (!Number.isSafeInteger(totalItems) || totalItems < 0) {
+    throw new RangeError("invalid total item count");
+  }
+  return Object.freeze({
+    first: itemCount === 0 ? 0 : pageIndex * pageSize + 1,
+    last: itemCount === 0 ? 0 : Math.min(pageIndex * pageSize + itemCount, totalItems),
+    totalPages: Math.max(1, Math.ceil(totalItems / pageSize)),
+  });
 }
 
 export function shortJobId(jobId: string): string {

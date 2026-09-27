@@ -29,9 +29,12 @@ test("encodes path and query parameters", async () => {
     baseUrl: "https://api.example.test/root/",
     fetch: async (input, init) => {
       requests.push(new Request(input, init));
-      return new Response(JSON.stringify({ items: [], page: { limit: 20, nextCursor: null } }), {
-        headers: jsonHeaders,
-      });
+      return new Response(
+        JSON.stringify({ items: [], page: { limit: 20, nextCursor: null, totalItems: 0 } }),
+        {
+          headers: jsonHeaders,
+        },
+      );
     },
   });
 
