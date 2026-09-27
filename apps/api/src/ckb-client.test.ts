@@ -99,6 +99,20 @@ test("CCC wrapper reads chain and indexer responses", async (context) => {
     respond(response, request, result);
   });
   const indexer = await openServer((request, response) => {
+    if (request.method === "get_transactions") {
+      respond(response, request, {
+        last_cursor: "0xcursor",
+        objects: [
+          {
+            block_number: "0x2a",
+            cells: [["output", "0x0"]],
+            tx_hash: LIVE_TX_HASH,
+            tx_index: "0x1",
+          },
+        ],
+      });
+      return;
+    }
     assert.equal(request.method, "get_indexer_tip");
     respond(response, request, { block_number: "0x29", block_hash: PARENT_HASH });
   });
@@ -122,6 +136,25 @@ test("CCC wrapper reads chain and indexer responses", async (context) => {
   const live = await client.getCellLive({ txHash: LIVE_TX_HASH, index: 0 });
   assert.equal(live?.outPoint.txHash, LIVE_TX_HASH);
   assert.equal(live?.cellOutput.capacity, 100_000_000_000n);
+  const transactions = await client.findTransactionsPaged({
+    script: {
+      args: "0x",
+      codeHash: GENESIS_HASH,
+      hashType: "data1",
+    },
+    scriptType: "lock",
+    scriptSearchMode: "exact",
+    groupByTransaction: true,
+  });
+  assert.equal(transactions.lastCursor, "0xcursor");
+  assert.deepEqual(transactions.transactions, [
+    {
+      blockNumber: 42n,
+      cells: [{ cellIndex: 0n, isInput: false }],
+      txHash: LIVE_TX_HASH,
+      txIndex: 1n,
+    },
+  ]);
 });
 
 test("client configuration rejects unsafe endpoints and retry bounds", () => {

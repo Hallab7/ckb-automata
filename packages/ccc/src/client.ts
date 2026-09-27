@@ -4,6 +4,8 @@ import {
   type ClientBlockHeader,
   type Cell,
   type ClientFindCellsResponse,
+  type ClientFindTransactionsGroupedResponse,
+  type ClientIndexerSearchKeyTransactionLike,
   type ClientIndexerSearchKeyLike,
   type ClientTransactionResponse,
   type Hex,
@@ -64,6 +66,14 @@ export interface CkbReadClient {
     limit?: NumLike,
     after?: string,
   ): Promise<ClientFindCellsResponse>;
+  findTransactionsPaged(
+    key: Omit<ClientIndexerSearchKeyTransactionLike, "groupByTransaction"> & {
+      readonly groupByTransaction: true;
+    },
+    order?: "asc" | "desc",
+    limit?: NumLike,
+    after?: string,
+  ): Promise<ClientFindTransactionsGroupedResponse>;
   getTransactionStatus(txHash: HexLike): Promise<ClientTransactionResponse | undefined>;
 }
 
@@ -249,6 +259,19 @@ export class CkbClient implements CkbReadClient {
   ): Promise<ClientFindCellsResponse> {
     return this.#safeRead("INDEXER_READ_FAILED", "indexer", "get_cells", () =>
       this.#indexerOwner.value.findCellsPagedNoCache(key, order, limit, after),
+    );
+  }
+
+  findTransactionsPaged(
+    key: Omit<ClientIndexerSearchKeyTransactionLike, "groupByTransaction"> & {
+      readonly groupByTransaction: true;
+    },
+    order?: "asc" | "desc",
+    limit?: NumLike,
+    after?: string,
+  ): Promise<ClientFindTransactionsGroupedResponse> {
+    return this.#safeRead("INDEXER_READ_FAILED", "indexer", "get_transactions", () =>
+      this.#indexerOwner.value.findTransactionsPaged(key, order, limit, after),
     );
   }
 

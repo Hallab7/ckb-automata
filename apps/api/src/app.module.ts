@@ -19,6 +19,7 @@ import { CanonicalCheckpointStore } from "./indexer/checkpoints.ts";
 import { JobCellDiscovery } from "./indexer/job-discovery.ts";
 import { JobTransitionIndexer } from "./indexer/job-transitions.ts";
 import { CanonicalBlockProjector, JobProjectionRollback } from "./indexer/reorg.ts";
+import { LiveJobReconciler } from "./indexer/reconciliation.ts";
 import { LiveIndexerRuntime } from "./indexer/runtime.ts";
 import {
   AccountJobsController,
@@ -179,6 +180,33 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
             loadDeployment: async () => {
               const result = await deploymentRegistry.load(environment.CKB_GENESIS_HASH);
               if (result.status !== "ok") throw new Error("indexer deployment is unavailable");
+              return result.deployment;
+            },
+          }),
+      },
+      {
+        provide: LiveJobReconciler,
+        inject: [
+          CkbClient,
+          CanonicalCheckpointStore,
+          JobCellDiscovery,
+          JobTransitionIndexer,
+          BackendTelemetry,
+        ],
+        useFactory: (
+          ckbClient: CkbClient,
+          checkpoints: CanonicalCheckpointStore,
+          discovery: JobCellDiscovery,
+          transitions: JobTransitionIndexer,
+          telemetry: BackendTelemetry,
+        ) =>
+          new LiveJobReconciler(ckbClient, checkpoints, discovery, transitions, telemetry.logger, {
+            enabled: environment.AUTOMATA_PROFILE === "testnet-public",
+            loadDeployment: async () => {
+              const result = await deploymentRegistry.load(environment.CKB_GENESIS_HASH);
+              if (result.status !== "ok") {
+                throw new Error("reconciliation deployment is unavailable");
+              }
               return result.deployment;
             },
           }),
