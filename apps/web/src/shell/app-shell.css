@@ -26,7 +26,7 @@
   border-right: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--ui-space-6);
+  gap: var(--ui-space-8);
   height: 100dvh;
   overflow-y: auto;
   padding: var(--ui-space-6) var(--ui-space-4) var(--ui-space-5);
@@ -139,7 +139,15 @@
 
 .app-nav__section {
   display: grid;
-  gap: var(--ui-space-2);
+  gap: var(--ui-space-3);
+}
+
+.app-sidebar .app-nav {
+  padding-top: var(--ui-space-2);
+}
+
+.app-sidebar .app-nav__group {
+  gap: var(--ui-space-3);
 }
 
 .app-nav__label {
@@ -158,7 +166,7 @@
   font-size: 0.875rem;
   font-weight: 650;
   gap: var(--ui-space-3);
-  min-height: 2.5rem;
+  min-height: 3rem;
   min-width: 0;
   padding: var(--ui-space-2) var(--ui-space-3);
   text-decoration: none;
@@ -179,10 +187,10 @@
   border-top: 1px solid rgb(255 255 255 / 12%);
   color: #9db3a8;
   display: grid;
-  gap: var(--ui-space-2);
+  gap: var(--ui-space-3);
   margin-top: auto;
   min-width: 0;
-  padding: var(--ui-space-4) var(--ui-space-2) 0;
+  padding: var(--ui-space-5) var(--ui-space-2) var(--ui-space-1);
 }
 
 .app-wallet-control__heading,

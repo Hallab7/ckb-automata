@@ -1,7 +1,7 @@
 "use client";
 
 import { CircleCheck, CircleX, Info, TriangleAlert, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { IconButton } from "@ckb-automata/ui";
 
@@ -10,6 +10,7 @@ export const APP_NOTIFICATION_EVENT = "automata:notification";
 export type AppNotificationTone = "info" | "success" | "warning" | "danger";
 
 export interface AppNotification {
+  readonly dismissAfterMs?: number;
   readonly id: string;
   readonly message: string;
   readonly title: string;
@@ -27,8 +28,50 @@ const toneIcons = {
   warning: TriangleAlert,
 } as const;
 
+function NotificationItem({
+  notification,
+  onDismiss,
+}: Readonly<{
+  notification: AppNotification;
+  onDismiss: (id: string) => void;
+}>) {
+  const Icon = toneIcons[notification.tone];
+
+  useEffect(() => {
+    if (notification.dismissAfterMs === undefined) return;
+    const timeout = window.setTimeout(
+      () => onDismiss(notification.id),
+      notification.dismissAfterMs,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [notification.dismissAfterMs, notification.id, onDismiss]);
+
+  return (
+    <div
+      className={`app-notification app-notification--${notification.tone}`}
+      role={notification.tone === "danger" ? "alert" : "status"}
+    >
+      <Icon aria-hidden="true" size={18} />
+      <div>
+        <strong>{notification.title}</strong>
+        <p>{notification.message}</p>
+      </div>
+      <IconButton
+        icon={<X aria-hidden="true" size={16} />}
+        label={`Dismiss ${notification.title}`}
+        onClick={() => onDismiss(notification.id)}
+        showTooltip={false}
+      />
+    </div>
+  );
+}
+
 export function NotificationCenter() {
   const [notifications, setNotifications] = useState<readonly AppNotification[]>([]);
+
+  const dismissNotification = useCallback((id: string) => {
+    setNotifications((current) => current.filter((item) => item.id !== id));
+  }, []);
 
   useEffect(() => {
     function receive(event: Event) {
@@ -51,30 +94,13 @@ export function NotificationCenter() {
       className="app-notifications"
       role="region"
     >
-      {notifications.map((notification) => {
-        const Icon = toneIcons[notification.tone];
-        return (
-          <div
-            className={`app-notification app-notification--${notification.tone}`}
-            key={notification.id}
-            role={notification.tone === "danger" ? "alert" : "status"}
-          >
-            <Icon aria-hidden="true" size={18} />
-            <div>
-              <strong>{notification.title}</strong>
-              <p>{notification.message}</p>
-            </div>
-            <IconButton
-              icon={<X aria-hidden="true" size={16} />}
-              label={`Dismiss ${notification.title}`}
-              onClick={() =>
-                setNotifications((current) => current.filter((item) => item.id !== notification.id))
-              }
-              showTooltip={false}
-            />
-          </div>
-        );
-      })}
+      {notifications.map((notification) => (
+        <NotificationItem
+          key={notification.id}
+          notification={notification}
+          onDismiss={dismissNotification}
+        />
+      ))}
     </div>
   );
 }

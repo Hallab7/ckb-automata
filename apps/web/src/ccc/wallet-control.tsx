@@ -50,6 +50,7 @@ export function WalletControl() {
     try {
       await navigator.clipboard.writeText(session.address);
       publishNotification({
+        dismissAfterMs: 3_000,
         id: "wallet-address-copied",
         message: "The complete CKB testnet address is on your clipboard.",
         title: "Address copied",
