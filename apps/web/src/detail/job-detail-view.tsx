@@ -207,10 +207,38 @@ function EventTimelineItem({ event }: Readonly<{ event: DetailEvent }>) {
   );
 }
 
-function LoadingDetail() {
+export function AutomationDetailSkeleton() {
   return (
-    <section aria-label="Loading automation details" className="job-detail-loading">
+    <section
+      aria-busy="true"
+      aria-label="Loading automation details"
+      className="app-page job-detail job-detail-loading"
+    >
       <span className="ui-sr-only">Loading automation details</span>
+      <header aria-hidden="true" className="job-detail-loading__header">
+        <span />
+        <span />
+        <span />
+      </header>
+      <div aria-hidden="true" className="job-detail-loading__summary">
+        {[0, 1, 2, 3].map((item) => (
+          <span key={item} />
+        ))}
+      </div>
+      <div aria-hidden="true" className="job-detail-loading__columns">
+        {[0, 1].map((item) => (
+          <section key={item}>
+            <span />
+            <span />
+            <span />
+          </section>
+        ))}
+      </div>
+      <section aria-hidden="true" className="job-detail-loading__activity">
+        <span />
+        <span />
+        <span />
+      </section>
     </section>
   );
 }
@@ -246,7 +274,7 @@ export function JobDetailView({
   recipientAmount,
   referenceBlock,
 }: JobDetailViewProperties) {
-  if (loadState === "loading") return <LoadingDetail />;
+  if (loadState === "loading") return <AutomationDetailSkeleton />;
   if (loadState === "not_found") {
     return (
       <section className="app-page job-detail-empty">

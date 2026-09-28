@@ -7,6 +7,8 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { createApiClient } from "@ckb-automata/api-client";
 import { Button, InlineNotice } from "@ckb-automata/ui";
 
+import { AutomationDashboardSkeleton } from "./dashboard/dashboard-view.tsx";
+import { AutomationDetailSkeleton } from "./detail/job-detail-view.tsx";
 import {
   assertPublicDeploymentIdentity,
   requiresPublicDeploymentVerification,
@@ -52,6 +54,10 @@ export function PublicDeploymentGate({ children }: Readonly<{ children: ReactNod
   if (!requiresVerification) return children;
   if (state === "ready") return children;
   if (state === "checking") {
+    if (pathname === "/automations") return <AutomationDashboardSkeleton />;
+    if (/^\/automations\/[^/]+$/.test(pathname) && pathname !== "/automations/new") {
+      return <AutomationDetailSkeleton />;
+    }
     return (
       <section aria-busy="true" aria-live="polite" className="app-deployment-gate">
         <span className="app-deployment-gate__spinner" />
@@ -63,14 +69,14 @@ export function PublicDeploymentGate({ children }: Readonly<{ children: ReactNod
   return (
     <section aria-labelledby="deployment-gate-title" className="app-page">
       <h1 id="deployment-gate-title">
-        {state === "unavailable" ? "Public backend unavailable" : "Deployment identity mismatch"}
+        {state === "unavailable" ? "Something went wrong" : "Deployment identity mismatch"}
       </h1>
-      <InlineNotice title="Live access is blocked" tone="danger">
+      <InlineNotice
+        title={state === "unavailable" ? "Unable to load this page" : "Live access is blocked"}
+        tone="danger"
+      >
         {state === "unavailable" ? (
-          <p>
-            The configured backend could not be reached. Wallet and transaction workflows remain
-            unavailable until its identity can be verified.
-          </p>
+          <p>Something went wrong. Please try again.</p>
         ) : (
           <p>
             The configured backend did not prove the expected CKB Testnet and contract manifest.
@@ -83,7 +89,7 @@ export function PublicDeploymentGate({ children }: Readonly<{ children: ReactNod
           icon={<RefreshCw aria-hidden="true" size={16} />}
           onClick={() => setAttempt((current) => current + 1)}
         >
-          Verify again
+          Try again
         </Button>
       </div>
     </section>

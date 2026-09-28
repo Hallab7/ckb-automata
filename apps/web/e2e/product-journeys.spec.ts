@@ -29,13 +29,13 @@ test("completes both deterministic setup journeys", async ({ page }) => {
     await expect(page.getByRole("heading", { level: 1, name: setup.title })).toBeVisible();
     await page.getByLabel(setup.field).fill(setup.name);
 
-    for (const step of ["timing", "funding", "review", "approval", "result"]) {
+    for (const step of ["timing", "funding", "review", "approval"]) {
       await page.getByRole("button", { name: "Continue" }).click();
       await expect(page.locator("[data-setup-step]")).toHaveAttribute("data-setup-step", step);
       await expect(page.locator("[data-preserved-value]")).toHaveText(setup.name);
     }
 
-    await expect(page.getByRole("button", { name: "Return to automations" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Continue" })).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
   }
 });
@@ -68,6 +68,23 @@ test("reproduces wallet outcomes and transaction progress", async ({ page }) => 
     "confirmed",
   );
   await expect(page.getByText("3 / 3", { exact: true })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
+test("keeps loading and request failure states calm and stable", async ({ page }) => {
+  await page.goto("/fixtures/automation-dashboard");
+  await page.getByRole("button", { name: "loading", exact: true }).click();
+  await expect(page.locator(".automation-dashboard--loading")).toHaveAttribute("aria-busy", "true");
+  await expect(page.locator(".automation-loading__row")).toHaveCount(3);
+  await expect(page.getByText("Verifying public deployment")).toHaveCount(0);
+  await expectNoHorizontalOverflow(page);
+
+  await page.getByRole("button", { name: "error", exact: true }).click();
+  await expect(page.getByText("Something went wrong. Please try again.")).toBeVisible();
+
+  await page.goto("/fixtures/automation-detail");
+  await page.getByRole("button", { name: "loading", exact: true }).click();
+  await expect(page.locator(".job-detail-loading")).toHaveAttribute("aria-busy", "true");
   await expectNoHorizontalOverflow(page);
 });
 

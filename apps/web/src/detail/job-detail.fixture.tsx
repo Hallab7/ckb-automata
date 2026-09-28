@@ -14,6 +14,7 @@ const ATTEMPT_ID = "11111111-1111-4111-8111-111111111111";
 
 type FixtureState =
   "deadline" | "recurring" | "cancelled" | "conflicted" | "dropped" | "reorged" | "unsupported";
+type FixtureViewState = FixtureState | "loading";
 
 function fixtureJob(state: FixtureState): ApiJob {
   const recurring = state !== "deadline";
@@ -116,7 +117,8 @@ function fixtureEvents(state: FixtureState): ApiJobEvents["items"] {
   ] as ApiJobEvents["items"];
 }
 
-const states: readonly FixtureState[] = [
+const states: readonly FixtureViewState[] = [
+  "loading",
   "deadline",
   "recurring",
   "cancelled",
@@ -201,7 +203,7 @@ function FixtureOwnerActions() {
 }
 
 export function JobDetailFixture() {
-  const [state, setState] = useState<FixtureState>("conflicted");
+  const [state, setState] = useState<FixtureViewState>("conflicted");
   return (
     <div className="job-detail-fixture">
       <div className="job-detail-fixture__controls" aria-label="Job detail fixture state">
@@ -217,11 +219,15 @@ export function JobDetailFixture() {
         ))}
       </div>
       <JobDetailView
-        events={fixtureEvents(state)}
-        job={fixtureJob(state)}
-        loadState="ready"
-        ownerActions={<FixtureOwnerActions />}
-        recipientAmount="10000000000"
+        events={state === "loading" ? [] : fixtureEvents(state)}
+        loadState={state === "loading" ? "loading" : "ready"}
+        {...(state === "loading"
+          ? {}
+          : {
+              job: fixtureJob(state),
+              ownerActions: <FixtureOwnerActions />,
+              recipientAmount: "10000000000",
+            })}
       />
     </div>
   );

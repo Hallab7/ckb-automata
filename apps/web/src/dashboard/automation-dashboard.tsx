@@ -79,9 +79,9 @@ export function AutomationDashboard() {
   const apiResult = useMemo(() => {
     try {
       const provider = createLiveDataProvider(browserApiClient);
-      return { api: provider.load(), error: undefined } as const;
+      return { api: provider.load() } as const;
     } catch {
-      return { api: undefined, error: "The public testnet API is not configured." } as const;
+      return { api: undefined } as const;
     }
   }, []);
   const [mode, setMode] = useState<DashboardMode>("public");
@@ -91,7 +91,6 @@ export function AutomationDashboard() {
   const [pageIndex, setPageIndex] = useState(0);
   const [recipientAmounts, setRecipientAmounts] = useState<RecipientAmountsByJob>({});
   const [loadState, setLoadState] = useState<DashboardLoadState>("loading");
-  const [error, setError] = useState<string>();
   const [paginationError, setPaginationError] = useState<string>();
   const [loadingPage, setLoadingPage] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -122,7 +121,6 @@ export function AutomationDashboard() {
 
   useEffect(() => {
     if (apiResult.api === undefined) {
-      setError(apiResult.error);
       setPages([]);
       setRecipientAmounts({});
       setLoadState("error");
@@ -142,7 +140,6 @@ export function AutomationDashboard() {
         return;
       }
       if (session.ownerLockHash === undefined) {
-        setError("The connected wallet lock could not be resolved. Retry the wallet details.");
         setPages([]);
         setRecipientAmounts({});
         setLoadState("error");
@@ -151,7 +148,6 @@ export function AutomationDashboard() {
     }
 
     let active = true;
-    setError(undefined);
     setPages([]);
     setPageIndex(0);
     setRecipientAmounts({});
@@ -170,9 +166,8 @@ export function AutomationDashboard() {
           if (active) setRecipientAmounts(amounts);
         });
       })
-      .catch((reason: unknown) => {
+      .catch(() => {
         if (!active) return;
-        setError(requestErrorMessage("dashboard", reason));
         setLoadState("error");
       });
     return () => {
@@ -261,7 +256,6 @@ export function AutomationDashboard() {
       checkpointAt={checkpointAt}
       checkpointBlock={checkpointBlock}
       dataSourceLabel={LIVE_DATA_LABEL}
-      error={error}
       hasNextPage={currentPage?.response.page.nextCursor != null}
       hasPreviousPage={pageIndex > 0}
       items={items}

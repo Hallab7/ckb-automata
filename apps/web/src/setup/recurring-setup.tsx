@@ -224,6 +224,13 @@ export function RecurringSetup() {
   return (
     <SetupStepper
       initialDraft={RECURRING_INITIAL_DRAFT}
+      isContinueDisabled={(step, draft) =>
+        step === "review" &&
+        reviewStateError(
+          reviewState,
+          creationReviewKey("recurring", draft, session.ownerLockHash),
+        ) !== undefined
+      }
       renderStep={(context) => (
         <RecurringStep
           context={context}

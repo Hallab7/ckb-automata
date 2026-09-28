@@ -37,6 +37,7 @@ export interface SetupStepRenderContext {
 }
 
 export interface SetupStepperProperties {
+  readonly isContinueDisabled?: (step: SetupStepId, draft: SetupDraft) => boolean;
   readonly initialDraft?: SetupDraft;
   readonly renderStep?: (context: SetupStepRenderContext) => ReactNode;
   readonly storageId?: string;
@@ -54,7 +55,6 @@ const STEP_EMPTY_COPY: Record<Exclude<SetupStepId, "template">, readonly [string
   approval: ["Wallet approval", "No transaction is ready for wallet approval."],
   details: ["Details", "No automation details have been entered."],
   funding: ["Funding", "No funding quote has been requested."],
-  result: ["Result", "No transaction has been submitted."],
   review: ["Review", "No automation details are ready for review."],
   timing: ["Timing", "No schedule has been entered."],
 };
@@ -115,6 +115,7 @@ function removeSessionDraft(key: string): void {
 
 export function SetupStepper({
   initialDraft = EMPTY_DRAFT,
+  isContinueDisabled = () => false,
   renderStep,
   storageId,
   steps = SETUP_STEPS,
@@ -240,6 +241,7 @@ export function SetupStepper({
 
   const previous = steps[currentIndex - 1];
   const next = steps[currentIndex + 1];
+  const continueDisabled = validating || isContinueDisabled(currentStep, draft);
   const context = useMemo<SetupStepRenderContext>(
     () => ({ draft, errors, setField, step: currentStep, template }),
     [currentStep, draft, errors, setField, template],
@@ -324,7 +326,7 @@ export function SetupStepper({
         >
           Back
         </Button>
-        {next === undefined ? (
+        {currentStep === "approval" ? null : next === undefined ? (
           <Button
             onClick={() => {
               removeSessionDraft(storageKey);
@@ -335,7 +337,7 @@ export function SetupStepper({
           </Button>
         ) : (
           <Button
-            disabled={validating}
+            disabled={continueDisabled}
             icon={<ArrowRight aria-hidden="true" size={17} />}
             onClick={() => void continueForward()}
           >

@@ -15,16 +15,16 @@ import {
 test("setup progress uses canonical URL-safe step identifiers", () => {
   assert.deepEqual(
     SETUP_STEPS.map((step) => step.id),
-    ["template", "details", "timing", "funding", "review", "approval", "result"],
+    ["template", "details", "timing", "funding", "review", "approval"],
   );
   assert.equal(FIRST_SETUP_STEP, "details");
   assert.deepEqual(
     DEADLINE_SETUP_STEPS.map((step) => step.id),
-    ["template", "details", "timing", "review", "approval", "result"],
+    ["template", "details", "timing", "review", "approval"],
   );
   assert.deepEqual(
     RECURRING_SETUP_STEPS.map((step) => step.id),
-    ["template", "details", "timing", "review", "approval", "result"],
+    ["template", "details", "timing", "review", "approval"],
   );
   assert.equal(parseSetupStep("funding"), "funding");
   assert.equal(parseSetupStep("template"), "details");
@@ -57,5 +57,18 @@ test("stepper protects dirty drafts and focuses the first invalid field", async 
   assert.match(source, /\.focus\(\)/);
   assert.match(source, /sessionStorage/);
   assert.match(source, /await validateStep/);
-  assert.match(source, /disabled=\{validating\}/);
+  assert.match(source, /disabled=\{continueDisabled\}/);
+  assert.match(source, /currentStep === "approval" \? null/);
+});
+
+test("creation review blocks navigation until the exact transaction is ready", async () => {
+  const [deadline, recurring] = await Promise.all([
+    readFile(new URL("./deadline-setup.tsx", import.meta.url), "utf8"),
+    readFile(new URL("./recurring-setup.tsx", import.meta.url), "utf8"),
+  ]);
+  for (const source of [deadline, recurring]) {
+    assert.match(source, /isContinueDisabled=/);
+    assert.match(source, /step === "review"/);
+    assert.match(source, /reviewStateError/);
+  }
 });

@@ -5,7 +5,6 @@ export const SETUP_STEPS = [
   { id: "funding", label: "Funding" },
   { id: "review", label: "Review" },
   { id: "approval", label: "Wallet approval" },
-  { id: "result", label: "Result" },
 ] as const;
 
 export const DEADLINE_SETUP_STEPS = SETUP_STEPS.filter((step) => step.id !== "funding");

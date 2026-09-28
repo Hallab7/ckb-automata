@@ -239,6 +239,13 @@ export function DeadlineSetup() {
   return (
     <SetupStepper
       initialDraft={DEADLINE_INITIAL_DRAFT}
+      isContinueDisabled={(step, draft) =>
+        step === "review" &&
+        reviewStateError(
+          reviewState,
+          creationReviewKey("deadline", draft, session.ownerLockHash),
+        ) !== undefined
+      }
       renderStep={(context) => (
         <DeadlineStep
           context={context}

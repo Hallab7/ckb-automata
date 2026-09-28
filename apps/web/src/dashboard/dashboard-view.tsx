@@ -259,10 +259,48 @@ function LoadingRows() {
   return (
     <div className="automation-loading" aria-label="Loading automations" aria-live="polite">
       {[0, 1, 2].map((row) => (
-        <div aria-hidden="true" className="automation-loading__row" key={row} />
+        <div aria-hidden="true" className="automation-loading__row" key={row}>
+          <span className="automation-loading__date" />
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
       ))}
       <span className="ui-sr-only">Loading automations</span>
     </div>
+  );
+}
+
+export function AutomationDashboardSkeleton() {
+  return (
+    <section
+      aria-busy="true"
+      aria-label="Loading automations"
+      className="app-page automation-dashboard automation-dashboard--loading"
+    >
+      <header className="app-page-header">
+        <div className="app-page-header__copy">
+          <span className="app-page-header__eyebrow">Automation workspace</span>
+          <h1>Automations</h1>
+          <p>Monitor scheduled and recurring payments from one clear workspace.</p>
+        </div>
+        <span aria-hidden="true" className="automation-loading__action" />
+      </header>
+      <div aria-hidden="true" className="automation-loading__overview">
+        <span />
+        <span />
+        <span />
+      </div>
+      <section className="automation-surface">
+        <div aria-hidden="true" className="automation-loading__toolbar">
+          <span />
+          <span />
+        </div>
+        <div aria-hidden="true" className="automation-loading__heading" />
+        <LoadingRows />
+      </section>
+    </section>
   );
 }
 
@@ -333,7 +371,6 @@ export interface AutomationDashboardViewProperties {
   readonly checkpointAt?: string | undefined;
   readonly checkpointBlock?: string | undefined;
   readonly dataSourceLabel?: string | undefined;
-  readonly error?: string | undefined;
   readonly hasNextPage?: boolean | undefined;
   readonly hasPreviousPage?: boolean | undefined;
   readonly items: readonly DashboardJob[];
@@ -363,7 +400,6 @@ export function AutomationDashboardView({
   checkpointAt,
   checkpointBlock,
   dataSourceLabel,
-  error,
   hasNextPage = false,
   hasPreviousPage = false,
   items,
@@ -388,6 +424,8 @@ export function AutomationDashboardView({
   titles = {},
   totalItems = items.length,
 }: AutomationDashboardViewProperties) {
+  if (loadState === "loading") return <AutomationDashboardSkeleton />;
+
   const page = dashboardPageRange(pageIndex, pageSize, items.length, totalItems);
   return (
     <section className="app-page automation-dashboard" aria-labelledby="page-title">
@@ -474,7 +512,6 @@ export function AutomationDashboardView({
           </span>
         </header>
 
-        {loadState === "loading" ? <LoadingRows /> : null}
         {loadState === "owner_required" ? (
           <div className="automation-surface__state">
             <InlineNotice title="Connect your owner wallet" tone="warning">
@@ -491,7 +528,7 @@ export function AutomationDashboardView({
         {loadState === "error" ? (
           <div className="automation-surface__state">
             <InlineNotice title="Automations unavailable" tone="danger">
-              <p>{error ?? "The job index could not be read."}</p>
+              <p>Something went wrong. Please try again.</p>
               <Button
                 icon={<RefreshCw aria-hidden="true" size={16} />}
                 onClick={onRetry}

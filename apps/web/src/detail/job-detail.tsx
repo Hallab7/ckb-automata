@@ -41,7 +41,7 @@ export function AutomationDetail({ jobId }: Readonly<{ jobId: string }>) {
       return {
         api: undefined,
         sseUrl: undefined,
-        error: "The public testnet API is not configured.",
+        error: "Something went wrong. Please try again.",
       } as const;
     }
   }, []);

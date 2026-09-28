@@ -5,25 +5,25 @@ export type DetailFailureState = "error" | "not_found";
 
 const copy = {
   activity: {
-    conflict: "The canonical checkpoint advanced. Refresh the feed before loading more.",
-    generic: "The activity feed could not be loaded.",
-    rejected: "The API rejected this activity query.",
-    transport: "The testnet API could not be reached. Check the connection and retry.",
-    unavailable: "The testnet activity index is temporarily unavailable.",
+    conflict: "Something went wrong. Please try again.",
+    generic: "Something went wrong. Please try again.",
+    rejected: "Something went wrong. Please try again.",
+    transport: "Something went wrong. Please try again.",
+    unavailable: "Something went wrong. Please try again.",
   },
   dashboard: {
-    conflict: "The index advanced during pagination. Refresh the list to continue.",
-    generic: "The automation list could not be loaded.",
-    rejected: "The API rejected this automation query.",
-    transport: "The testnet API could not be reached. Check the API connection and retry.",
-    unavailable: "The testnet job index is temporarily unavailable.",
+    conflict: "Something went wrong. Please try again.",
+    generic: "Something went wrong. Please try again.",
+    rejected: "Something went wrong. Please try again.",
+    transport: "Something went wrong. Please try again.",
+    unavailable: "Something went wrong. Please try again.",
   },
   detail: {
-    conflict: "The index advanced while the timeline was loading. Refresh and retry.",
-    generic: "The automation detail could not be loaded.",
+    conflict: "Something went wrong. Please try again.",
+    generic: "Something went wrong. Please try again.",
     notFound: "The automation was not found at the current checkpoint.",
-    transport: "The testnet API could not be reached. Check the API connection and retry.",
-    unavailable: "The testnet job index is temporarily unavailable.",
+    transport: "Something went wrong. Please try again.",
+    unavailable: "Something went wrong. Please try again.",
   },
 } as const;
 

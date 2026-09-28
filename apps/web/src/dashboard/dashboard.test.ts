@@ -11,6 +11,14 @@ test("dashboard consumes generated public and owner job reads", async () => {
   assert.match(source, /templateFilter/);
 });
 
+test("dashboard keeps a page-shaped skeleton while records load", async () => {
+  const source = await readFile(new URL("./dashboard-view.tsx", import.meta.url), "utf8");
+  assert.match(source, /export function AutomationDashboardSkeleton/);
+  assert.match(source, /aria-busy="true"/);
+  assert.match(source, /loadState === "loading"/);
+  assert.match(source, /Something went wrong\. Please try again\./);
+});
+
 test("dashboard fixture covers lifecycle, operational, and request states", async () => {
   const source = await readFile(new URL("./dashboard.fixture.tsx", import.meta.url), "utf8");
   for (const state of [
