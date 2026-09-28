@@ -7,7 +7,21 @@ import {
   formatBlockDate,
   formatBlockDuration,
   formatDateTime,
+  latestObservedBlock,
+  readNetworkTipBlock,
 } from "./chain-time.ts";
+
+test("latest observed block ignores stale and malformed references", () => {
+  assert.equal(latestObservedBlock("22561000", "22555883", "22560976"), "22561000");
+  assert.equal(latestObservedBlock(undefined, "22561001", "bad"), "22561001");
+  assert.equal(latestObservedBlock(undefined, null, "bad"), undefined);
+});
+
+test("network tip parsing validates unknown API metadata", () => {
+  assert.equal(readNetworkTipBlock({ tip: { blockNumber: "22561000" } }), "22561000");
+  assert.equal(readNetworkTipBlock({ tip: { blockNumber: "bad" } }), undefined);
+  assert.equal(readNetworkTipBlock({}), undefined);
+});
 
 test("block schedules become deterministic readable UTC dates", () => {
   const estimate = estimateBlockDate("160", "100", "2026-09-24T10:00:00.000Z");

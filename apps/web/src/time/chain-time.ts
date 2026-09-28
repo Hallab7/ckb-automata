@@ -1,5 +1,34 @@
 const TARGET_BLOCK_MILLISECONDS = 10_000n;
 
+export function readNetworkTipBlock(value: unknown): string | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
+  const tip = (value as Readonly<Record<string, unknown>>)["tip"];
+  if (typeof tip !== "object" || tip === null || Array.isArray(tip)) return undefined;
+  const blockNumber = (tip as Readonly<Record<string, unknown>>)["blockNumber"];
+  if (typeof blockNumber !== "string") return undefined;
+  try {
+    return BigInt(blockNumber).toString();
+  } catch {
+    return undefined;
+  }
+}
+
+export function latestObservedBlock(
+  ...blockNumbers: readonly (string | bigint | null | undefined)[]
+): string | undefined {
+  let latest: bigint | undefined;
+  for (const blockNumber of blockNumbers) {
+    if (blockNumber === undefined || blockNumber === null) continue;
+    try {
+      const parsed = BigInt(blockNumber);
+      if (latest === undefined || parsed > latest) latest = parsed;
+    } catch {
+      // Ignore malformed optional observations and retain any valid reference.
+    }
+  }
+  return latest?.toString();
+}
+
 function parsedDate(value: string): Date | undefined {
   const timestamp = Date.parse(value);
   return Number.isFinite(timestamp) ? new Date(timestamp) : undefined;

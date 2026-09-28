@@ -64,8 +64,9 @@ export function jobDetailPresentation(
   events: readonly DetailEvent[],
   recipientAmount?: string,
   checkpointAt = job.updatedAt,
+  referenceBlock?: string,
 ): JobDetailPresentation {
-  const checkpoint = job.source.indexCheckpoint?.blockNumber;
+  const checkpoint = referenceBlock ?? job.source.indexCheckpoint?.blockNumber;
   const checkpointBlock = checkpoint === undefined ? undefined : BigInt(checkpoint);
   const notBefore = BigInt(job.trigger.notBefore);
   const notAfter = BigInt(job.trigger.notAfter);
@@ -143,8 +144,9 @@ export function jobScheduleDate(
   job: DetailJob,
   block: string,
   checkpointAt = job.updatedAt,
+  referenceBlock?: string,
 ): string {
-  const checkpoint = job.source.indexCheckpoint?.blockNumber;
+  const checkpoint = referenceBlock ?? job.source.indexCheckpoint?.blockNumber;
   if (checkpoint === undefined) return "Schedule time syncing";
   return formatBlockDate(block, checkpoint, checkpointAt);
 }

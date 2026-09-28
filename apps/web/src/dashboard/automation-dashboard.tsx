@@ -14,6 +14,7 @@ import { createLiveDataProvider, LIVE_DATA_LABEL } from "../data-provider.ts";
 import { browserWebEnvironment } from "../environment.ts";
 import { requestErrorMessage } from "../request-errors.ts";
 import { readAutomationTitles } from "../setup/automation-title.ts";
+import { latestObservedBlock, readNetworkTipBlock } from "../time/chain-time.ts";
 import {
   AutomationDashboardView,
   type DashboardLoadState,
@@ -27,6 +28,7 @@ const EMPTY_ITEMS: ApiJobList["items"] = Object.freeze([]);
 
 interface LoadedDashboardPage {
   readonly loadedAt: string;
+  readonly referenceBlock?: string;
   readonly response: ApiJobList;
 }
 
@@ -50,6 +52,26 @@ async function loadRecipientAmounts(
     }),
   );
   return Object.fromEntries(entries);
+}
+
+async function loadDashboardPage(
+  api: AutomataApiClient,
+  responsePromise: Promise<ApiJobList>,
+): Promise<LoadedDashboardPage> {
+  const [response, network] = await Promise.all([
+    responsePromise,
+    api.network().catch(() => undefined),
+  ]);
+  const referenceBlock = latestObservedBlock(
+    readNetworkTipBlock(network),
+    response.indexCheckpoint?.blockNumber,
+    ...response.items.map((job) => job.source.block.number),
+  );
+  return {
+    loadedAt: new Date().toISOString(),
+    ...(referenceBlock === undefined ? {} : { referenceBlock }),
+    response,
+  };
 }
 
 export function AutomationDashboard() {
@@ -78,7 +100,7 @@ export function AutomationDashboard() {
   const currentPage = pages[pageIndex];
   const items = currentPage?.response.items ?? EMPTY_ITEMS;
   const checkpointAt = currentPage?.loadedAt;
-  const checkpointBlock = currentPage?.response.indexCheckpoint?.blockNumber;
+  const checkpointBlock = currentPage?.referenceBlock;
   const totalItems = currentPage?.response.page.totalItems ?? 0;
 
   useEffect(() => setTitles(readAutomationTitles(window.localStorage)), [items]);
@@ -137,12 +159,12 @@ export function AutomationDashboard() {
       mode === "owner"
         ? apiResult.api.listAccountJobs(session.ownerLockHash!, query)
         : apiResult.api.listJobs(query);
-    void request
-      .then((response) => {
+    void loadDashboardPage(apiResult.api, request)
+      .then((page) => {
         if (!active) return;
-        setPages([{ loadedAt: new Date().toISOString(), response }]);
+        setPages([page]);
         setLoadState("ready");
-        void loadRecipientAmounts(apiResult.api!, response.items).then((amounts) => {
+        void loadRecipientAmounts(apiResult.api!, page.response.items).then((amounts) => {
           if (active) setRecipientAmounts(amounts);
         });
       })
@@ -173,11 +195,11 @@ export function AutomationDashboard() {
         mode === "owner"
           ? apiResult.api!.listAccountJobs(session.ownerLockHash!, query)
           : apiResult.api!.listJobs(query);
-      void request
-        .then((response) => {
+      void loadDashboardPage(apiResult.api!, request)
+        .then((page) => {
           if (!active) return;
-          setPages([{ loadedAt: new Date().toISOString(), response }]);
-          void loadRecipientAmounts(apiResult.api!, response.items).then((amounts) => {
+          setPages([page]);
+          void loadRecipientAmounts(apiResult.api!, page.response.items).then((amounts) => {
             if (active) setRecipientAmounts((current) => ({ ...current, ...amounts }));
           });
         })
@@ -212,14 +234,11 @@ export function AutomationDashboard() {
       mode === "owner"
         ? apiResult.api.listAccountJobs(session.ownerLockHash!, cursorQuery)
         : apiResult.api.listJobs(cursorQuery);
-    void request
-      .then((response) => {
-        setPages((current) => [
-          ...current.slice(0, pageIndex + 1),
-          { loadedAt: new Date().toISOString(), response },
-        ]);
+    void loadDashboardPage(apiResult.api, request)
+      .then((page) => {
+        setPages((current) => [...current.slice(0, pageIndex + 1), page]);
         setPageIndex(pageIndex + 1);
-        void loadRecipientAmounts(apiResult.api!, response.items).then((amounts) => {
+        void loadRecipientAmounts(apiResult.api!, page.response.items).then((amounts) => {
           setRecipientAmounts((current) => ({ ...current, ...amounts }));
         });
       })

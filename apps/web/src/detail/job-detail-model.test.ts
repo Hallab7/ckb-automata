@@ -89,6 +89,18 @@ test("detail presentation covers waiting, processing, completed, and funding sta
   );
 });
 
+test("detail presentation uses a live chain reference ahead of the index checkpoint", () => {
+  const presentation = jobDetailPresentation(
+    job(),
+    [],
+    "10000000000",
+    "2026-09-24T10:00:00.000Z",
+    "150",
+  );
+  assert.equal(presentation.status, "processing");
+  assert.equal(presentation.nextExecution, "Processing since Sep 24, 2026, 9:58 AM UTC");
+});
+
 test("terminal attempts, reorgs, and unsupported policies remain distinct", () => {
   for (const state of ["cancelled", "conflicted", "dropped"] as const) {
     assert.equal(jobDetailPresentation(job(), [event("2", { state })]).status, state);

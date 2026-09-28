@@ -229,6 +229,7 @@ export interface JobDetailViewProperties {
   readonly onRetry?: () => void;
   readonly ownerActions?: ReactNode;
   readonly recipientAmount?: string;
+  readonly referenceBlock?: string;
 }
 
 export function JobDetailView({
@@ -244,6 +245,7 @@ export function JobDetailView({
   onRetry,
   ownerActions,
   recipientAmount,
+  referenceBlock,
 }: JobDetailViewProperties) {
   if (loadState === "loading") return <LoadingDetail />;
   if (loadState === "not_found") {
@@ -275,7 +277,13 @@ export function JobDetailView({
     );
   }
 
-  const presentation = jobDetailPresentation(job, events, recipientAmount, checkpointAt);
+  const presentation = jobDetailPresentation(
+    job,
+    events,
+    recipientAmount,
+    checkpointAt,
+    referenceBlock,
+  );
   return (
     <article className="app-page job-detail" aria-labelledby="job-detail-title">
       <header className="job-detail__header">
@@ -332,14 +340,14 @@ export function JobDetailView({
             </div>
             <div>
               <dt>Scheduled for</dt>
-              <dd>{jobScheduleDate(job, job.trigger.notBefore, checkpointAt)}</dd>
+              <dd>{jobScheduleDate(job, job.trigger.notBefore, checkpointAt, referenceBlock)}</dd>
             </div>
             <div>
               <dt>Schedule ends</dt>
               <dd>
                 {job.trigger.notAfter === "0"
                   ? "No end date"
-                  : jobScheduleDate(job, job.trigger.notAfter, checkpointAt)}
+                  : jobScheduleDate(job, job.trigger.notAfter, checkpointAt, referenceBlock)}
               </dd>
             </div>
           </dl>

@@ -14,6 +14,7 @@ import { browserWebEnvironment } from "../environment.ts";
 import { readAutomationTitles } from "../setup/automation-title.ts";
 import { detailRequestError } from "../request-errors.ts";
 import { decodeDetailStreamEvent } from "../stream-reducers.ts";
+import { latestObservedBlock, readNetworkTipBlock } from "../time/chain-time.ts";
 import { JobDetailView, type JobDetailLoadState } from "./job-detail-view.tsx";
 import { mergeTimeline } from "./job-detail-model.ts";
 import { OwnerActions } from "./owner-actions.tsx";
@@ -54,6 +55,7 @@ export function AutomationDetail({ jobId }: Readonly<{ jobId: string }>) {
   const [refreshKey, setRefreshKey] = useState(0);
   const [automationTitle, setAutomationTitle] = useState<string>();
   const [checkpointAt, setCheckpointAt] = useState<string>();
+  const [referenceBlock, setReferenceBlock] = useState<string>();
 
   useEffect(() => {
     setAutomationTitle(readAutomationTitles(window.localStorage)[jobId]);
@@ -61,13 +63,21 @@ export function AutomationDetail({ jobId }: Readonly<{ jobId: string }>) {
 
   const load = useCallback(
     async (api: AutomataApiClient) => {
-      const [nextJob, timeline, nextTerms] = await Promise.all([
+      const [nextJob, timeline, nextTerms, network] = await Promise.all([
         api.getJob(jobId),
         api.listJobEvents(jobId, { limit: EVENT_PAGE_SIZE }),
         api.getJobTerms(jobId).catch(() => undefined),
+        api.network().catch(() => undefined),
       ]);
       setJob(nextJob);
       setCheckpointAt(new Date().toISOString());
+      setReferenceBlock(
+        latestObservedBlock(
+          readNetworkTipBlock(network),
+          nextJob.source.indexCheckpoint?.blockNumber,
+          nextJob.source.block.number,
+        ),
+      );
       setEvents(timeline.items);
       setNextCursor(timeline.page.nextCursor);
       setTerms(nextTerms);
@@ -107,14 +117,22 @@ export function AutomationDetail({ jobId }: Readonly<{ jobId: string }>) {
     let polling: ReturnType<typeof setInterval> | undefined;
     const refresh = async () => {
       try {
-        const [nextJob, timeline, nextTerms] = await Promise.all([
+        const [nextJob, timeline, nextTerms, network] = await Promise.all([
           apiResult.api!.getJob(jobId),
           apiResult.api!.listJobEvents(jobId, { limit: 100 }),
           apiResult.api!.getJobTerms(jobId).catch(() => undefined),
+          apiResult.api!.network().catch(() => undefined),
         ]);
         if (stopped) return;
         setJob(nextJob);
         setCheckpointAt(new Date().toISOString());
+        setReferenceBlock(
+          latestObservedBlock(
+            readNetworkTipBlock(network),
+            nextJob.source.indexCheckpoint?.blockNumber,
+            nextJob.source.block.number,
+          ),
+        );
         setEvents((current) => mergeTimeline(current, timeline.items));
         setTerms(nextTerms);
       } catch {
@@ -144,12 +162,21 @@ export function AutomationDetail({ jobId }: Readonly<{ jobId: string }>) {
       }
       if (decoded.kind === "ignored" || decoded.value === undefined || stopped) return;
       setEvents((current) => mergeTimeline(current, [decoded.value!]));
-      void apiResult
-        .api!.getJob(jobId)
-        .then((nextJob) => {
+      void Promise.all([
+        apiResult.api!.getJob(jobId),
+        apiResult.api!.network().catch(() => undefined),
+      ])
+        .then(([nextJob, network]) => {
           if (!stopped) {
             setJob(nextJob);
             setCheckpointAt(new Date().toISOString());
+            setReferenceBlock(
+              latestObservedBlock(
+                readNetworkTipBlock(network),
+                nextJob.source.indexCheckpoint?.blockNumber,
+                nextJob.source.block.number,
+              ),
+            );
           }
         })
         .catch(() => {
@@ -196,6 +223,7 @@ export function AutomationDetail({ jobId }: Readonly<{ jobId: string }>) {
       onLoadNext={loadNextPage}
       onRetry={() => setRefreshKey((current) => current + 1)}
       {...(terms === undefined ? {} : { recipientAmount: terms.payout.perExecution })}
+      {...(referenceBlock === undefined ? {} : { referenceBlock })}
       {...(job === undefined
         ? {}
         : {
