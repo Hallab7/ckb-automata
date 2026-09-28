@@ -17,7 +17,7 @@ export const TEMPLATE_CATALOG: readonly TemplateCatalogItem[] = Object.freeze([
     approval:
       "The owner wallet signs creation. The automation can process only after the scheduled time.",
     capability: "executable",
-    description: "Send or refund one payment at a date and time you choose.",
+    description: "Send payment at a date and time you choose.",
     id: "deadline",
     name: "Scheduled payment",
     recoverability: "Owner-authorized cancel or recovery returns the complete Job Cell value.",
