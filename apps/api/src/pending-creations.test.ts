@@ -31,8 +31,9 @@ test("registered creations are validated and persisted as submitted attempts", a
       calls.push("metadata");
       return metadata;
     },
-    validate: async () => {
+    validateSubmitted: async (_body: unknown, hash: string) => {
       calls.push("validate");
+      assert.equal(hash, HASH_B);
       return { valid: true };
     },
   };

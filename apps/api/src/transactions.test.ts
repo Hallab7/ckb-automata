@@ -4,7 +4,7 @@ import test from "node:test";
 
 import type { LoggerService } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
-import { scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
+import { rawTransactionToHash, scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
 
 import { parseHash32, type ScriptIdentity } from "@ckb-automata/core";
 
@@ -297,17 +297,29 @@ test("signed creation validation accepts canonical tip advances and rejects expi
   const reviewedHash = `0x${"a".repeat(64)}`;
   let tip = 100n;
   let canonicalHash = reviewedHash;
+  let dryRunAvailable = true;
+  let submittedTransactionHash: string | undefined;
   let resolutionStoreAvailable = true;
   const remembered: ScriptIdentity[][] = [];
   const service = new TransactionBuildService(
     {} as never,
     {
-      dryRun: async () => 123n,
+      dryRun: async () => {
+        if (!dryRunAvailable) throw new Error("inputs are already consumed");
+        return 123n;
+      },
       getBlockByNumber: async () => ({ header: { hash: canonicalHash } }),
       getTipHeader: async () => ({
         hash: tip === 100n ? reviewedHash : `0x${"b".repeat(64)}`,
         number: tip,
       }),
+      getTransactionStatus: async (transactionHash: string) =>
+        transactionHash === submittedTransactionHash
+          ? ({
+              status: "pending",
+              transaction: { hash: () => transactionHash },
+            } as never)
+          : undefined,
     } as never,
     environment().CKB_GENESIS_HASH,
     {
@@ -345,6 +357,34 @@ test("signed creation validation accepts canonical tip advances and rejects expi
   assert.equal(validation.policyCriticalHash, artifact.policyCriticalHash);
   assert.equal(validation.dryRunCycles, "123");
   assert.deepEqual(remembered, [[OWNER_LOCK, RECIPIENT_LOCK]]);
+
+  dryRunAvailable = false;
+  submittedTransactionHash = rawTransactionToHash(
+    completed as unknown as Parameters<typeof rawTransactionToHash>[0],
+  );
+  await assert.rejects(service.validate(request), (error: unknown) => {
+    assert.equal((error as { getStatus(): number }).getStatus(), 422);
+    return true;
+  });
+  const submittedValidation = await service.validateSubmitted(request, submittedTransactionHash);
+  assert.equal(submittedValidation.dryRunCycles, "0");
+  await assert.rejects(
+    service.validateSubmitted(request, `0x${"f".repeat(64)}`),
+    (error: unknown) => {
+      assert.equal((error as { getStatus(): number }).getStatus(), 422);
+      return true;
+    },
+  );
+  const knownSubmittedTransactionHash = submittedTransactionHash;
+  submittedTransactionHash = undefined;
+  await assert.rejects(
+    service.validateSubmitted(request, knownSubmittedTransactionHash),
+    (error: unknown) => {
+      assert.equal((error as { getStatus(): number }).getStatus(), 422);
+      return true;
+    },
+  );
+  dryRunAvailable = true;
 
   tip = 131n;
   await assert.rejects(service.validate(request), (error: unknown) => {

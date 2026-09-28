@@ -135,7 +135,7 @@ export class PendingCreationService {
     const validationBody = Object.fromEntries(
       Object.entries(body).filter(([key]) => key !== "transactionHash"),
     );
-    await this.#transactions.validate(validationBody);
+    await this.#transactions.validateSubmitted(validationBody, hash);
     const metadata = await this.#transactions.creationMetadata(body["operation"], body["request"]);
     const submittedAt = new Date();
     await this.#database

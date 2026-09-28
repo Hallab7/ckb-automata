@@ -23,7 +23,7 @@ import {
   ApiTags,
   ApiUnprocessableEntityResponse,
 } from "@nestjs/swagger";
-import { scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
+import { rawTransactionToHash, scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
 
 import {
   CREATION_REVIEW_EXPIRY_CONDITION,
@@ -554,7 +554,27 @@ export class TransactionBuildService {
     }
   }
 
-  async validate(input: unknown): Promise<SignedTransactionValidation> {
+  validate(input: unknown): Promise<SignedTransactionValidation> {
+    return this.#validate(input);
+  }
+
+  validateSubmitted(
+    input: unknown,
+    transactionHashInput: unknown,
+  ): Promise<SignedTransactionValidation> {
+    let transactionHash: ReturnType<typeof parseHash32>;
+    try {
+      transactionHash = hash(transactionHashInput, "transactionHash");
+    } catch (error) {
+      return this.#mapBuildError(error);
+    }
+    return this.#validate(input, transactionHash);
+  }
+
+  async #validate(
+    input: unknown,
+    submittedTransactionHash?: ReturnType<typeof parseHash32>,
+  ): Promise<SignedTransactionValidation> {
     let request: Record<string, unknown>;
     let operation: TransactionOperation;
     let artifact: BuiltArtifact;
@@ -643,10 +663,24 @@ export class TransactionBuildService {
     try {
       cycles = await this.#chain.dryRun(transaction as never);
     } catch (error) {
-      throw new UnprocessableEntityException(
-        { status: "invalid_transaction", code: "DRY_RUN_FAILED" },
-        { cause: error },
-      );
+      let submitted = false;
+      if (submittedTransactionHash !== undefined) {
+        try {
+          submitted = await this.#isKnownSubmittedTransaction(
+            transaction,
+            submittedTransactionHash,
+          );
+        } catch (statusError) {
+          return this.#mapBuildError(statusError);
+        }
+      }
+      if (!submitted) {
+        throw new UnprocessableEntityException(
+          { status: "invalid_transaction", code: "DRY_RUN_FAILED" },
+          { cause: error },
+        );
+      }
+      cycles = 0n;
     }
     if (artifact.lockResolutions) {
       try {
@@ -662,6 +696,24 @@ export class TransactionBuildService {
       policyCriticalHash: reviewedPolicyHash,
       dryRunCycles: cycles.toString(),
     });
+  }
+
+  async #isKnownSubmittedTransaction(
+    transaction: UnsignedDeadlineTransaction,
+    expectedHash: ReturnType<typeof parseHash32>,
+  ): Promise<boolean> {
+    const actualHash = parseHash32(
+      rawTransactionToHash(transaction as unknown as Parameters<typeof rawTransactionToHash>[0]),
+    );
+    if (actualHash !== expectedHash) return false;
+    const response = await this.#chain.getTransactionStatus(expectedHash);
+    if (
+      response === undefined ||
+      !["sent", "pending", "proposed", "committed"].includes(response.status)
+    ) {
+      return false;
+    }
+    return parseHash32(response.transaction.hash()) === expectedHash;
   }
 
   async creationMetadata(
