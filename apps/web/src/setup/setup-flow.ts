@@ -9,6 +9,7 @@ export const SETUP_STEPS = [
 ] as const;
 
 export const DEADLINE_SETUP_STEPS = SETUP_STEPS.filter((step) => step.id !== "funding");
+export const RECURRING_SETUP_STEPS = SETUP_STEPS.filter((step) => step.id !== "funding");
 
 export type SetupStepId = (typeof SETUP_STEPS)[number]["id"];
 export type SetupTemplateId = "deadline" | "recurring";

@@ -7,17 +7,14 @@ import { Button, InlineNotice, TextField } from "@ckb-automata/ui";
 
 import { useWalletSession } from "../ccc/session.tsx";
 import { shortenCkbAddress } from "../ccc/wallet-display.ts";
-import { shannonsToCkb } from "./ckb-amount.ts";
 import {
   RECURRING_INITIAL_DRAFT,
-  recurringFundingPreview,
   validateRecurringStep,
-  type RecurringFundingPreview,
   type RecurringValidationContext,
 } from "./recurring-form.ts";
+import { RECURRING_SETUP_STEPS } from "./setup-flow.ts";
 import type { SetupStepRenderContext } from "./setup-stepper.tsx";
 import { SetupStepper } from "./setup-stepper.tsx";
-import { ReadonlyField } from "./readonly-field.tsx";
 import {
   CreationReview,
   creationReviewKey,
@@ -41,7 +38,7 @@ function RecurringDetails(context: SetupStepRenderContext) {
     <div className="setup-step__group">
       <div>
         <h2>Payment details</h2>
-        <p>Every scheduled run pays this fixed amount to one CKB testnet recipient.</p>
+        <p>Choose who receives every payment and how much they receive.</p>
       </div>
       <div className="setup-form-grid">
         <TextField
@@ -57,8 +54,8 @@ function RecurringDetails(context: SetupStepRenderContext) {
         <TextField
           {...error(context, "recipientAddress")}
           autoComplete="off"
-          hint="The recipient cannot change after wallet approval."
-          label="Payment recipient"
+          hint="This address receives every scheduled payment."
+          label="Recipient address"
           name="recipientAddress"
           onChange={(event) => context.setField("recipientAddress", event.target.value)}
           placeholder="ckt1..."
@@ -69,7 +66,7 @@ function RecurringDetails(context: SetupStepRenderContext) {
           {...error(context, "amountCkb")}
           hint="The app checks the minimum required by the recipient address."
           inputMode="decimal"
-          label="Amount per run (CKB)"
+          label="Amount per payment (CKB)"
           name="amountCkb"
           onChange={(event) => context.setField("amountCkb", event.target.value)}
           placeholder="100"
@@ -82,6 +79,7 @@ function RecurringDetails(context: SetupStepRenderContext) {
 }
 
 function RecurringTiming(context: SetupStepRenderContext) {
+  const session = useWalletSession();
   const [minimum, setMinimum] = useState("");
   useEffect(() => {
     const now = new Date();
@@ -120,9 +118,9 @@ function RecurringTiming(context: SetupStepRenderContext) {
         />
         <TextField
           {...error(context, "runCount")}
-          hint="How many fixed payments the automation will make."
+          hint="The total number of payments to send."
           inputMode="numeric"
-          label="Number of runs"
+          label="Number of payments"
           name="runCount"
           onChange={(event) => context.setField("runCount", event.target.value)}
           placeholder="3"
@@ -130,92 +128,28 @@ function RecurringTiming(context: SetupStepRenderContext) {
           value={context.draft["runCount"] ?? ""}
         />
       </div>
-    </div>
-  );
-}
-
-function FundingPreview({ preview }: Readonly<{ preview: RecurringFundingPreview }>) {
-  return (
-    <div className="setup-funding-preview" aria-label="Recurring funding preview">
-      <h3>Total locked value</h3>
-      <dl>
-        <div>
-          <dt>Payments</dt>
-          <dd>{shannonsToCkb(preview.payoutTotal)} CKB</dd>
-        </div>
-        <div>
-          <dt>Executor rewards</dt>
-          <dd>{shannonsToCkb(preview.rewardTotal)} CKB</dd>
-        </div>
-        <div>
-          <dt>Job cell capacity</dt>
-          <dd>{shannonsToCkb(preview.occupiedCapacity)} CKB</dd>
-        </div>
-        <div className="setup-funding-preview__total">
-          <dt>Locked at approval</dt>
-          <dd>{preview.totalLockedCkb} CKB</dd>
-        </div>
-      </dl>
-    </div>
-  );
-}
-
-function RecurringFunding(context: SetupStepRenderContext) {
-  const session = useWalletSession();
-  const ownerAddress = session.address ?? "No testnet wallet connected";
-  let preview: RecurringFundingPreview | undefined;
-  try {
-    preview = recurringFundingPreview(context.draft);
-  } catch {
-    preview = undefined;
-  }
-  const insufficient =
-    preview !== undefined &&
-    session.balanceShannons !== undefined &&
-    session.balanceShannons < preview.totalLocked;
-  return (
-    <div className="setup-step__group">
-      <div>
-        <h2>Funding and final refund</h2>
-        <p>Fund every payment and reward now. Unspent job cell capacity returns to the owner.</p>
-      </div>
-      <TextField
-        {...error(context, "rewardCkb")}
-        hint="This fixed reward is reserved for each successful run."
-        inputMode="decimal"
-        label="Executor reward per run (CKB)"
-        name="rewardCkb"
-        onChange={(event) => context.setField("rewardCkb", event.target.value)}
-        required
-        value={context.draft["rewardCkb"] ?? ""}
-      />
-      {preview === undefined ? null : <FundingPreview preview={preview} />}
-      <ReadonlyField
-        code
-        error={context.errors["ownerAddress"]}
-        label="Funding and refund wallet"
-        name="ownerAddress"
-      >
-        {ownerAddress}
-      </ReadonlyField>
-      <ReadonlyField label="Final refund" name="finalRefund">
-        Remaining job cell capacity returns to the connected owner wallet
-      </ReadonlyField>
       {session.status === "ready" ? (
-        <InlineNotice
-          title={insufficient ? "More testnet CKB required" : "Owner refund path confirmed"}
-          tone={insufficient ? "danger" : "success"}
+        <div
+          data-field-name="ownerAddress"
+          tabIndex={context.errors["ownerAddress"] === undefined ? undefined : -1}
         >
-          <p>
-            {session.walletName ?? "Connected wallet"}: {shortenCkbAddress(ownerAddress)}
-            {session.balanceShannons === undefined
-              ? ". Balance is loading."
-              : ` with ${shannonsToCkb(session.balanceShannons)} CKB available.`}
-          </p>
-        </InlineNotice>
+          <InlineNotice
+            title={
+              context.errors["ownerAddress"] === undefined
+                ? "Payment wallet confirmed"
+                : "Wallet cannot cover this schedule"
+            }
+            tone={context.errors["ownerAddress"] === undefined ? "success" : "danger"}
+          >
+            <p>
+              {context.errors["ownerAddress"] ??
+                `${session.walletName ?? "Connected wallet"}: ${shortenCkbAddress(session.address ?? "")}. All charges are added automatically and shown on the next review.`}
+            </p>
+          </InlineNotice>
+        </div>
       ) : (
-        <InlineNotice title="Funding wallet required" tone="warning">
-          <p>Connect a supported CKB testnet wallet before continuing.</p>
+        <InlineNotice title="Wallet required" tone="warning">
+          <p>Connect a CKB testnet wallet to pay and retain recovery control.</p>
           <Button
             icon={<WalletCards aria-hidden="true" size={17} />}
             name="ownerAddress"
@@ -243,7 +177,6 @@ function RecurringStep({
 }>) {
   if (context.step === "details") return <RecurringDetails {...context} />;
   if (context.step === "timing") return <RecurringTiming {...context} />;
-  if (context.step === "funding") return <RecurringFunding {...context} />;
   if (context.step === "review") {
     return (
       <CreationReview
@@ -300,6 +233,7 @@ export function RecurringSetup() {
         />
       )}
       template="recurring"
+      steps={RECURRING_SETUP_STEPS}
       validateStep={(step, draft) => {
         if (step === "review") {
           const message = reviewStateError(

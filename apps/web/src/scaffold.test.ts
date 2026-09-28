@@ -116,6 +116,6 @@ test("typed environment configures the generated API client and rejects unsafe v
         ...input,
         NEXT_PUBLIC_CKB_GENESIS_HASH: `0x${"0".repeat(64)}`,
       }),
-    /Pudge testnet/,
+    /CKB Testnet/,
   );
 });

@@ -22,7 +22,7 @@ test("completes both deterministic setup journeys", async ({ page }) => {
       field: "Recurring automation name",
       name: "Monthly contributor payout",
       path: "/fixtures/setup-recurring",
-      title: "Recurring distribution",
+      title: "Recurring payments",
     },
   ]) {
     await page.goto(setup.path);
@@ -52,7 +52,9 @@ test("reproduces wallet outcomes and transaction progress", async ({ page }) => 
 
   await page.getByRole("button", { name: "Approve", exact: true }).click();
   await page.getByRole("button", { name: "Approve and submit" }).click();
-  await expect(page.getByText("Transaction submitted", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Your Automation Is Being Confirmed" }),
+  ).toBeVisible();
 
   await page.goto("/fixtures/transaction-progress");
   await page.getByRole("button", { name: "submitted", exact: true }).click();
@@ -72,9 +74,7 @@ test("reproduces wallet outcomes and transaction progress", async ({ page }) => 
 test("shows recurring successors and separate owner escape reviews", async ({ page }) => {
   await page.goto("/fixtures/automation-detail");
   await page.getByRole("button", { name: "recurring", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Recurring distribution" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Recurring payments" })).toBeVisible();
   await expect(page.locator(".job-detail__summary").getByText("2", { exact: true })).toBeVisible();
   await expect(page.locator(".job-detail__summary").getByText("4", { exact: true })).toBeVisible();
 

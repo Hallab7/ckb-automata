@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   DEADLINE_SETUP_STEPS,
   FIRST_SETUP_STEP,
+  RECURRING_SETUP_STEPS,
   SETUP_STEPS,
   parseSetupStep,
   parseStoredDraft,
@@ -19,6 +20,10 @@ test("setup progress uses canonical URL-safe step identifiers", () => {
   assert.equal(FIRST_SETUP_STEP, "details");
   assert.deepEqual(
     DEADLINE_SETUP_STEPS.map((step) => step.id),
+    ["template", "details", "timing", "review", "approval", "result"],
+  );
+  assert.deepEqual(
+    RECURRING_SETUP_STEPS.map((step) => step.id),
     ["template", "details", "timing", "review", "approval", "result"],
   );
   assert.equal(parseSetupStep("funding"), "funding");

@@ -19,7 +19,7 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = Object.freeze([
     summary: "A recurring contributor payout is funded and waiting for its next scheduled time.",
     tone: "info",
     facts: Object.freeze([
-      { label: "Template", value: "Recurring distribution" },
+      { label: "Template", value: "Recurring payments" },
       { label: "Recipient amount", value: "100 CKB" },
       { label: "Next execution", value: "Sep 27, 2026, 10:30 AM UTC" },
       { label: "Runs remaining", value: "4" },
@@ -94,7 +94,7 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = Object.freeze([
       "A terminal operational failure left a live job that the owner can recover without the service.",
     tone: "danger",
     facts: Object.freeze([
-      { label: "Template", value: "Recurring distribution" },
+      { label: "Template", value: "Recurring payments" },
       { label: "Recoverable value", value: "93 CKB" },
       { label: "Failure", value: "Unsupported metadata" },
       { label: "Owner action", value: "Exact refund" },

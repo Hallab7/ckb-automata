@@ -73,8 +73,8 @@ export function PublicDeploymentGate({ children }: Readonly<{ children: ReactNod
           </p>
         ) : (
           <p>
-            The configured backend did not prove the expected CKB Pudge testnet and contract
-            manifest. Wallet and transaction workflows remain unavailable.
+            The configured backend did not prove the expected CKB Testnet and contract manifest.
+            Wallet and transaction workflows remain unavailable.
           </p>
         )}
       </InlineNotice>

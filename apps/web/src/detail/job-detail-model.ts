@@ -129,7 +129,7 @@ export function jobDetailPresentation(
       job.template === "deadline"
         ? "Deadline finalization"
         : job.template === "recurring"
-          ? "Recurring distribution"
+          ? "Recurring payments"
           : "Unknown policy",
     recipientAmount:
       recipientAmount === undefined ? "Unavailable" : formatCkbBalance(BigInt(recipientAmount)),

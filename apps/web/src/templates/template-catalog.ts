@@ -13,24 +13,24 @@ export interface TemplateCatalogItem {
 
 export const TEMPLATE_CATALOG: readonly TemplateCatalogItem[] = Object.freeze([
   Object.freeze({
-    action: Object.freeze({ href: "/automations/new/deadline", label: "Start setup" }),
+    action: Object.freeze({ href: "/automations/new/deadline", label: "Set up payment" }),
     approval:
       "The owner wallet signs creation. The automation can process only after the scheduled time.",
     capability: "executable",
-    description: "Finalize a test campaign into its committed release or refund outcome.",
+    description: "Send or refund one payment at a date and time you choose.",
     id: "deadline",
-    name: "Deadline finalization",
+    name: "Scheduled payment",
     recoverability: "Owner-authorized cancel or recovery returns the complete Job Cell value.",
     risk: "Funds remain locked until finalization or an owner exit is confirmed on testnet.",
   }),
   Object.freeze({
-    action: Object.freeze({ href: "/automations/new/recurring", label: "Start setup" }),
+    action: Object.freeze({ href: "/automations/new/recurring", label: "Set up payments" }),
     approval:
       "The owner wallet signs once. Each run pays only the committed recipient and executor.",
     capability: "executable",
-    description: "Pay one fixed recipient on a time interval for a chosen number of runs.",
+    description: "Send the same amount to one recipient on a repeating schedule.",
     id: "recurring",
-    name: "Recurring distribution",
+    name: "Recurring payments",
     recoverability: "The owner may cancel a live job or recover a stalled or unsupported job.",
     risk: "Capacity stays locked across runs and must cover payouts, rewards, and occupied capacity.",
   }),

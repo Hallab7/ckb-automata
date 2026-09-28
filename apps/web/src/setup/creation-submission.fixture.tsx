@@ -26,7 +26,7 @@ export function CreationSubmissionFixture() {
     <main className="app-page" aria-labelledby="fixture-title">
       <header className="app-page-header">
         <div className="app-page-header__copy">
-          <p className="setup-flow__eyebrow">CKB Pudge Testnet</p>
+          <p className="setup-flow__eyebrow">CKB Testnet</p>
           <h1 id="fixture-title">Wallet approval fixture</h1>
         </div>
       </header>

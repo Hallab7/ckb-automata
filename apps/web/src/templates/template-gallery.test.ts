@@ -26,14 +26,15 @@ test("template availability matches implemented product boundaries", () => {
   );
 });
 
-test("every gallery entry states risk, approval, and recoverability", async () => {
+test("creation gallery stays focused on executable payment choices", async () => {
   for (const template of TEMPLATE_CATALOG) {
     assert.ok(template.risk.length > 20, `${template.id} risk is too vague`);
     assert.ok(template.approval.length > 20, `${template.id} approval is too vague`);
     assert.ok(template.recoverability.length > 20, `${template.id} recovery is too vague`);
   }
   const source = await readFile(new URL("./template-gallery.tsx", import.meta.url), "utf8");
-  assert.match(source, /data-create-action=\{template\.capability === "executable"/);
-  assert.match(source, /Demo only/);
-  assert.match(source, /Research only/);
+  assert.match(source, /template\.capability === "executable"/);
+  assert.match(source, /data-create-action="true"/);
+  assert.doesNotMatch(source, /Guided scenarios|Demo only|NervDAO Cycle Guard|Research only/);
+  assert.doesNotMatch(source, /template-card__facts/);
 });

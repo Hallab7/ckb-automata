@@ -335,6 +335,9 @@ export async function verifyCreationReview(
   let normalizedIntent: unknown;
   let jobId: string;
   let deadlinePledged: bigint | undefined;
+  let recurringAmountPerRun: bigint | undefined;
+  let recurringRecipientTotal: bigint | undefined;
+  let recurringRuns: bigint | undefined;
 
   if (request.operation === "create_recurring_job") {
     const build = buildRecurringCreation({
@@ -356,21 +359,14 @@ export async function verifyCreationReview(
     );
     ownerLockHash = request.value.ownerLockHash;
     requiredOutputCount = build.completion.requiredOutputCount;
-    title = "Recurring distribution";
-    summary = `${shannonsToCkb(BigInt(request.value.amount))} CKB will be available to the fixed recipient on each of ${request.value.totalRuns} scheduled runs.`;
+    title = "Recurring payments";
+    recurringAmountPerRun = BigInt(request.value.amount);
+    recurringRuns = BigInt(request.value.totalRuns);
+    recurringRecipientTotal = recurringAmountPerRun * recurringRuns;
+    summary = `${shannonsToCkb(recurringAmountPerRun)} CKB will be sent to the recipient on each of ${request.value.totalRuns} scheduled payments.`;
     timing = timingCopy(BigInt(request.value.firstNotBefore), chainSnapshot.block);
-    recovery =
-      "After the final run, remaining Job Cell capacity returns to the connected owner. The owner also retains cancellation and recovery authority.";
-    amounts = Object.freeze([
-      { label: "Payment per run", value: `${shannonsToCkb(BigInt(request.value.amount))} CKB` },
-      { label: "Executions", value: request.value.totalRuns },
-      {
-        label: "Executor reward per run",
-        value: `${shannonsToCkb(BigInt(request.value.reward))} CKB`,
-      },
-      { label: "Total capacity locked", value: `${shannonsToCkb(totalLocked)} CKB` },
-      { label: "Recoverable residual", value: `${shannonsToCkb(build.quote.residualRefund)} CKB` },
-    ]);
+    recovery = `${shannonsToCkb(build.quote.residualRefund)} CKB of the charges returns to your connected wallet after the final payment. If you cancel or recover earlier, all unspent payments and service charges are also preserved, minus network fees.`;
+    amounts = Object.freeze([]);
     immutableTerms = Object.freeze([
       `Recipient lock ${request.value.recipientLockHash}`,
       `${request.value.amount} shannons per run for ${request.value.totalRuns} runs`,
@@ -431,6 +427,21 @@ export async function verifyCreationReview(
     const charges = totalLocked - deadlinePledged + completion.fee;
     amounts = Object.freeze([
       { label: "Recipient amount", value: `${shannonsToCkb(deadlinePledged)} CKB` },
+      { label: "Charges", value: `${shannonsToCkb(charges)} CKB` },
+      { label: "Total amount to pay", value: `${shannonsToCkb(totalLocked + completion.fee)} CKB` },
+    ]);
+  }
+  if (
+    recurringAmountPerRun !== undefined &&
+    recurringRecipientTotal !== undefined &&
+    recurringRuns !== undefined
+  ) {
+    const charges = totalLocked - recurringRecipientTotal + completion.fee;
+    amounts = Object.freeze([
+      {
+        label: "Recipient amount",
+        value: `${shannonsToCkb(recurringRecipientTotal)} CKB total (${shannonsToCkb(recurringAmountPerRun)} CKB x ${recurringRuns} payments)`,
+      },
       { label: "Charges", value: `${shannonsToCkb(charges)} CKB` },
       { label: "Total amount to pay", value: `${shannonsToCkb(totalLocked + completion.fee)} CKB` },
     ]);

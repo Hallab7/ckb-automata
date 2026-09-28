@@ -36,7 +36,7 @@ export function parseWebEnvironment(
   if (apiUrl !== sseUrl) throw new Error("public API and SSE origins must match");
   const genesisHash = input["NEXT_PUBLIC_CKB_GENESIS_HASH"];
   if (genesisHash !== TESTNET_GENESIS_HASH) {
-    throw new Error("NEXT_PUBLIC_CKB_GENESIS_HASH must identify CKB Pudge testnet");
+    throw new Error("NEXT_PUBLIC_CKB_GENESIS_HASH must identify CKB Testnet");
   }
   const manifestSha256 = input["NEXT_PUBLIC_DEPLOYMENT_MANIFEST_SHA256"];
   if (manifestSha256 !== TESTNET_DEPLOYMENT_MANIFEST_SHA256) {

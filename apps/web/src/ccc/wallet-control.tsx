@@ -71,7 +71,7 @@ export function WalletControl() {
         >
           Connect wallet
         </Button>
-        <strong>CKB Pudge Testnet only</strong>
+        <strong>CKB Testnet only</strong>
         <p>Wallet unavailable? Install or unlock a supported CKB or BTC wallet, then retry.</p>
       </div>
     );
@@ -81,7 +81,7 @@ export function WalletControl() {
     return (
       <WalletGuidance
         action="open"
-        detail="Switch the wallet to CKB Pudge Testnet before reconnecting. Mainnet signing is blocked."
+        detail="Switch the wallet to CKB Testnet before reconnecting. Mainnet signing is blocked."
         title="Wrong wallet network"
       />
     );
@@ -145,7 +145,7 @@ export function WalletControl() {
       </div>
       <div className="app-wallet-control__footer">
         <span>{balance}</span>
-        <strong>CKB Pudge Testnet</strong>
+        <strong>CKB Testnet</strong>
       </div>
       {session.detailsStatus === "error" ? (
         <Button

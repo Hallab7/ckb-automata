@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 const limitations = [
   {
     description:
-      "This deployment is bound to CKB Pudge testnet. Testnet CKB has no monetary value, and mainnet signing is blocked.",
+      "This deployment is bound to CKB Testnet. Testnet CKB has no monetary value, and mainnet signing is blocked.",
     icon: FlaskConical,
     title: "Testnet only",
   },

@@ -26,10 +26,11 @@ export const RECURRING_INITIAL_DRAFT: SetupDraft = Object.freeze({
   firstExecutionAt: "",
   intervalMinutes: "",
   recipientAddress: "",
-  rewardCkb: "61",
   runCount: "",
   title: "",
 });
+
+export const RECURRING_SERVICE_CHARGE_CKB = "61";
 
 export interface RecurringValidationContext {
   readonly balanceShannons: bigint | undefined;
@@ -80,8 +81,8 @@ function ckbAmount(value: string, label: string): bigint {
 }
 
 export function recurringFundingPreview(draft: SetupDraft): RecurringFundingPreview {
-  const amountPerRun = ckbAmount(draft["amountCkb"] ?? "", "Payment per run");
-  const rewardPerRun = ckbAmount(draft["rewardCkb"] ?? "", "Executor reward");
+  const amountPerRun = ckbAmount(draft["amountCkb"] ?? "", "Payment amount");
+  const rewardPerRun = ckbAmount(RECURRING_SERVICE_CHARGE_CKB, "Service charge");
   const runs = parseRunCount(canonicalDecimal(draft["runCount"] ?? "", "Run count"));
   const quote = calculateRecurringQuote({
     amountPerExecution: amountPerRun,
@@ -204,20 +205,19 @@ export async function validateRecurringStep(
     const titleError = validateAutomationTitle(draft);
     if (titleError !== undefined) errors["title"] = titleError;
     const resolvedRecipient = await recipient(draft, context, errors);
-    const amount = validateAmount(draft, "amountCkb", "payment per run", errors);
+    const amount = validateAmount(draft, "amountCkb", "payment amount", errors);
     if (
       resolvedRecipient !== undefined &&
       amount !== undefined &&
       amount < resolvedRecipient.minimumCapacity
     ) {
       errors["amountCkb"] =
-        `Payment per run must be at least ${shannonsToCkb(resolvedRecipient.minimumCapacity)} CKB for this recipient address.`;
+        `Payment amount must be at least ${shannonsToCkb(resolvedRecipient.minimumCapacity)} CKB for this recipient address.`;
     }
   }
-  if (step === "timing") timingValues(draft, errors);
-  if (step === "funding") {
-    const amount = validateAmount(draft, "amountCkb", "payment per run", errors);
-    const reward = validateAmount(draft, "rewardCkb", "executor reward", errors);
+  if (step === "timing") {
+    const amount = validateAmount(draft, "amountCkb", "payment amount", errors);
+    const reward = ckbAmount(RECURRING_SERVICE_CHARGE_CKB, "Service charge");
     const { interval, runs } = timingValues(draft, errors);
     const resolvedRecipient = await recipient(draft, context, errors);
     if (
@@ -226,16 +226,18 @@ export async function validateRecurringStep(
       amount < resolvedRecipient.minimumCapacity
     ) {
       errors["amountCkb"] =
-        `Payment per run must be at least ${shannonsToCkb(resolvedRecipient.minimumCapacity)} CKB for this recipient address.`;
+        `Payment amount must be at least ${shannonsToCkb(resolvedRecipient.minimumCapacity)} CKB for this recipient address.`;
     }
     if (!context.walletReady || context.ownerLockHash === undefined) {
-      errors["ownerAddress"] = "Connect a supported CKB testnet wallet for funding and refunds.";
+      errors["ownerAddress"] = "Connect a supported CKB testnet wallet to pay and manage refunds.";
     }
     let preview: RecurringFundingPreview | undefined;
-    try {
-      preview = recurringFundingPreview(draft);
-    } catch {
-      errors["rewardCkb"] = "The complete schedule exceeds CKB funding limits.";
+    if (amount !== undefined && runs !== undefined) {
+      try {
+        preview = recurringFundingPreview(draft);
+      } catch {
+        errors["runCount"] = "The complete payment schedule exceeds CKB funding limits.";
+      }
     }
     if (context.walletReady && context.balanceShannons === undefined) {
       errors["ownerAddress"] = "Wait for the connected wallet balance to finish loading.";
@@ -245,7 +247,7 @@ export async function validateRecurringStep(
       context.balanceShannons < preview.totalLocked
     ) {
       errors["ownerAddress"] =
-        `Wallet balance is below the ${preview.totalLockedCkb} CKB locked total.`;
+        `Wallet needs at least ${preview.totalLockedCkb} CKB to cover all payments and charges.`;
     }
     if (
       amount !== undefined &&
@@ -267,7 +269,7 @@ export async function validateRecurringStep(
           creatorNonce: "0",
         });
       } catch {
-        errors["rewardCkb"] = "These values cannot create a valid recurring automation.";
+        errors["runCount"] = "These values cannot create a valid recurring payment schedule.";
       }
     }
   }

@@ -79,7 +79,7 @@ test("dialog focus is trapped and returns to the owner action trigger", async ({
 test("accessible tree exposes setup landmarks and labeled controls", async ({ page }) => {
   await page.goto("/fixtures/setup-recurring");
   const snapshot = await page.locator("body").ariaSnapshot();
-  expect(snapshot).toContain('- heading "Recurring distribution" [level=1]');
+  expect(snapshot).toContain('- heading "Recurring payments" [level=1]');
   expect(snapshot).toContain('- navigation "Automation setup progress"');
   expect(snapshot).toContain('- textbox "Recurring automation name"');
   expect(snapshot).toContain('- button "Continue"');

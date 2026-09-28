@@ -21,7 +21,7 @@ import { useWalletSession } from "../ccc/session.tsx";
 import { browserWebEnvironment } from "../environment.ts";
 import { ckbToShannons } from "./ckb-amount.ts";
 import { DEADLINE_SERVICE_CHARGE_CKB, deadlineTarget, scheduleToBlock } from "./deadline-form.ts";
-import { intervalMinutesToBlocks } from "./recurring-form.ts";
+import { intervalMinutesToBlocks, RECURRING_SERVICE_CHARGE_CKB } from "./recurring-form.ts";
 import { automationTitle } from "./automation-title.ts";
 import {
   reviewTechnicalDetailsJson,
@@ -137,7 +137,7 @@ async function requestFromDraft(
       intervalBlocks: intervalMinutesToBlocks(draft["intervalMinutes"] ?? ""),
       firstNotBefore: scheduleToBlock(draft["firstExecutionAt"] ?? "", tipBlock ?? ""),
       totalRuns: draft["runCount"] ?? "",
-      reward: ckbToShannons(draft["rewardCkb"] ?? ""),
+      reward: ckbToShannons(RECURRING_SERVICE_CHARGE_CKB),
       creatorNonce,
     });
     return {
@@ -276,9 +276,7 @@ export function ReviewSummary({
       </div>
 
       <section className="setup-review__section" aria-labelledby="review-timing">
-        <h3 id="review-timing">
-          {model.operation === "create_deadline_job" ? "Schedule" : "Timing"}
-        </h3>
+        <h3 id="review-timing">Schedule</h3>
         <p>
           {model.operation === "create_deadline_job" && draft["scheduleAt"]
             ? new Intl.DateTimeFormat(undefined, { dateStyle: "full", timeStyle: "short" }).format(
@@ -289,11 +287,7 @@ export function ReviewSummary({
       </section>
 
       <section className="setup-review__section" aria-labelledby="review-amounts">
-        <h3 id="review-amounts">
-          {model.operation === "create_deadline_job"
-            ? "Payment summary"
-            : "Amounts and wallet effects"}
-        </h3>
+        <h3 id="review-amounts">Payment summary</h3>
         <dl className="setup-review__values">
           {model.amounts.map((line) => (
             <div key={line.label}>
@@ -301,22 +295,6 @@ export function ReviewSummary({
               <dd>{line.value}</dd>
             </div>
           ))}
-          {model.operation === "create_recurring_job" ? (
-            <>
-              <div>
-                <dt>Exact network fee</dt>
-                <dd>{model.fee}</dd>
-              </div>
-              <div>
-                <dt>Reviewed fee ceiling</dt>
-                <dd>{model.maximumFee}</dd>
-              </div>
-              <div>
-                <dt>Wallet change</dt>
-                <dd>{model.change}</dd>
-              </div>
-            </>
-          ) : null}
         </dl>
       </section>
 
@@ -349,44 +327,15 @@ export function ReviewSummary({
         </dl>
       </section>
 
-      {model.operation === "create_deadline_job" ? (
-        <InlineNotice title="Recoverable amount" tone="info">
-          <p>{model.recovery}</p>
-        </InlineNotice>
-      ) : (
-        <>
-          <section className="setup-review__section" aria-labelledby="review-terms">
-            <h3 id="review-terms">Immutable terms</h3>
-            <ul>
-              {model.immutableTerms.map((term) => (
-                <li key={term}>{term}</li>
-              ))}
-            </ul>
-          </section>
-          <section className="setup-review__section" aria-labelledby="review-recovery">
-            <h3 id="review-recovery">Cancellation and recovery</h3>
-            <p>{model.recovery}</p>
-          </section>
-          <InlineNotice title="Review warnings" tone="warning">
-            <ul className="setup-review__warnings">
-              {model.warnings.map((warning) => (
-                <li key={warning}>{warning}</li>
-              ))}
-            </ul>
-          </InlineNotice>
-        </>
-      )}
+      <InlineNotice title="Recoverable amount" tone="info">
+        <p>{model.recovery}</p>
+      </InlineNotice>
 
       <div className="setup-review__network">
         <ShieldCheck aria-hidden="true" size={18} />
         <div>
           <strong>{model.network}</strong>
-          <span>
-            {model.operation === "create_deadline_job"
-              ? "Testnet transaction"
-              : "Current testnet snapshot"}
-          </span>
-          {model.operation === "create_recurring_job" ? <code>{model.genesisHash}</code> : null}
+          <span>CKB Testnet transaction</span>
         </div>
       </div>
 

@@ -8,8 +8,8 @@ const ADDRESS = "ckt1qfixturepaymentrecipient00000000000000000000000000000000000
 const MODEL: CreationReviewModel = Object.freeze({
   jobId: HASH_A,
   operation: "create_recurring_job",
-  title: "Recurring distribution",
-  summary: "100 CKB will be available to the fixed recipient on each of 3 scheduled runs.",
+  title: "Recurring payments",
+  summary: "100 CKB will be sent to the recipient on each of 3 scheduled payments.",
   network: "ckb_testnet",
   snapshotBlock: "14999940",
   snapshotHash: HASH_A,
@@ -17,17 +17,15 @@ const MODEL: CreationReviewModel = Object.freeze({
   manifestSha256: "33".repeat(32),
   timing: "Expected in about 10 minutes. Network timing can vary slightly.",
   amounts: Object.freeze([
-    { label: "Payment per run", value: "100 CKB" },
-    { label: "Executions", value: "3" },
-    { label: "Executor reward per run", value: "61 CKB" },
-    { label: "Total capacity locked", value: "864 CKB" },
-    { label: "Recoverable residual", value: "381 CKB" },
+    { label: "Recipient amount", value: "300 CKB total (100 CKB x 3 payments)" },
+    { label: "Charges", value: "564.0000124 CKB" },
+    { label: "Total amount to pay", value: "864.0000124 CKB" },
   ]),
   fee: "0.0000124 CKB (1240 shannons), paid by the connected owner",
   maximumFee: "0.000016 CKB (1600 shannons)",
   change: "135.9999876 CKB across 1 owner change output",
   recovery:
-    "After the final run, remaining Job Cell capacity returns to the connected owner. The owner also retains cancellation and recovery authority.",
+    "381 CKB of the charges returns to your connected wallet after the final payment. If you cancel or recover earlier, all unspent payments and service charges are also preserved, minus network fees.",
   immutableTerms: Object.freeze([
     `Recipient lock ${HASH_A}`,
     "10000000000 shannons per run for 3 runs",
@@ -69,7 +67,7 @@ export function CreationReviewFixture() {
     <main className="app-page" aria-labelledby="fixture-title">
       <header className="app-page-header">
         <div className="app-page-header__copy">
-          <p className="setup-flow__eyebrow">CKB Pudge Testnet</p>
+          <p className="setup-flow__eyebrow">CKB Testnet</p>
           <h1 id="fixture-title">Transaction review fixture</h1>
         </div>
       </header>

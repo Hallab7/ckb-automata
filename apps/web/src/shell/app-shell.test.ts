@@ -31,7 +31,7 @@ test("network, wallet, and notification state remain explicit in text", () => {
   assert.match(walletSource, /Connect wallet/);
   assert.match(walletSource, /Wrong wallet network/);
   assert.match(walletSource, /Disconnect wallet/);
-  assert.match(walletSource, /CKB Pudge Testnet/);
+  assert.match(walletSource, /CKB Testnet/);
   assert.match(walletSource, /formatCkbBalance/);
   assert.match(walletSource, /ckbTestnetAddressUrl/);
   assert.match(shellSource, /<NotificationCenter \/>/);

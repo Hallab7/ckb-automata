@@ -23,7 +23,6 @@ const VALID_DRAFT = {
   firstExecutionAt: "2099-09-24T10:00",
   intervalMinutes: "17",
   recipientAddress: "recipient",
-  rewardCkb: "61",
   runCount: "3",
 };
 const CONTEXT = {
@@ -43,7 +42,7 @@ interface Fixture {
 }
 
 test("recurring preview exposes every component of the locked total", () => {
-  const preview = recurringFundingPreview(VALID_DRAFT);
+  const preview = recurringFundingPreview({ ...VALID_DRAFT, rewardCkb: "999" });
   assert.equal(preview.amountPerRun, 10_000_000_000n);
   assert.equal(preview.payoutTotal, 30_000_000_000n);
   assert.equal(preview.rewardTotal, 18_300_000_000n);
@@ -90,11 +89,14 @@ test("recurring validation rejects overflow and insufficient wallet balance", as
       runCount: "2",
     }),
   );
-  const errors = await validateRecurringStep("funding", VALID_DRAFT, {
+  const errors = await validateRecurringStep("timing", VALID_DRAFT, {
     ...CONTEXT,
     balanceShannons: 86_399_999_999n,
   });
-  assert.equal(errors["ownerAddress"], "Wallet balance is below the 864 CKB locked total.");
+  assert.equal(
+    errors["ownerAddress"],
+    "Wallet needs at least 864 CKB to cover all payments and charges.",
+  );
 });
 
 test("recurring validation uses the resolved recipient address minimum", async () => {
@@ -105,7 +107,7 @@ test("recurring validation uses the resolved recipient address minimum", async (
   );
   assert.equal(
     errors["amountCkb"],
-    "Payment per run must be at least 63 CKB for this recipient address.",
+    "Payment amount must be at least 63 CKB for this recipient address.",
   );
 });
 
@@ -130,18 +132,22 @@ test("recurring client rejects every invalid API fixture", async () => {
 });
 
 test("recurring form asks for plain-language values and no raw scripts", async () => {
-  const source = await readFile(new URL("./recurring-setup.tsx", import.meta.url), "utf8");
+  const [source, reviewSource] = await Promise.all([
+    readFile(new URL("./recurring-setup.tsx", import.meta.url), "utf8"),
+    readFile(new URL("./creation-review.tsx", import.meta.url), "utf8"),
+  ]);
   for (const field of [
     "recipientAddress",
     "amountCkb",
     "firstExecutionAt",
     "intervalMinutes",
     "runCount",
-    "rewardCkb",
     "ownerAddress",
-    "finalRefund",
   ]) {
     assert.match(source, new RegExp(`name="${field}"`));
   }
+  assert.doesNotMatch(source, /name="(?:rewardCkb|finalRefund)"/);
+  assert.doesNotMatch(source, /Funding and final refund|Executor reward per run/);
+  assert.match(reviewSource, /reward: ckbToShannons\(RECURRING_SERVICE_CHARGE_CKB\)/);
   assert.doesNotMatch(source, /name="[^"]*(?:script|hash|outPoint)/i);
 });

@@ -142,8 +142,7 @@ function NextAutomation({
     checkpointAt,
   );
   const title =
-    titles[job.jobId] ??
-    (job.template === "deadline" ? "Scheduled payment" : "Recurring distribution");
+    titles[job.jobId] ?? (job.template === "deadline" ? "Scheduled payment" : "Recurring payments");
   const calendar = calendarDateParts(presentation.scheduledAt);
 
   return (
@@ -211,7 +210,7 @@ function PendingAutomationRows({
         : formatBlockDate(BigInt(item.notBefore), checkpoint, checkpointAt ?? item.submittedAt);
     const title =
       titles[item.jobId] ??
-      (item.template === "deadline" ? "Scheduled payment" : "Recurring distribution");
+      (item.template === "deadline" ? "Scheduled payment" : "Recurring payments");
     const confirmations = Math.min(Number(item.confirmations), item.requiredConfirmations);
     return (
       <a
@@ -304,7 +303,7 @@ function AutomationRows({
             <div className="automation-row__identity">
               <strong>
                 {titles[job.jobId] ??
-                  (job.template === "deadline" ? "Scheduled payment" : "Recurring distribution")}
+                  (job.template === "deadline" ? "Scheduled payment" : "Recurring payments")}
               </strong>
               <code title={job.jobId}>{shortJobId(job.jobId)}</code>
             </div>
@@ -464,7 +463,7 @@ export function AutomationDashboardView({
           <strong>Payment automations</strong>
           <span>
             {items.length === 0
-              ? "CKB Pudge Testnet schedule"
+              ? "CKB Testnet schedule"
               : `Synced ${formatDateTime(
                   items.reduce(
                     (latest, item) =>
