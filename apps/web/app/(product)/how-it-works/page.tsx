@@ -1,11 +1,11 @@
 import {
+  Activity,
   CalendarClock,
   CheckCircle2,
-  CircleDollarSign,
+  ListChecks,
   LockKeyhole,
-  Radar,
+  Repeat2,
   RotateCcw,
-  ShieldCheck,
   WalletCards,
 } from "lucide-react";
 import type { Metadata } from "next";
@@ -20,33 +20,33 @@ export const metadata: Metadata = {
 const steps = [
   {
     description:
-      "Choose who should be paid, how much they should receive, and the date and time for the payment. For recurring payments, also choose how often it repeats.",
-    icon: CalendarClock,
-    title: "Set the payment details",
+      "Choose Schedule payment for one future payment, or Recurring distribution for a payment that repeats.",
+    icon: ListChecks,
+    title: "Choose an automation",
   },
   {
     description:
-      "Check the recipient amount, charges, and total. Your wallet will show the exact transaction before you approve it.",
+      "Add a title, recipient address, and payment amount. A title is optional, but it can make the automation easier to find later.",
     icon: WalletCards,
+    title: "Enter the payment details",
+  },
+  {
+    description:
+      "Choose a future date and time. For a recurring distribution, also choose how often it repeats and the number of payments.",
+    icon: CalendarClock,
+    title: "Set the schedule",
+  },
+  {
+    description:
+      "Check the recipient amount, combined charges, and total deposit. Your wallet shows the exact transaction before you approve it.",
+    icon: LockKeyhole,
     title: "Review and approve",
   },
   {
     description:
-      "Once approved, the payment funds are secured on CKB. CKAutomata cannot send them somewhere else or change the amount you approved.",
-    icon: LockKeyhole,
-    title: "Your funds are secured",
-  },
-  {
-    description:
-      "After the scheduled time arrives, an executor prepares the payment. An executor can be an automated service or anyone running compatible software.",
-    icon: Radar,
-    title: "An executor starts the payment",
-  },
-  {
-    description:
-      "The CKB network checks every rule before accepting the payment. When confirmed, the recipient receives the funds and the automation is marked completed.",
+      "Open Automations to follow progress. The payment stays secured until its scheduled time and is sent according to the details you approved.",
     icon: CheckCircle2,
-    title: "CKB completes the payment",
+    title: "Track the automation",
   },
 ] as const;
 
@@ -54,7 +54,7 @@ export default function HowItWorksPage() {
   return (
     <div className="app-page how-it-works-page">
       <PageHeader
-        description="Schedule a payment once, and CKAutomata handles the rest without taking control of your wallet."
+        description="A simple guide to creating, tracking, and managing automated CKB payments."
         title="How it works"
       />
 
@@ -75,37 +75,48 @@ export default function HowItWorksPage() {
 
       <section aria-labelledby="important-details-title" className="how-it-works-details">
         <div className="how-it-works-details__heading">
-          <span>Good to know</span>
-          <h2 id="important-details-title">Simple answers to important questions</h2>
+          <span>Using CKAutomata</span>
+          <h2 id="important-details-title">Understand your automation</h2>
         </div>
         <div className="how-it-works-details__list">
           <article>
-            <CircleDollarSign aria-hidden="true" size={20} />
+            <CalendarClock aria-hidden="true" size={20} />
             <div>
-              <h3>What does the executor earn?</h3>
+              <h3>Schedule payment</h3>
               <p>
-                The executor that completes the payment receives the automation charge. It pays the
-                CKB network fee from that amount.
+                Runs once at the selected date and time. You choose whether the amount is sent to
+                the recipient or returned to the refund address.
               </p>
             </div>
           </article>
           <article>
-            <ShieldCheck aria-hidden="true" size={20} />
+            <Repeat2 aria-hidden="true" size={20} />
             <div>
-              <h3>Can an executor take my funds?</h3>
+              <h3>Recurring distribution</h3>
               <p>
-                No. The executor can only submit a payment that follows the recipient, amount, and
-                schedule you approved. CKB rejects changes.
+                Sends the same amount more than once. You choose the first payment time, repeat
+                interval, and total number of payments.
+              </p>
+            </div>
+          </article>
+          <article>
+            <Activity aria-hidden="true" size={20} />
+            <div>
+              <h3>Payment status</h3>
+              <p>
+                Submitting and Confirming mean the automation is being created. Waiting means it is
+                ready for its scheduled time. Processing means payment is underway, and Completed
+                means it has finished.
               </p>
             </div>
           </article>
           <article>
             <RotateCcw aria-hidden="true" size={20} />
             <div>
-              <h3>What if an executor is late?</h3>
+              <h3>Manage an automation</h3>
               <p>
-                Your funds stay secured. The payment can be completed by an available executor after
-                the scheduled time, and your wallet does not need to stay connected.
+                Open an automation to view its payment details and activity. When available, the
+                owner can cancel it, add funds, or recover the remaining funds.
               </p>
             </div>
           </article>

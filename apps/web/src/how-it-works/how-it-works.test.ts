@@ -9,19 +9,22 @@ const pageSource = await readFile(
 
 test("how it works explains the complete automation flow in plain language", () => {
   for (const copy of [
-    "Set the payment details",
+    "Choose an automation",
+    "Enter the payment details",
+    "Set the schedule",
     "Review and approve",
-    "Your funds are secured",
-    "An executor starts the payment",
-    "CKB completes the payment",
-    "your wallet does not need to stay connected",
+    "Track the automation",
+    "Schedule payment",
+    "Recurring distribution",
+    "Payment status",
+    "Manage an automation",
   ]) {
     assert.match(pageSource, new RegExp(copy, "i"));
   }
 });
 
-test("how it works states the executor and fund-safety boundaries", () => {
-  assert.match(pageSource, /receives the automation charge/i);
-  assert.match(pageSource, /can only submit a payment that follows/i);
-  assert.match(pageSource, /funds stay secured/i);
+test("how it works remains a standalone product guide", () => {
+  assert.doesNotMatch(pageSource, /executor/i);
+  assert.match(pageSource, /Submitting and Confirming/i);
+  assert.match(pageSource, /cancel it, add funds, or recover/i);
 });
