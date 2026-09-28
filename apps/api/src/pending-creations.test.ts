@@ -95,10 +95,10 @@ test("pending creations follow canonical progress and disappear after indexing",
       progressReads += 1;
       return {
         block: { hash: HASH_A, number: "450" },
-        confirmations: "8",
+        confirmations: "3",
         observedAt: "2026-09-28T00:01:00.000Z",
         reason: null,
-        requiredConfirmations: 24,
+        requiredConfirmations: 5,
         state: "committed",
         transactionHash: HASH_B,
       };
@@ -112,7 +112,7 @@ test("pending creations follow canonical progress and disappear after indexing",
   );
   const pending = await service.list({ indexedJobIds: new Set() });
   assert.equal(pending[0]?.status, "confirming");
-  assert.equal(pending[0]?.confirmations, "8");
+  assert.equal(pending[0]?.confirmations, "3");
   assert.equal(updates[0]?.["state"], "committed");
 
   const indexed = await service.list({ indexedJobIds: new Set([HASH_A]) });

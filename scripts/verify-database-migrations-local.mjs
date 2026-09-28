@@ -65,7 +65,7 @@ try {
 
   const emptyUrl = databaseUrl(names[0]);
   const installed = await migrateDatabase({ connectionString: emptyUrl });
-  assert.deepEqual(installed.changed, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  assert.deepEqual(installed.changed, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
   const repeated = await migrateDatabase({ connectionString: emptyUrl });
   assert.deepEqual(repeated.changed, []);
   await withClient(names[0], async (sql) => {
@@ -80,8 +80,20 @@ try {
         id, genesis_hash, rpc_profile, confirmation_depth, deployment_manifest_hash
       ) VALUES ('invalid', 'not-a-hash', 'local', 1, ${"0".repeat(64)})`,
     );
+    await sql`INSERT INTO networks (
+      id, genesis_hash, rpc_profile, confirmation_depth, deployment_manifest_hash
+    ) VALUES (
+      'ckb_testnet', ${`0x${"03".repeat(32)}`}, 'testnet-public', 5, ${"04".repeat(32)}
+    )`;
   });
 
+  const rolledBackConfirmationDepth = await rollbackDatabase({ connectionString: emptyUrl });
+  assert.deepEqual(rolledBackConfirmationDepth.changed, [13]);
+  await withClient(names[0], async (sql) => {
+    const [{ confirmation_depth: confirmationDepth }] =
+      await sql`SELECT confirmation_depth FROM networks WHERE id = 'ckb_testnet'`;
+    assert.equal(confirmationDepth, 24);
+  });
   const rolledBackBuilderIdentity = await rollbackDatabase({ connectionString: emptyUrl });
   assert.deepEqual(rolledBackBuilderIdentity.changed, [12]);
   await withClient(names[0], async (sql) => {
@@ -138,7 +150,12 @@ try {
     assert.equal(column, undefined);
   });
   const reapplied = await migrateDatabase({ connectionString: emptyUrl });
-  assert.deepEqual(reapplied.changed, [4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  assert.deepEqual(reapplied.changed, [4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+  await withClient(names[0], async (sql) => {
+    const [{ confirmation_depth: confirmationDepth }] =
+      await sql`SELECT confirmation_depth FROM networks WHERE id = 'ckb_testnet'`;
+    assert.equal(confirmationDepth, 5);
+  });
 
   const previousUrl = databaseUrl(names[1]);
   const previous = await migrateDatabase({ connectionString: previousUrl, targetVersion: 3 });
@@ -148,14 +165,19 @@ try {
       id, genesis_hash, rpc_profile, confirmation_depth, deployment_manifest_hash
     ) VALUES (
       'fixture', ${`0x${"01".repeat(32)}`}, 'local', 12, ${"02".repeat(32)}
+    ), (
+      'ckb_testnet', ${`0x${"03".repeat(32)}`}, 'testnet-public', 24, ${"04".repeat(32)}
     )`;
   });
   const upgraded = await migrateDatabase({ connectionString: previousUrl });
-  assert.deepEqual(upgraded.changed, [4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  assert.deepEqual(upgraded.changed, [4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
   await withClient(names[1], async (sql) => {
     const [{ count }] =
       await sql`SELECT count(*)::integer AS count FROM networks WHERE id = 'fixture'`;
     assert.equal(count, 1);
+    const [{ confirmation_depth: confirmationDepth }] =
+      await sql`SELECT confirmation_depth FROM networks WHERE id = 'ckb_testnet'`;
+    assert.equal(confirmationDepth, 5);
     const [{ table_name: tableName }] =
       await sql`SELECT to_regclass('public.transaction_attempts')::text AS table_name`;
     assert.equal(tableName, "transaction_attempts");
@@ -167,11 +189,11 @@ try {
   try {
     await copyMigrations(temporaryMigrations);
     await writeFile(
-      join(temporaryMigrations, "0013_forced_failure.up.sql"),
+      join(temporaryMigrations, "0014_forced_failure.up.sql"),
       "CREATE TABLE must_rollback (id integer); SELECT 1 / 0;",
     );
     await writeFile(
-      join(temporaryMigrations, "0013_forced_failure.down.sql"),
+      join(temporaryMigrations, "0014_forced_failure.down.sql"),
       "DROP TABLE must_rollback;",
     );
     const migrationsDirectory = new URL(`file:///${temporaryMigrations.replaceAll("\\", "/")}/`);
@@ -188,7 +210,7 @@ try {
     assert.equal(tableName, null);
     const [{ maximum }] =
       await sql`SELECT max(version)::integer AS maximum FROM automata_schema_migrations`;
-    assert.equal(maximum, 12);
+    assert.equal(maximum, 13);
   });
 
   console.log(

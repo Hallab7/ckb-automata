@@ -50,5 +50,6 @@ hash; no contract hash is copied into an application-specific configuration.
 Its zero lock makes every code cell permanently immutable. Verify the committed
 transaction, every code dependency, and one raw CKB-VM fixture per script with
 `pnpm contracts:verify:testnet`. Set `CKB_TESTNET_RPC_URL` only to use a
-different Pudge RPC endpoint for that read-only verification. The verifier and
-runtime registry both require at least 24 confirmations.
+different Pudge RPC endpoint for that read-only verification. The immutable
+contract verifier requires at least 24 confirmations. User-created and
+executor-submitted testnet transactions use a runtime depth of 5 confirmations.

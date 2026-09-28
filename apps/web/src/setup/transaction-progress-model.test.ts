@@ -124,7 +124,7 @@ test("only canonical confirmation uses success copy and styling", () => {
 test("confirmation label stops at the required depth", () => {
   assert.equal(transactionConfirmationLabel(committed), "2 / 3");
   assert.equal(
-    transactionConfirmationLabel({ confirmations: "36", requiredConfirmations: 24 }),
-    "24 / 24",
+    transactionConfirmationLabel({ confirmations: "8", requiredConfirmations: 5 }),
+    "5 / 5",
   );
 });

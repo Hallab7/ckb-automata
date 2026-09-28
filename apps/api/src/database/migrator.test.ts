@@ -53,6 +53,16 @@ test("loads paired migrations in numeric order with stable checksums", async () 
   );
 });
 
+test("repository migrations include the five-confirmation testnet policy", async () => {
+  const migrations = await loadMigrations();
+  const latest = migrations.at(-1);
+
+  assert.equal(latest?.version, 13);
+  assert.equal(latest?.name, "testnet_confirmation_depth");
+  assert.match(latest?.upSql ?? "", /confirmation_depth = 5/);
+  assert.match(latest?.downSql ?? "", /confirmation_depth = 24/);
+});
+
 test("rejects gaps and unpaired migration files", async () => {
   await withMigrationDirectory(
     {

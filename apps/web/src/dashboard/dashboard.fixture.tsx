@@ -79,13 +79,13 @@ const FIXTURE_JOBS = [
 
 const PENDING_ITEMS: ApiJobList["pendingItems"] = [
   {
-    confirmations: "8",
+    confirmations: "3",
     jobId: `0x${"99".repeat(32)}`,
     notBefore: "150",
     ownerLockHash: `0x${"22".repeat(32)}`,
     recipientAmount: { perExecution: "10000000000", total: "10000000000" },
     remainingRuns: "1",
-    requiredConfirmations: 24,
+    requiredConfirmations: 5,
     status: "confirming",
     submittedAt: "2026-09-23T00:01:00.000Z",
     template: "deadline",

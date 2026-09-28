@@ -219,6 +219,6 @@ export const deploymentRegistry = createDeploymentRegistry([
     genesisHash: TESTNET_GENESIS_HASH,
     manifestSha256: TESTNET_DEPLOYMENT_MANIFEST_SHA256,
     manifest: testnetManifest,
-    confirmationDepth: 24,
+    confirmationDepth: 5,
   },
 ]);

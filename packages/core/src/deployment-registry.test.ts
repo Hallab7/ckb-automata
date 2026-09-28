@@ -37,7 +37,7 @@ test("the pinned public manifest is canonical and selected by testnet genesis", 
   if (result.status !== "ok") return;
   assert.equal(result.deployment.network, "ckb_testnet");
   assert.equal(result.deployment.manifestSha256, TESTNET_DEPLOYMENT_MANIFEST_SHA256);
-  assert.equal(result.deployment.confirmation.requiredDepth, 24);
+  assert.equal(result.deployment.confirmation.requiredDepth, 5);
 });
 
 test("genesis lookup exposes only validated script, dep, and confirmation metadata", async () => {
