@@ -291,9 +291,14 @@ export function JobDetailView({
         </Link>
         <div className="job-detail__title-row">
           <div>
-            <p>{job.network.replaceAll("_", " ")}</p>
+            <p>
+              {automationTitle === undefined
+                ? "Automation details"
+                : job.template === "recurring"
+                  ? "Recurring payments"
+                  : "Scheduled payment"}
+            </p>
             <h1 id="job-detail-title">{automationTitle ?? presentation.policyName}</h1>
-            <code>{job.jobId}</code>
           </div>
           <DetailStatus label={presentation.statusLabel} status={presentation.status} />
         </div>
@@ -307,15 +312,15 @@ export function JobDetailView({
           </dd>
         </div>
         <div>
-          <dt>Sequence</dt>
+          <dt>Payments sent</dt>
           <dd>{job.sequence}</dd>
         </div>
         <div>
-          <dt>Runs remaining</dt>
+          <dt>Payments left</dt>
           <dd>{presentation.runsRemaining}</dd>
         </div>
         <div>
-          <dt>Next execution</dt>
+          <dt>Next payment</dt>
           <dd>{presentation.nextExecution}</dd>
         </div>
       </dl>
@@ -325,24 +330,16 @@ export function JobDetailView({
       <div className="job-detail__columns">
         <section className="job-detail__section" aria-labelledby="policy-heading">
           <div className="job-detail__section-heading">
-            <h2 id="policy-heading">Policy and schedule</h2>
+            <h2 id="policy-heading">Schedule</h2>
             <p>{presentation.nextAction}</p>
           </div>
           <dl className="job-detail__facts">
             <div>
-              <dt>Policy</dt>
-              <dd>{presentation.policyName}</dd>
-            </div>
-            <div>
-              <dt>Schedule type</dt>
-              <dd>{job.trigger.metric === "block" ? "Date and time" : job.trigger.metric}</dd>
-            </div>
-            <div>
-              <dt>Scheduled for</dt>
+              <dt>Next scheduled payment</dt>
               <dd>{jobScheduleDate(job, job.trigger.notBefore, checkpointAt, referenceBlock)}</dd>
             </div>
             <div>
-              <dt>Schedule ends</dt>
+              <dt>End date</dt>
               <dd>
                 {job.trigger.notAfter === "0"
                   ? "No end date"
@@ -354,29 +351,21 @@ export function JobDetailView({
 
         <section className="job-detail__section" aria-labelledby="funds-heading">
           <div className="job-detail__section-heading">
-            <h2 id="funds-heading">Automation costs</h2>
-            <p>CKB reserved to keep this automation running.</p>
+            <h2 id="funds-heading">Funds</h2>
+            <p>CKB currently held for this automation.</p>
           </div>
           <dl className="job-detail__facts">
             <div>
-              <dt>Automation reserve</dt>
+              <dt>Total held</dt>
               <dd>{presentation.automationReserve}</dd>
             </div>
             <div>
-              <dt>Remaining service budget</dt>
+              <dt>Service budget left</dt>
               <dd>{presentation.remainingBudget}</dd>
             </div>
             <div>
-              <dt>Automation service payment</dt>
+              <dt>Service payment</dt>
               <dd>{presentation.executorReward}</dd>
-            </div>
-            <div>
-              <dt>Source outpoint</dt>
-              <dd>
-                <code>
-                  {job.source.outPoint.txHash}:{job.source.outPoint.index}
-                </code>
-              </dd>
             </div>
           </dl>
           <ExplorerLink href={ckbTestnetTransactionUrl(job.source.outPoint.txHash)}>
@@ -390,7 +379,7 @@ export function JobDetailView({
         aria-labelledby="timeline-heading"
       >
         <div className="job-detail__section-heading">
-          <h2 id="timeline-heading">Event timeline</h2>
+          <h2 id="timeline-heading">Activity</h2>
           <p>
             {job.source.indexCheckpoint === null
               ? "Latest sync time unavailable"
@@ -425,6 +414,10 @@ export function JobDetailView({
       <details className="job-detail__technical">
         <summary>Technical details</summary>
         <dl>
+          <div>
+            <dt>Automation ID</dt>
+            <dd>{job.jobId}</dd>
+          </div>
           <div>
             <dt>Owner lock hash</dt>
             <dd>{job.ownerLockHash}</dd>

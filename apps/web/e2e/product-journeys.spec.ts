@@ -80,18 +80,18 @@ test("shows recurring successors and separate owner escape reviews", async ({ pa
 
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(
-    page.getByRole("dialog").getByText("Review owner cancel", { exact: true }),
+    page.getByRole("dialog").getByText("Cancel automation", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("dialog").getByText("Race protection", { exact: true }),
+    page.getByRole("dialog").getByText("action stops safely", { exact: false }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Close" }).click();
 
   await page.getByRole("button", { name: "Recover", exact: true }).click();
-  await expect(
-    page.getByRole("dialog").getByText("Review owner recover", { exact: true }),
-  ).toBeVisible();
-  await expect(page.getByLabel("Recovery reason")).toHaveValue("terminal_operational_failure");
+  await expect(page.getByRole("dialog").getByText("Recover funds", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Why are you recovering the funds?")).toHaveValue(
+    "terminal_operational_failure",
+  );
   await expectNoHorizontalOverflow(page);
 });
 

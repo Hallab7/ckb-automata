@@ -69,7 +69,7 @@ test("dialog focus is trapped and returns to the owner action trigger", async ({
   await trigger.focus();
   await page.keyboard.press("Enter");
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByText("Review owner cancel", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("Cancel automation", { exact: true })).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Close" })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();

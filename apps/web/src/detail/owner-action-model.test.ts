@@ -11,6 +11,7 @@ import type { ScriptIdentity, UnsignedDeadlineTransaction } from "@ckb-automata/
 
 import {
   assertOwner,
+  connectedWalletOwnsJob,
   createOwnerActionReview,
   ownerActionRequest,
   readOwnerActionRecord,
@@ -199,6 +200,12 @@ test("wrong owners are rejected before any transaction can be built", () => {
   assert.throws(() => assertOwner(job, HASH_A), /not the owner/);
   assert.throws(() => assertOwner(job, undefined), /Connect the owner wallet/);
   assert.doesNotThrow(() => assertOwner(job, HASH_B));
+});
+
+test("owner controls require a live job owned by the connected wallet", () => {
+  assert.equal(connectedWalletOwnsJob(job, new Set([HASH_B])), true);
+  assert.equal(connectedWalletOwnsJob(job, new Set([HASH_A])), false);
+  assert.equal(connectedWalletOwnsJob({ ...job, state: "spent" }, new Set([HASH_B])), false);
 });
 
 test("recovery submission has no executor dependency", async () => {

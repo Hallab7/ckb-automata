@@ -101,16 +101,16 @@ export function jobDetailPresentation(
     waiting: "Waiting",
   };
   const nextActions: Readonly<Record<JobDetailStatus, string>> = {
-    cancelled: "Funds returned by owner cancellation",
-    completed: "Review the final canonical execution",
-    conflicted: "Review the winning transaction and attempt receipt",
-    dropped: "Review the dropped attempt before retrying",
-    processing: "Payment execution is in progress",
-    needs_funding: "Top up the committed executor budget",
-    recovery_required: "Recover the remaining live funds",
-    reorged: "Wait for canonical replay before acting",
-    unsupported: "Use owner recovery with the published manifest",
-    waiting: "Wait for the committed schedule bound",
+    cancelled: "This automation has been cancelled.",
+    completed: "All scheduled payments are complete.",
+    conflicted: "Another transaction completed first.",
+    dropped: "The last payment attempt did not complete.",
+    processing: "The scheduled payment is being processed.",
+    needs_funding: "More funds are needed before the next payment.",
+    recovery_required: "The remaining funds are ready to recover.",
+    reorged: "Waiting for the network to confirm the latest state.",
+    unsupported: "This automation needs manual recovery.",
+    waiting: "Waiting for the next scheduled payment.",
   };
 
   return Object.freeze({
@@ -119,15 +119,15 @@ export function jobDetailPresentation(
     nextAction: nextActions[status],
     nextExecution:
       job.state !== "live"
-        ? "No further scheduled execution"
+        ? "No more payments scheduled"
         : checkpointBlock === undefined
-          ? "Schedule time syncing"
+          ? "Updating schedule"
           : checkpointBlock >= notBefore
             ? `Processing since ${formatBlockDate(notBefore, checkpointBlock, checkpointAt)}`
             : formatBlockDate(notBefore, checkpointBlock, checkpointAt),
     policyName:
       job.template === "deadline"
-        ? "Deadline finalization"
+        ? "Scheduled payment"
         : job.template === "recurring"
           ? "Recurring payments"
           : "Unknown policy",
@@ -147,7 +147,7 @@ export function jobScheduleDate(
   referenceBlock?: string,
 ): string {
   const checkpoint = referenceBlock ?? job.source.indexCheckpoint?.blockNumber;
-  if (checkpoint === undefined) return "Schedule time syncing";
+  if (checkpoint === undefined) return "Updating schedule";
   return formatBlockDate(block, checkpoint, checkpointAt);
 }
 

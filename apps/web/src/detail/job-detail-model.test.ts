@@ -68,9 +68,11 @@ function event(
 }
 
 test("detail presentation covers waiting, processing, completed, and funding states", () => {
-  assert.equal(jobDetailPresentation(job(), [], "10000000000").status, "waiting");
-  assert.equal(jobDetailPresentation(job(), [], "10000000000").recipientAmount, "100 CKB");
-  assert.equal(jobDetailPresentation(job(), [], "10000000000").automationReserve, "125 CKB");
+  const waiting = jobDetailPresentation(job(), [], "10000000000");
+  assert.equal(waiting.status, "waiting");
+  assert.equal(waiting.nextAction, "Waiting for the next scheduled payment.");
+  assert.equal(waiting.recipientAmount, "100 CKB");
+  assert.equal(waiting.automationReserve, "125 CKB");
   assert.equal(
     jobDetailPresentation(
       job({

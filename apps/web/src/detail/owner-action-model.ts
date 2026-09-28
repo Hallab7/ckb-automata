@@ -138,6 +138,13 @@ export function assertOwner(job: ApiJob, ownerLockHash: string | undefined): voi
   }
 }
 
+export function connectedWalletOwnsJob(
+  job: Pick<ApiJob, "ownerLockHash" | "state">,
+  lockHashes: ReadonlySet<string>,
+): boolean {
+  return job.state === "live" && lockHashes.has(job.ownerLockHash);
+}
+
 export async function createOwnerActionReview(
   action: OwnerAction,
   request: OwnerActionRequest,

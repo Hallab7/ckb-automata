@@ -17,6 +17,7 @@ import { ckbToShannons, shannonsToCkb } from "../setup/ckb-amount.ts";
 import { TransactionProgressTracker } from "../setup/transaction-progress.tsx";
 import {
   assertOwner,
+  connectedWalletOwnsJob,
   createOwnerActionReview,
   ownerActionRequest,
   readOwnerActionRecord,
@@ -40,30 +41,34 @@ type ActionState =
     };
 
 interface ActionDefinition {
-  readonly action: OwnerAction;
+  readonly confirmLabel: string;
   readonly description: string;
   readonly label: string;
+  readonly reviewLabel: string;
   readonly title: string;
 }
 
 const definitions: Readonly<Record<OwnerAction, ActionDefinition>> = {
   cancel: {
-    action: "cancel",
-    description: "Return the remaining live funds to the owner and stop future execution.",
+    confirmLabel: "Confirm cancellation",
+    description: "Stop future payments and return the remaining funds to your wallet.",
     label: "Cancel",
-    title: "Review owner cancellation",
+    reviewLabel: "Review cancellation",
+    title: "Cancel automation",
   },
   recover: {
-    action: "recover",
-    description: "Recover a live job that cannot safely continue, without relying on an executor.",
+    confirmLabel: "Confirm recovery",
+    description: "Recover the remaining funds from an automation that cannot continue.",
     label: "Recover",
-    title: "Review owner recovery",
+    reviewLabel: "Review recovery",
+    title: "Recover funds",
   },
   top_up: {
-    action: "top_up",
-    description: "Increase committed capacity or budget while preserving the existing policy.",
+    confirmLabel: "Confirm top up",
+    description: "Add CKB to keep this automation funded for future payments.",
     label: "Top up",
-    title: "Review owner top-up",
+    reviewLabel: "Review top up",
+    title: "Top up automation",
   },
 };
 
@@ -125,32 +130,39 @@ function ReviewFacts({ review }: Readonly<{ review: OwnerActionReview }>) {
   };
   const maximumFee = quote.amounts?.estimatedFee?.maximum;
   return (
-    <dl className="owner-action__facts">
+    <div className="owner-action__review">
       <div>
-        <dt>Transaction hash</dt>
-        <dd>
-          <code>{review.transactionHash}</code>
-        </dd>
-      </div>
-      <div>
-        <dt>Live job outpoint</dt>
-        <dd>
-          <code>
-            {review.sourceOutPoint.txHash}:{review.sourceOutPoint.index}
-          </code>
-        </dd>
-      </div>
-      <div>
-        <dt>Snapshot</dt>
-        <dd>Latest testnet state</dd>
+        <strong>Ready for wallet approval</strong>
+        <p>The transaction matches this automation and the latest network state.</p>
       </div>
       {maximumFee === undefined ? null : (
-        <div>
-          <dt>Maximum fee</dt>
-          <dd>{shannonsToCkb(BigInt(maximumFee))} CKB</dd>
-        </div>
+        <dl className="owner-action__fee">
+          <div>
+            <dt>Maximum network fee</dt>
+            <dd>{shannonsToCkb(BigInt(maximumFee))} CKB</dd>
+          </div>
+        </dl>
       )}
-    </dl>
+      <details className="owner-action__technical">
+        <summary>Technical details</summary>
+        <dl className="owner-action__facts">
+          <div>
+            <dt>Transaction hash</dt>
+            <dd>
+              <code>{review.transactionHash}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>Live input</dt>
+            <dd>
+              <code>
+                {review.sourceOutPoint.txHash}:{review.sourceOutPoint.index}
+              </code>
+            </dd>
+          </div>
+        </dl>
+      </details>
+    </div>
   );
 }
 
@@ -281,13 +293,11 @@ function ActionDialog({
             onClick={() => void submit()}
             tone={action === "cancel" || action === "recover" ? "danger" : "primary"}
           >
-            {state.status === "submitting"
-              ? "Checking live outpoint..."
-              : `Approve ${definition.label.toLowerCase()}`}
+            {state.status === "submitting" ? "Submitting..." : definition.confirmLabel}
           </Button>
         ) : (
           <Button icon={<RefreshCw aria-hidden="true" size={16} />} onClick={() => void prepare()}>
-            Build fresh review
+            {definition.reviewLabel}
           </Button>
         )
       }
@@ -301,59 +311,49 @@ function ActionDialog({
       <div className="owner-action__dialog">
         {action === "recover" && !ready && state.status !== "submitted" ? (
           <SelectField
-            label="Recovery reason"
+            label="Why are you recovering the funds?"
             onChange={(event) => setReason(event.target.value as RecoveryReason)}
             value={reason}
           >
-            <option value="terminal_operational_failure">Terminal operational failure</option>
-            <option value="invalid_application_state">Invalid application state</option>
-            <option value="unsupported_metadata">Unsupported metadata</option>
+            <option value="terminal_operational_failure">Automation cannot continue</option>
+            <option value="invalid_application_state">Automation data is invalid</option>
+            <option value="unsupported_metadata">Automation type is not supported</option>
           </SelectField>
         ) : null}
         {action === "top_up" && !ready && state.status !== "submitted" ? (
           <div className="owner-action__amounts">
             <TextField
+              hint="Used for future automation runs."
               inputMode="decimal"
-              label="Budget increase (CKB)"
+              label="Additional service budget (CKB)"
               onChange={(event) => setBudget(event.target.value)}
               value={budget}
             />
+            {job.template === "recurring" ? null : (
+              <TextField
+                hint="Reserved for the automation service."
+                inputMode="decimal"
+                label="Additional service payment (CKB)"
+                onChange={(event) => setReward(event.target.value)}
+                value={reward}
+              />
+            )}
             <TextField
-              disabled={job.template === "recurring"}
-              {...(job.template === "recurring"
-                ? { hint: "Recurring rewards cannot change after creation." }
-                : {})}
+              hint="Added to the CKB held by this automation."
               inputMode="decimal"
-              label="Reward increase (CKB)"
-              onChange={(event) => setReward(event.target.value)}
-              value={reward}
-            />
-            <TextField
-              hint="Added to the job cell capacity."
-              inputMode="decimal"
-              label="Capacity increase (CKB)"
+              label="Additional automation reserve (CKB)"
               onChange={(event) => setCapacity(event.target.value)}
               value={capacity}
             />
           </div>
         ) : null}
-        <InlineNotice title="Race protection" tone="warning">
-          <p>
-            The live job outpoint and chain tip are checked again immediately before the wallet
-            opens. If another transaction wins first, this action stops without signing.
-          </p>
-        </InlineNotice>
-        {action === "recover" ? (
-          <InlineNotice title="Executor independent" tone="info">
-            <p>
-              Recovery is built, signed, and submitted by the owner wallet. The executor service is
-              not required.
-            </p>
-          </InlineNotice>
-        ) : null}
+        <p className="owner-action__safety">
+          The latest network state is checked again before your wallet opens. If this automation has
+          already changed, the action stops safely.
+        </p>
         {state.status === "loading" ? (
           <p className="owner-action__loading">
-            <RefreshCw aria-hidden="true" size={17} /> Resolving the current job cell...
+            <RefreshCw aria-hidden="true" size={17} /> Preparing review...
           </p>
         ) : null}
         {state.status === "error" ? (
@@ -371,6 +371,11 @@ function ActionDialog({
 }
 
 export function OwnerActions({ job }: Readonly<{ job: ApiJob }>) {
+  const session = useWalletSession();
+  const getSignerLockHashes = session.getSignerLockHashes;
+  const jobState = job.state;
+  const ownerLockHash = job.ownerLockHash;
+  const [isOwner, setIsOwner] = useState(false);
   const [submission, setSubmission] = useState<{
     readonly persisted: boolean;
     readonly record: OwnerActionRecord;
@@ -380,21 +385,29 @@ export function OwnerActions({ job }: Readonly<{ job: ApiJob }>) {
     setSubmission(record === undefined ? undefined : { persisted: true, record });
   }, [job.jobId]);
 
-  if (job.state !== "live") {
-    return (
-      <section className="owner-actions" aria-labelledby="owner-actions-heading">
-        <div>
-          <h2 id="owner-actions-heading">Owner actions</h2>
-          <p>This automation has no live job cell to change.</p>
-        </div>
-      </section>
-    );
-  }
+  useEffect(() => {
+    let active = true;
+    setIsOwner(false);
+    if (session.status !== "ready" || jobState !== "live") return;
+    void getSignerLockHashes()
+      .then((lockHashes) => {
+        if (active)
+          setIsOwner(connectedWalletOwnsJob({ ownerLockHash, state: jobState }, lockHashes));
+      })
+      .catch(() => {
+        if (active) setIsOwner(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [getSignerLockHashes, jobState, ownerLockHash, session.status]);
+
+  if (!isOwner) return null;
   return (
     <section className="owner-actions" aria-labelledby="owner-actions-heading">
       <div>
         <h2 id="owner-actions-heading">Owner actions</h2>
-        <p>Each action has a separate exact-transaction review.</p>
+        <p>Manage the funds held by your automation.</p>
       </div>
       <div className="owner-actions__controls">
         <ActionDialog

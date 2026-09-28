@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Ban, CirclePlus, LifeBuoy } from "lucide-react";
 
 import type { ApiJob, ApiJobEvents } from "@ckb-automata/api-client";
-import { Button, Dialog, InlineNotice, SelectField, TextField } from "@ckb-automata/ui";
+import { Button, Dialog, SelectField, TextField } from "@ckb-automata/ui";
 
 import { JobDetailView } from "./job-detail-view.tsx";
 
@@ -130,6 +130,7 @@ function FixtureDialog({ action }: Readonly<{ action: "cancel" | "recover" | "to
   const topUp = action === "top_up";
   const recover = action === "recover";
   const label = topUp ? "Top up" : recover ? "Recover" : "Cancel";
+  const title = topUp ? "Top up automation" : recover ? "Recover funds" : "Cancel automation";
   const icon = topUp ? (
     <CirclePlus aria-hidden="true" size={16} />
   ) : recover ? (
@@ -141,13 +142,17 @@ function FixtureDialog({ action }: Readonly<{ action: "cancel" | "recover" | "to
     <Dialog
       description={
         topUp
-          ? "Increase committed capacity or budget while preserving the existing policy."
+          ? "Add CKB to keep this automation funded for future payments."
           : recover
-            ? "Recover a live job without relying on an executor."
-            : "Return the remaining live funds and stop future execution."
+            ? "Recover the remaining funds from an automation that cannot continue."
+            : "Stop future payments and return the remaining funds to your wallet."
       }
-      footer={<Button tone={topUp ? "primary" : "danger"}>Approve {label.toLowerCase()}</Button>}
-      title={`Review owner ${label.toLowerCase()}`}
+      footer={
+        <Button tone={topUp ? "primary" : "danger"}>
+          {topUp ? "Review top up" : recover ? "Review recovery" : "Review cancellation"}
+        </Button>
+      }
+      title={title}
       trigger={
         <Button icon={icon} tone={topUp ? "primary" : "secondary"}>
           {label}
@@ -157,45 +162,23 @@ function FixtureDialog({ action }: Readonly<{ action: "cancel" | "recover" | "to
       <div className="owner-action__dialog">
         {topUp ? (
           <div className="owner-action__amounts">
-            <TextField defaultValue="100" label="Budget increase (CKB)" />
-            <TextField defaultValue="0" label="Reward increase (CKB)" />
-            <TextField defaultValue="161" label="Capacity increase (CKB)" />
+            <TextField defaultValue="100" label="Additional service budget (CKB)" />
+            <TextField defaultValue="161" label="Additional automation reserve (CKB)" />
           </div>
         ) : recover ? (
-          <SelectField defaultValue="terminal_operational_failure" label="Recovery reason">
-            <option value="terminal_operational_failure">Terminal operational failure</option>
-            <option value="invalid_application_state">Invalid application state</option>
-            <option value="unsupported_metadata">Unsupported metadata</option>
+          <SelectField
+            defaultValue="terminal_operational_failure"
+            label="Why are you recovering the funds?"
+          >
+            <option value="terminal_operational_failure">Automation cannot continue</option>
+            <option value="invalid_application_state">Automation data is invalid</option>
+            <option value="unsupported_metadata">Automation type is not supported</option>
           </SelectField>
         ) : null}
-        <InlineNotice title="Race protection" tone="warning">
-          <p>
-            The live job outpoint and chain tip are checked again immediately before the wallet
-            opens.
-          </p>
-        </InlineNotice>
-        <dl className="owner-action__facts">
-          <div>
-            <dt>Transaction hash</dt>
-            <dd>
-              <code>{HASH_A}</code>
-            </dd>
-          </div>
-          <div>
-            <dt>Live job outpoint</dt>
-            <dd>
-              <code>{HASH_B}:0</code>
-            </dd>
-          </div>
-          <div>
-            <dt>Snapshot</dt>
-            <dd>Sep 24, 2026, 10:00 AM UTC</dd>
-          </div>
-          <div>
-            <dt>Maximum fee</dt>
-            <dd>0.000016 CKB</dd>
-          </div>
-        </dl>
+        <p className="owner-action__safety">
+          The latest network state is checked again before your wallet opens. If this automation has
+          already changed, the action stops safely.
+        </p>
       </div>
     </Dialog>
   );
@@ -206,7 +189,7 @@ function FixtureOwnerActions() {
     <section className="owner-actions" aria-labelledby="owner-actions-heading">
       <div>
         <h2 id="owner-actions-heading">Owner actions</h2>
-        <p>Each action has a separate exact-transaction review.</p>
+        <p>Manage the funds held by your automation.</p>
       </div>
       <div className="owner-actions__controls">
         <FixtureDialog action="top_up" />
