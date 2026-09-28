@@ -53,7 +53,7 @@ export function VisualSystemFixture() {
       <header className="ui-story__header">
         <div>
           <p className="ui-story__eyebrow">Interface fixture</p>
-          <h1>CKB Automata visual system</h1>
+          <h1>CKAutomata visual system</h1>
           <p>Review testnet automation state, funding, and transaction evidence.</p>
         </div>
         <StatusBadge state="submitted" />

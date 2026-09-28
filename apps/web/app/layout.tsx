@@ -12,11 +12,11 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "CKB Automata",
-    template: "%s | CKB Automata",
+    default: "CKAutomata",
+    template: "%s | CKAutomata",
   },
   description: "Non-custodial automation for CKB testnet.",
-  applicationName: "CKB Automata",
+  applicationName: "CKAutomata",
   icons: { icon: "/automata-mark.svg" },
 };
 

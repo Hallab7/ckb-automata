@@ -16,7 +16,7 @@ import {
 test("wallet policy is testnet-only and excludes unreviewed signer families", () => {
   assert.deepEqual(AUTOMATA_CCC_IDENTITY, {
     icon: "/automata-mark.svg",
-    name: "CKB Automata",
+    name: "CKAutomata",
   });
   assert.equal(EXPECTED_CKB_ADDRESS_PREFIX, "ckt");
   assert.deepEqual(SUPPORTED_CCC_SIGNER_TYPES, ["CKB", "BTC"]);

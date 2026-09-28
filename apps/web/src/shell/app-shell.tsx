@@ -15,7 +15,6 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   WalletCards,
-  X,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -92,12 +91,19 @@ function NavigationLinks({ closeOnSelect = false }: Readonly<{ closeOnSelect?: b
 
 function ProductMark() {
   return (
-    <Link aria-label="CKB Automata home" className="app-brand" href="/automations">
-      <span aria-hidden="true" className="app-brand__mark">
-        <X size={19} strokeWidth={2.25} />
-      </span>
+    <Link aria-label="CKAutomata home" className="app-brand" href="/automations">
+      <svg aria-hidden="true" className="app-brand__mark" viewBox="0 0 128 128">
+        <path
+          className="app-brand__cell"
+          d="M31 14h58l23 23v17H91V46L80 35H40L27 48v32l13 13h40l11-11v-8h21v17l-23 23H31L6 89V39Z"
+        />
+        <path className="app-brand__transition" d="M58 53h31l17 11-17 11H58l12-11Z" />
+        <circle className="app-brand__node" cx="58" cy="64" r="6" />
+      </svg>
       <span className="app-brand__copy">
-        <strong>CKB Automata</strong>
+        <strong>
+          <span>CK</span>Automata
+        </strong>
         <small>Non-custodial automation</small>
       </span>
     </Link>

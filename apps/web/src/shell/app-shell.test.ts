@@ -15,6 +15,13 @@ test("application shell exposes keyboard and landmark navigation", () => {
   assert.match(shellSource, /pathname\.startsWith\("\/automations\/new"\)/);
 });
 
+test("application shell uses the approved CKAutomata identity", () => {
+  assert.match(shellSource, /aria-label="CKAutomata home"/);
+  assert.match(shellSource, /className="app-brand__cell"/);
+  assert.match(shellSource, /<span>CK<\/span>Automata/);
+  assert.doesNotMatch(shellSource, /CKB Automata/);
+});
+
 test("network, wallet, and notification state remain explicit in text", () => {
   assert.match(shellSource, /app-network-badge__prefix/);
   assert.match(shellSource, /Testnet/);

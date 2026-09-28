@@ -1,6 +1,6 @@
 export const AUTOMATA_CCC_IDENTITY = Object.freeze({
   icon: "/automata-mark.svg",
-  name: "CKB Automata",
+  name: "CKAutomata",
 });
 
 export const EXPECTED_CKB_ADDRESS_PREFIX = "ckt" as const;
