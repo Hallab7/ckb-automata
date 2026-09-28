@@ -10,4 +10,5 @@
 @import "../src/templates/template-gallery.css";
 @import "../src/setup/setup-stepper.css";
 @import "../src/privacy/privacy.css";
+@import "../src/how-it-works/how-it-works.css";
 @source "../../../packages/ui/src";

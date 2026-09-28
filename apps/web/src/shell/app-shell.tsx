@@ -3,6 +3,7 @@
 import {
   Activity,
   Beaker,
+  BookOpenText,
   BriefcaseBusiness,
   ChevronDown,
   ChevronRight,
@@ -37,6 +38,7 @@ const primaryNavigation: readonly NavigationItem[] = [
   { href: "/automations", icon: BriefcaseBusiness, label: "Automations" },
   { href: "/automations/new", icon: CirclePlus, label: "New automation" },
   { href: "/activity", icon: Activity, label: "Activity" },
+  { href: "/how-it-works", icon: BookOpenText, label: "How it works" },
 ];
 
 const secondaryNavigation: readonly NavigationItem[] = [
@@ -113,6 +115,7 @@ function breadcrumbLabel(pathname: string): string {
   if (pathname.startsWith("/automations/new")) return "New automation";
   if (/^\/automations\/.+/.test(pathname)) return "Automation details";
   if (pathname.startsWith("/activity")) return "Activity";
+  if (pathname.startsWith("/how-it-works")) return "How it works";
   if (pathname.startsWith("/demo")) return "Demo";
   if (pathname.startsWith("/research/nervdao")) return "NervDAO research";
   if (pathname.startsWith("/settings")) return "Settings";
@@ -266,9 +269,9 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
             <MobileNavigation />
           </div>
         </header>
-        <div className="app-mobile-wallet">
+        <aside aria-label="Wallet status" className="app-mobile-wallet">
           <WalletArea />
-        </div>
+        </aside>
         <main className="app-main" id="main-content" tabIndex={-1}>
           <NetworkNotice />
           {children}

@@ -11,8 +11,11 @@ test("application shell exposes keyboard and landmark navigation", () => {
   assert.match(shellSource, /<main className="app-main" id="main-content" tabIndex=\{-1\}>/);
   assert.match(shellSource, /aria-current=\{isActive\(pathname, item\) \? "page" : undefined\}/);
   assert.match(shellSource, /aria-label="Primary"/);
+  assert.match(shellSource, /aria-label="Wallet status"/);
   assert.match(shellSource, /label="Open navigation"/);
   assert.match(shellSource, /pathname\.startsWith\("\/automations\/new"\)/);
+  assert.match(shellSource, /href: "\/how-it-works"/);
+  assert.match(shellSource, /label: "How it works"/);
 });
 
 test("application shell uses the approved CKAutomata identity", () => {

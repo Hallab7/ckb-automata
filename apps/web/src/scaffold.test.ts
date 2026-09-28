@@ -38,6 +38,7 @@ test("App Router exposes every planned product route", async () => {
     "/automations/new/deadline",
     "/automations/new/recurring",
     "/demo",
+    "/how-it-works",
     "/limitations",
     "/research/nervdao",
     "/settings",
