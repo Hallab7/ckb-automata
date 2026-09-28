@@ -435,21 +435,7 @@
 }
 
 .job-detail-loading {
-  color: var(--ui-color-text-muted);
-  display: flex;
-  gap: var(--ui-space-3);
-  justify-content: center;
-}
-
-.job-detail-loading > svg {
-  animation: app-loading-spin 1.1s linear infinite;
-  color: var(--ui-color-accent);
-}
-
-@keyframes app-loading-spin {
-  to {
-    transform: rotate(360deg);
-  }
+  display: block;
 }
 
 @media (max-width: 60rem) {
@@ -556,10 +542,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .job-detail-loading > svg {
-    animation: none;
-  }
-
   .owner-action__loading svg {
     animation: none;
   }

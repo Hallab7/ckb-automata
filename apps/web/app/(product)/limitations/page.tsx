@@ -39,7 +39,7 @@ export default function LimitationsPage() {
   return (
     <div className="app-page limitations-page">
       <PageHeader
-        description="Public deployment boundaries, service assumptions, and browser privacy choices."
+        description="Public deployment boundaries, service assumptions, and analytics handling."
         title="Privacy and limitations"
       />
       <div className="limitations-list">
@@ -53,10 +53,10 @@ export default function LimitationsPage() {
           </section>
         ))}
       </div>
-      <section aria-labelledby="analytics-preferences-title" className="limitations-analytics">
+      <section aria-labelledby="analytics-handling-title" className="limitations-analytics">
         <div>
           <p className="limitations-eyebrow">Browser privacy</p>
-          <h2 id="analytics-preferences-title">Analytics preference</h2>
+          <h2 id="analytics-handling-title">Analytics handling</h2>
         </div>
         <AnalyticsPreferences />
       </section>

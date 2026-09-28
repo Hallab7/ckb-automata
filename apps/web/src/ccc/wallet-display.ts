@@ -13,6 +13,14 @@ export function formatCkbBalance(shannons: bigint): string {
   return `${whole.toLocaleString("en-US")}${fraction ? `.${fraction}` : ""} CKB`;
 }
 
+export function formatCkbBalanceTwoDecimals(shannons: bigint): string {
+  if (shannons < 0n) throw new RangeError("CKB balance cannot be negative");
+  const roundedHundredths = (shannons + 500_000n) / 1_000_000n;
+  const whole = roundedHundredths / 100n;
+  const fraction = (roundedHundredths % 100n).toString().padStart(2, "0");
+  return `${whole.toLocaleString("en-US")}.${fraction} CKB`;
+}
+
 export function ckbTestnetAddressUrl(address: string): string {
   const url = new URL(`/address/${encodeURIComponent(address)}`, CKB_TESTNET_EXPLORER_ORIGIN);
   return url.toString();

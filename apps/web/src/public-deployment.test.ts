@@ -36,7 +36,7 @@ test("live route groups fail closed behind deployment identity verification", ()
   assert.match(limitations, /Independent executor services are not active yet/);
 });
 
-test("analytics requires browser consent and limitations remain public", () => {
+test("analytics is always enabled with public limitations", () => {
   assert.match(rootLayout, /<AnalyticsConsent \/>/);
   assert.match(limitations, /<AnalyticsPreferences \/>/);
 });

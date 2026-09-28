@@ -1,77 +1,18 @@
-.analytics-consent {
-  align-items: flex-start;
-  background: var(--ui-color-surface);
-  border: 1px solid var(--ui-color-border-strong);
-  border-radius: var(--ui-radius-lg);
-  bottom: var(--ui-space-4);
-  box-shadow: var(--ui-shadow-dialog);
-  display: grid;
-  gap: var(--ui-space-3);
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  left: max(var(--ui-space-4), env(safe-area-inset-left));
-  max-width: min(46rem, calc(100vw - var(--ui-space-8)));
-  padding: var(--ui-space-4);
-  position: fixed;
-  z-index: 80;
-}
-
 .app-viewport {
   min-height: 100dvh;
 }
 
-body:has(.analytics-consent) {
-  --analytics-consent-clearance: 8rem;
-
-  height: 100dvh;
-  overflow: hidden;
-}
-
-body:has(.analytics-consent) .app-viewport {
-  height: calc(100dvh - var(--analytics-consent-clearance));
-  min-height: 0;
-  overflow-y: auto;
-}
-
-body:has(.analytics-consent) .app-shell {
-  min-height: 100%;
-}
-
-body:has(.analytics-consent) .app-sidebar {
-  height: 100%;
-}
-
-.analytics-consent > svg {
-  color: var(--ui-color-info);
-  margin-top: 0.1rem;
-}
-
-.analytics-consent strong,
 .analytics-preferences strong {
   color: var(--ui-color-text);
   font-size: 0.875rem;
 }
 
-.analytics-consent p,
 .analytics-preferences p,
 .limitations-list p {
   color: var(--ui-color-text-muted);
   font-size: 0.8125rem;
   line-height: 1.5;
   margin: var(--ui-space-1) 0 0;
-}
-
-.analytics-consent a {
-  color: var(--ui-color-info);
-  text-decoration: underline;
-  text-decoration-thickness: 0.08em;
-  text-underline-offset: 0.16em;
-}
-
-.analytics-consent__actions,
-.analytics-preferences__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--ui-space-2);
 }
 
 .limitations-list {
@@ -177,22 +118,6 @@ body:has(.analytics-consent) .app-sidebar {
 }
 
 @media (max-width: 46rem) {
-  body:has(.analytics-consent) {
-    --analytics-consent-clearance: 14rem;
-  }
-
-  .analytics-consent {
-    bottom: max(var(--ui-space-3), env(safe-area-inset-bottom));
-    grid-template-columns: auto minmax(0, 1fr);
-    left: var(--ui-space-3);
-    max-width: calc(100vw - var(--ui-space-6));
-  }
-
-  .analytics-consent__actions {
-    grid-column: 1 / -1;
-    justify-content: flex-end;
-  }
-
   .analytics-preferences {
     align-items: stretch;
     flex-direction: column;

@@ -2,7 +2,6 @@
 
 import {
   Activity,
-  Bell,
   Beaker,
   BriefcaseBusiness,
   ChevronDown,
@@ -25,7 +24,7 @@ import { Drawer, IconButton, OverlayClose } from "@ckb-automata/ui";
 import { useWalletSession, WalletNetworkNotice } from "../ccc/session.tsx";
 import { WalletControl } from "../ccc/wallet-control.tsx";
 import { formatCkbBalance, shortenCkbAddress } from "../ccc/wallet-display.ts";
-import { NotificationCenter, publishNotification } from "./notification-center.tsx";
+import { NotificationCenter } from "./notification-center.tsx";
 
 interface NavigationItem {
   readonly exact?: boolean;
@@ -81,7 +80,7 @@ function NavigationLinks({ closeOnSelect = false }: Readonly<{ closeOnSelect?: b
         <span className="app-nav__label">Workspace</span>
         <div className="app-nav__group">{links(primaryNavigation)}</div>
       </div>
-      <div className="app-nav__section">
+      <div className="app-nav__section" hidden>
         <span className="app-nav__label">Tools</span>
         <div className="app-nav__group">{links(secondaryNavigation)}</div>
       </div>
@@ -119,15 +118,6 @@ function breadcrumbLabel(pathname: string): string {
   if (pathname.startsWith("/settings")) return "Settings";
   if (pathname.startsWith("/limitations")) return "Privacy & limitations";
   return "Automations";
-}
-
-function showNotificationInfo() {
-  publishNotification({
-    id: "notification-center-ready",
-    message: "Automation updates and transaction results will appear here.",
-    title: "Notifications",
-    tone: "info",
-  });
 }
 
 function HeaderWallet() {
@@ -168,13 +158,6 @@ function DesktopHeader() {
         <strong>{breadcrumbLabel(pathname)}</strong>
       </nav>
       <div className="app-desktop-header__actions">
-        <IconButton
-          icon={<Bell aria-hidden="true" size={17} />}
-          label="Notifications"
-          onClick={showNotificationInfo}
-          showTooltip={false}
-          tone="secondary"
-        />
         <IconButton
           icon={<RefreshCw aria-hidden="true" size={17} />}
           label="Refresh page"

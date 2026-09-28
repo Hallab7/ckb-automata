@@ -6,7 +6,11 @@ import { Button, IconButton } from "@ckb-automata/ui";
 
 import { publishNotification } from "../shell/notification-center.tsx";
 import { useWalletSession } from "./session.tsx";
-import { ckbTestnetAddressUrl, formatCkbBalance, shortenCkbAddress } from "./wallet-display.ts";
+import {
+  ckbTestnetAddressUrl,
+  formatCkbBalanceTwoDecimals,
+  shortenCkbAddress,
+} from "./wallet-display.ts";
 
 function WalletGuidance({
   action,
@@ -102,7 +106,7 @@ export function WalletControl() {
       ? session.detailsStatus === "error"
         ? "Balance unavailable"
         : "Loading balance..."
-      : formatCkbBalance(session.balanceShannons);
+      : formatCkbBalanceTwoDecimals(session.balanceShannons);
 
   return (
     <div className="app-wallet-control">
@@ -145,7 +149,6 @@ export function WalletControl() {
       </div>
       <div className="app-wallet-control__footer">
         <span>{balance}</span>
-        <strong>CKB Testnet</strong>
       </div>
       {session.detailsStatus === "error" ? (
         <Button

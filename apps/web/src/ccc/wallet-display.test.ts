@@ -7,6 +7,7 @@ import {
   ckbTestnetAddressUrl,
   ckbTestnetTransactionUrl,
   formatCkbBalance,
+  formatCkbBalanceTwoDecimals,
   shortenCkbAddress,
 } from "./wallet-display.ts";
 
@@ -20,7 +21,12 @@ test("wallet values remain exact and scannable", () => {
   assert.equal(formatCkbBalance(100_000_000n), "1 CKB");
   assert.equal(formatCkbBalance(123_456_789n), "1.23456789 CKB");
   assert.equal(formatCkbBalance(123_456_789_000_000n), "1,234,567.89 CKB");
+  assert.equal(formatCkbBalanceTwoDecimals(0n), "0.00 CKB");
+  assert.equal(formatCkbBalanceTwoDecimals(123_456_789n), "1.23 CKB");
+  assert.equal(formatCkbBalanceTwoDecimals(199_500_000n), "2.00 CKB");
+  assert.equal(formatCkbBalanceTwoDecimals(123_456_789_000_000n), "1,234,567.89 CKB");
   assert.throws(() => formatCkbBalance(-1n), /cannot be negative/);
+  assert.throws(() => formatCkbBalanceTwoDecimals(-1n), /cannot be negative/);
 });
 
 test("wallet explorer links cannot leave the public testnet explorer", () => {

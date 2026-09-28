@@ -210,8 +210,7 @@ function EventTimelineItem({ event }: Readonly<{ event: DetailEvent }>) {
 function LoadingDetail() {
   return (
     <section aria-label="Loading automation details" className="job-detail-loading">
-      <RefreshCw aria-hidden="true" size={22} />
-      <p>Loading canonical job and event data...</p>
+      <span className="ui-sr-only">Loading automation details</span>
     </section>
   );
 }
