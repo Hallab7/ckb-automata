@@ -99,6 +99,8 @@ export function AutomationDashboard() {
 
   const currentPage = pages[pageIndex];
   const items = currentPage?.response.items ?? EMPTY_ITEMS;
+  const pendingItems = currentPage?.response.pendingItems ?? [];
+  const summary = currentPage?.response.summary;
   const checkpointAt = currentPage?.loadedAt;
   const checkpointBlock = currentPage?.referenceBlock;
   const totalItems = currentPage?.response.page.totalItems ?? 0;
@@ -263,6 +265,7 @@ export function AutomationDashboard() {
       hasNextPage={currentPage?.response.page.nextCursor != null}
       hasPreviousPage={pageIndex > 0}
       items={items}
+      pendingItems={pendingItems}
       loadState={loadState}
       loadingPage={loadingPage}
       mode={mode}
@@ -270,6 +273,7 @@ export function AutomationDashboard() {
       pageSize={PAGE_SIZE}
       paginationError={paginationError}
       recipientAmounts={recipientAmounts}
+      summary={summary}
       totalItems={totalItems}
       onConnect={session.open}
       onNextPage={loadNextPage}

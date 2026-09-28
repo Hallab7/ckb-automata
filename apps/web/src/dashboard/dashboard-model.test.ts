@@ -79,36 +79,36 @@ test("dashboard derives every lifecycle and operational status from canonical re
   assert.equal(dashboardJobPresentation(job("orphaned"), "110", null).status, "reorged");
 });
 
-test("dashboard summary preserves exact recipient amounts", () => {
-  const items = [
-    job("live", { jobId: `0x${"10".repeat(32)}` }),
-    job("spent", {
-      funds: { capacity: "123456789", executorReward: "0", remainingBudget: "0" },
-      jobId: `0x${"20".repeat(32)}`,
-    }),
-    job("orphaned", { jobId: `0x${"30".repeat(32)}` }),
-  ];
-  const summary = dashboardSummary(items, {
-    [items[0]!.jobId]: { perExecution: "10000000000", total: "30000000000" },
-    [items[1]!.jobId]: { perExecution: "200000000", total: "200000000" },
-    [items[2]!.jobId]: { perExecution: "300000000", total: "300000000" },
+test("dashboard summary preserves exact server-wide recipient amounts", () => {
+  const summary = dashboardSummary({
+    nextJob: null,
+    nextRecipientAmount: null,
+    recipientTotal: "30500000000",
+    states: { confirming: 2, live: 1, orphaned: 1, spent: 1, submitting: 1 },
+    totalItems: 6,
   });
   assert.deepEqual(summary, {
     recipientTotal: "305 CKB",
+    confirming: 2,
     live: 1,
     orphaned: 1,
     spent: 1,
-    total: 3,
+    submitting: 1,
+    total: 6,
   });
   assert.equal(
-    dashboardSummary(items, Object.fromEntries([[items[0]!.jobId, null]])).recipientTotal,
-    "Unavailable",
+    dashboardSummary({
+      nextJob: null,
+      nextRecipientAmount: null,
+      recipientTotal: null,
+      states: { confirming: 0, live: 0, orphaned: 0, spent: 0, submitting: 0 },
+      totalItems: 0,
+    }).recipientTotal,
+    "Temporarily unavailable",
   );
 });
 
 test("dashboard summary and page range use the complete filtered total", () => {
-  const items = [job("live", { jobId: `0x${"1".repeat(64)}` })];
-  assert.equal(dashboardSummary(items, {}, 14).total, 14);
   assert.deepEqual(dashboardPageRange(0, 12, 12, 14), { first: 1, last: 12, totalPages: 2 });
   assert.deepEqual(dashboardPageRange(1, 12, 2, 14), { first: 13, last: 14, totalPages: 2 });
 });

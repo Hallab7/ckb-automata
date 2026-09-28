@@ -28,6 +28,7 @@ import {
   TemplatesController,
 } from "./jobs.ts";
 import { NetworkMetadataController, NetworkMetadataService } from "./network-metadata.ts";
+import { PendingCreationController, PendingCreationService } from "./pending-creations.ts";
 import {
   NotificationPreferencesController,
   NotificationPreferencesService,
@@ -63,6 +64,7 @@ Module({
     JobEventStreamController,
     JobQuoteController,
     TransactionController,
+    PendingCreationController,
     TransactionProgressController,
   ],
 })(AppModule);
@@ -224,9 +226,13 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
       },
       {
         provide: JobReadService,
-        inject: [DatabaseClient],
-        useFactory: (databaseClient: DatabaseClient) =>
-          new JobReadService(databaseClient.database, environment.CKB_NETWORK),
+        inject: [DatabaseClient, JobQuoteService, PendingCreationService],
+        useFactory: (
+          databaseClient: DatabaseClient,
+          quotes: JobQuoteService,
+          pending: PendingCreationService,
+        ) =>
+          new JobReadService(databaseClient.database, environment.CKB_NETWORK, { pending, quotes }),
       },
       {
         provide: JobEventsService,
@@ -266,6 +272,21 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
         inject: [CkbClient],
         useFactory: (ckbClient: CkbClient) =>
           new TransactionProgressService(environment, ckbClient),
+      },
+      {
+        provide: PendingCreationService,
+        inject: [DatabaseClient, TransactionBuildService, TransactionProgressService],
+        useFactory: (
+          databaseClient: DatabaseClient,
+          transactions: TransactionBuildService,
+          progress: TransactionProgressService,
+        ) =>
+          new PendingCreationService(
+            databaseClient.database,
+            environment.CKB_NETWORK,
+            transactions,
+            progress,
+          ),
       },
       {
         provide: TransactionProgressStreamService,

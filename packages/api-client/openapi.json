@@ -193,9 +193,217 @@
                       },
                       "required": ["limit", "nextCursor", "totalItems"],
                       "type": "object"
+                    },
+                    "pendingItems": {
+                      "items": {
+                        "properties": {
+                          "confirmations": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                          "jobId": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                          "notBefore": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                          "ownerLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                          "recipientAmount": {
+                            "properties": {
+                              "perExecution": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                              "total": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" }
+                            },
+                            "required": ["perExecution", "total"],
+                            "type": "object"
+                          },
+                          "remainingRuns": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                          "requiredConfirmations": { "minimum": 1, "type": "integer" },
+                          "status": {
+                            "enum": ["submitting", "confirming", "waiting"],
+                            "type": "string"
+                          },
+                          "submittedAt": { "format": "date-time", "type": "string" },
+                          "template": { "enum": ["deadline", "recurring"], "type": "string" },
+                          "transactionHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+                        },
+                        "required": [
+                          "jobId",
+                          "notBefore",
+                          "ownerLockHash",
+                          "recipientAmount",
+                          "remainingRuns",
+                          "template",
+                          "confirmations",
+                          "requiredConfirmations",
+                          "status",
+                          "submittedAt",
+                          "transactionHash"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "summary": {
+                      "properties": {
+                        "nextJob": {
+                          "nullable": true,
+                          "properties": {
+                            "cancellationLockHash": {
+                              "pattern": "^0x[0-9a-f]{64}$",
+                              "type": "string"
+                            },
+                            "funds": {
+                              "properties": {
+                                "capacity": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                                "executorReward": {
+                                  "pattern": "^(0|[1-9][0-9]*)$",
+                                  "type": "string"
+                                },
+                                "remainingBudget": {
+                                  "pattern": "^(0|[1-9][0-9]*)$",
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["capacity", "executorReward", "remainingBudget"],
+                              "type": "object"
+                            },
+                            "jobId": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                            "network": { "type": "string" },
+                            "ownerLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                            "payloadHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                            "policyScriptHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                            "protocol": {
+                              "properties": {
+                                "flags": { "enum": [0], "type": "integer" },
+                                "rawData": { "pattern": "^0x(?:[0-9a-f]{2})+$", "type": "string" },
+                                "version": { "enum": [1], "type": "integer" }
+                              },
+                              "required": ["version", "flags", "rawData"],
+                              "type": "object"
+                            },
+                            "remainingRuns": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                            "sequence": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                            "source": {
+                              "properties": {
+                                "block": {
+                                  "properties": {
+                                    "hash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                                    "number": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                                    "transactionIndex": {
+                                      "pattern": "^(0|[1-9][0-9]*)$",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": ["number", "hash", "transactionIndex"],
+                                  "type": "object"
+                                },
+                                "canonical": { "type": "boolean" },
+                                "indexCheckpoint": {
+                                  "nullable": true,
+                                  "oneOf": [
+                                    {
+                                      "properties": {
+                                        "blockHash": {
+                                          "pattern": "^0x[0-9a-f]{64}$",
+                                          "type": "string"
+                                        },
+                                        "blockNumber": {
+                                          "pattern": "^(0|[1-9][0-9]*)$",
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": ["blockNumber", "blockHash"],
+                                      "type": "object"
+                                    }
+                                  ]
+                                },
+                                "outPoint": {
+                                  "properties": {
+                                    "index": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                                    "txHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+                                  },
+                                  "required": ["txHash", "index"],
+                                  "type": "object"
+                                }
+                              },
+                              "required": ["canonical", "outPoint", "block", "indexCheckpoint"],
+                              "type": "object"
+                            },
+                            "state": { "enum": ["live", "spent", "orphaned"], "type": "string" },
+                            "template": { "enum": ["deadline", "recurring"], "type": "string" },
+                            "trigger": {
+                              "properties": {
+                                "kind": { "maximum": 6, "minimum": 1, "type": "integer" },
+                                "metric": {
+                                  "enum": ["block", "epoch", "timestamp", "none"],
+                                  "type": "string"
+                                },
+                                "notAfter": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                                "notBefore": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                                "paramsHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+                              },
+                              "required": ["kind", "metric", "paramsHash", "notBefore", "notAfter"],
+                              "type": "object"
+                            },
+                            "updatedAt": { "format": "date-time", "type": "string" }
+                          },
+                          "required": [
+                            "jobId",
+                            "network",
+                            "template",
+                            "state",
+                            "sequence",
+                            "ownerLockHash",
+                            "policyScriptHash",
+                            "payloadHash",
+                            "trigger",
+                            "funds",
+                            "remainingRuns",
+                            "cancellationLockHash",
+                            "protocol",
+                            "source",
+                            "updatedAt"
+                          ],
+                          "type": "object"
+                        },
+                        "nextRecipientAmount": {
+                          "nullable": true,
+                          "oneOf": [
+                            {
+                              "properties": {
+                                "perExecution": {
+                                  "pattern": "^(0|[1-9][0-9]*)$",
+                                  "type": "string"
+                                },
+                                "total": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" }
+                              },
+                              "required": ["perExecution", "total"],
+                              "type": "object"
+                            }
+                          ]
+                        },
+                        "recipientTotal": {
+                          "nullable": true,
+                          "pattern": "^(0|[1-9][0-9]*)$",
+                          "type": "string"
+                        },
+                        "states": {
+                          "properties": {
+                            "confirming": { "minimum": 0, "type": "integer" },
+                            "live": { "minimum": 0, "type": "integer" },
+                            "orphaned": { "minimum": 0, "type": "integer" },
+                            "spent": { "minimum": 0, "type": "integer" },
+                            "submitting": { "minimum": 0, "type": "integer" }
+                          },
+                          "required": ["confirming", "live", "orphaned", "spent", "submitting"],
+                          "type": "object"
+                        },
+                        "totalItems": { "minimum": 0, "type": "integer" }
+                      },
+                      "required": [
+                        "nextJob",
+                        "nextRecipientAmount",
+                        "recipientTotal",
+                        "states",
+                        "totalItems"
+                      ],
+                      "type": "object"
                     }
                   },
-                  "required": ["items", "page", "indexCheckpoint"],
+                  "required": ["items", "pendingItems", "page", "summary", "indexCheckpoint"],
                   "type": "object"
                 }
               }
@@ -809,9 +1017,217 @@
                       },
                       "required": ["limit", "nextCursor", "totalItems"],
                       "type": "object"
+                    },
+                    "pendingItems": {
+                      "items": {
+                        "properties": {
+                          "confirmations": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                          "jobId": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                          "notBefore": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                          "ownerLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                          "recipientAmount": {
+                            "properties": {
+                              "perExecution": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                              "total": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" }
+                            },
+                            "required": ["perExecution", "total"],
+                            "type": "object"
+                          },
+                          "remainingRuns": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                          "requiredConfirmations": { "minimum": 1, "type": "integer" },
+                          "status": {
+                            "enum": ["submitting", "confirming", "waiting"],
+                            "type": "string"
+                          },
+                          "submittedAt": { "format": "date-time", "type": "string" },
+                          "template": { "enum": ["deadline", "recurring"], "type": "string" },
+                          "transactionHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+                        },
+                        "required": [
+                          "jobId",
+                          "notBefore",
+                          "ownerLockHash",
+                          "recipientAmount",
+                          "remainingRuns",
+                          "template",
+                          "confirmations",
+                          "requiredConfirmations",
+                          "status",
+                          "submittedAt",
+                          "transactionHash"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "summary": {
+                      "properties": {
+                        "nextJob": {
+                          "nullable": true,
+                          "properties": {
+                            "cancellationLockHash": {
+                              "pattern": "^0x[0-9a-f]{64}$",
+                              "type": "string"
+                            },
+                            "funds": {
+                              "properties": {
+                                "capacity": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                                "executorReward": {
+                                  "pattern": "^(0|[1-9][0-9]*)$",
+                                  "type": "string"
+                                },
+                                "remainingBudget": {
+                                  "pattern": "^(0|[1-9][0-9]*)$",
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["capacity", "executorReward", "remainingBudget"],
+                              "type": "object"
+                            },
+                            "jobId": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                            "network": { "type": "string" },
+                            "ownerLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                            "payloadHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                            "policyScriptHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                            "protocol": {
+                              "properties": {
+                                "flags": { "enum": [0], "type": "integer" },
+                                "rawData": { "pattern": "^0x(?:[0-9a-f]{2})+$", "type": "string" },
+                                "version": { "enum": [1], "type": "integer" }
+                              },
+                              "required": ["version", "flags", "rawData"],
+                              "type": "object"
+                            },
+                            "remainingRuns": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                            "sequence": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                            "source": {
+                              "properties": {
+                                "block": {
+                                  "properties": {
+                                    "hash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                                    "number": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                                    "transactionIndex": {
+                                      "pattern": "^(0|[1-9][0-9]*)$",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": ["number", "hash", "transactionIndex"],
+                                  "type": "object"
+                                },
+                                "canonical": { "type": "boolean" },
+                                "indexCheckpoint": {
+                                  "nullable": true,
+                                  "oneOf": [
+                                    {
+                                      "properties": {
+                                        "blockHash": {
+                                          "pattern": "^0x[0-9a-f]{64}$",
+                                          "type": "string"
+                                        },
+                                        "blockNumber": {
+                                          "pattern": "^(0|[1-9][0-9]*)$",
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": ["blockNumber", "blockHash"],
+                                      "type": "object"
+                                    }
+                                  ]
+                                },
+                                "outPoint": {
+                                  "properties": {
+                                    "index": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                                    "txHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+                                  },
+                                  "required": ["txHash", "index"],
+                                  "type": "object"
+                                }
+                              },
+                              "required": ["canonical", "outPoint", "block", "indexCheckpoint"],
+                              "type": "object"
+                            },
+                            "state": { "enum": ["live", "spent", "orphaned"], "type": "string" },
+                            "template": { "enum": ["deadline", "recurring"], "type": "string" },
+                            "trigger": {
+                              "properties": {
+                                "kind": { "maximum": 6, "minimum": 1, "type": "integer" },
+                                "metric": {
+                                  "enum": ["block", "epoch", "timestamp", "none"],
+                                  "type": "string"
+                                },
+                                "notAfter": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                                "notBefore": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                                "paramsHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+                              },
+                              "required": ["kind", "metric", "paramsHash", "notBefore", "notAfter"],
+                              "type": "object"
+                            },
+                            "updatedAt": { "format": "date-time", "type": "string" }
+                          },
+                          "required": [
+                            "jobId",
+                            "network",
+                            "template",
+                            "state",
+                            "sequence",
+                            "ownerLockHash",
+                            "policyScriptHash",
+                            "payloadHash",
+                            "trigger",
+                            "funds",
+                            "remainingRuns",
+                            "cancellationLockHash",
+                            "protocol",
+                            "source",
+                            "updatedAt"
+                          ],
+                          "type": "object"
+                        },
+                        "nextRecipientAmount": {
+                          "nullable": true,
+                          "oneOf": [
+                            {
+                              "properties": {
+                                "perExecution": {
+                                  "pattern": "^(0|[1-9][0-9]*)$",
+                                  "type": "string"
+                                },
+                                "total": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" }
+                              },
+                              "required": ["perExecution", "total"],
+                              "type": "object"
+                            }
+                          ]
+                        },
+                        "recipientTotal": {
+                          "nullable": true,
+                          "pattern": "^(0|[1-9][0-9]*)$",
+                          "type": "string"
+                        },
+                        "states": {
+                          "properties": {
+                            "confirming": { "minimum": 0, "type": "integer" },
+                            "live": { "minimum": 0, "type": "integer" },
+                            "orphaned": { "minimum": 0, "type": "integer" },
+                            "spent": { "minimum": 0, "type": "integer" },
+                            "submitting": { "minimum": 0, "type": "integer" }
+                          },
+                          "required": ["confirming", "live", "orphaned", "spent", "submitting"],
+                          "type": "object"
+                        },
+                        "totalItems": { "minimum": 0, "type": "integer" }
+                      },
+                      "required": [
+                        "nextJob",
+                        "nextRecipientAmount",
+                        "recipientTotal",
+                        "states",
+                        "totalItems"
+                      ],
+                      "type": "object"
                     }
                   },
-                  "required": ["items", "page", "indexCheckpoint"],
+                  "required": ["items", "pendingItems", "page", "summary", "indexCheckpoint"],
                   "type": "object"
                 }
               }
@@ -2836,6 +3252,92 @@
           "503": { "description": "Chain or deployment evidence is unavailable" }
         },
         "summary": "Build an owner recovery transaction",
+        "tags": ["transactions"]
+      }
+    },
+    "/v1/transactions/register-creation": {
+      "post": {
+        "operationId": "PendingCreationController_register",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "intentHash": { "pattern": "^[0-9a-f]{64}$", "type": "string" },
+                  "operation": {
+                    "enum": ["create_deadline_job", "create_recurring_job"],
+                    "type": "string"
+                  },
+                  "policyCriticalHash": { "pattern": "^[0-9a-f]{64}$", "type": "string" },
+                  "request": { "type": "object" },
+                  "reviewContext": { "type": "object" },
+                  "transaction": { "type": "object" },
+                  "transactionHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+                },
+                "required": [
+                  "operation",
+                  "request",
+                  "intentHash",
+                  "policyCriticalHash",
+                  "reviewContext",
+                  "transaction",
+                  "transactionHash"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "confirmations": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                    "jobId": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                    "notBefore": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                    "ownerLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                    "recipientAmount": {
+                      "properties": {
+                        "perExecution": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                        "total": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" }
+                      },
+                      "required": ["perExecution", "total"],
+                      "type": "object"
+                    },
+                    "remainingRuns": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                    "requiredConfirmations": { "minimum": 1, "type": "integer" },
+                    "status": { "enum": ["submitting", "confirming", "waiting"], "type": "string" },
+                    "submittedAt": { "format": "date-time", "type": "string" },
+                    "template": { "enum": ["deadline", "recurring"], "type": "string" },
+                    "transactionHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+                  },
+                  "required": [
+                    "jobId",
+                    "notBefore",
+                    "ownerLockHash",
+                    "recipientAmount",
+                    "remainingRuns",
+                    "template",
+                    "confirmations",
+                    "requiredConfirmations",
+                    "status",
+                    "submittedAt",
+                    "transactionHash"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": { "description": "Malformed or invalid creation submission" }
+        },
+        "summary": "Register a submitted creation while it confirms",
         "tags": ["transactions"]
       }
     },

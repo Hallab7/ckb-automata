@@ -15,7 +15,14 @@ export interface RecipientAmounts {
 }
 export type RecipientAmountsByJob = Readonly<Record<string, RecipientAmounts | null>>;
 export type DashboardStatus =
-  "completed" | "needs_funding" | "processing" | "recovery_required" | "reorged" | "waiting";
+  | "completed"
+  | "confirming"
+  | "needs_funding"
+  | "processing"
+  | "recovery_required"
+  | "reorged"
+  | "submitting"
+  | "waiting";
 
 export interface DashboardJobPresentation {
   readonly recipientAmount: string;
@@ -28,10 +35,12 @@ export interface DashboardJobPresentation {
 }
 
 export interface DashboardSummary {
+  readonly confirming: number;
   readonly recipientTotal: string;
   readonly live: number;
   readonly orphaned: number;
   readonly spent: number;
+  readonly submitting: number;
   readonly total: number;
 }
 
@@ -124,30 +133,14 @@ export function dashboardJobPresentation(
   };
 }
 
-export function dashboardSummary(
-  items: readonly DashboardJob[],
-  recipientAmounts: RecipientAmountsByJob,
-  totalItems = items.length,
-): DashboardSummary {
-  const counts = { live: 0, orphaned: 0, spent: 0 };
-  let recipientTotal = 0n;
-  let hasLoadingAmount = false;
-  let hasUnavailableAmount = false;
-  for (const item of items) {
-    counts[item.state] += 1;
-    const amounts = recipientAmounts[item.jobId];
-    if (amounts === undefined) hasLoadingAmount = true;
-    else if (amounts === null) hasUnavailableAmount = true;
-    else recipientTotal += BigInt(amounts.total);
-  }
+export function dashboardSummary(summary: ApiJobList["summary"]): DashboardSummary {
   return {
-    recipientTotal: hasUnavailableAmount
-      ? "Unavailable"
-      : hasLoadingAmount
-        ? "Loading..."
-        : formatCkbBalance(recipientTotal),
-    ...counts,
-    total: totalItems,
+    recipientTotal:
+      summary.recipientTotal === null
+        ? "Temporarily unavailable"
+        : formatCkbBalance(BigInt(summary.recipientTotal)),
+    ...summary.states,
+    total: summary.totalItems,
   };
 }
 

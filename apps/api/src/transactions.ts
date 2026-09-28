@@ -107,6 +107,19 @@ interface BuiltArtifact {
   readonly response: TransactionBuildResponse;
   readonly assertCompletion: (transaction: UnsignedDeadlineTransaction) => void;
   readonly lockResolutions?: readonly ScriptIdentity[];
+  readonly pendingCreation?: PendingCreationMetadata;
+}
+
+export interface PendingCreationMetadata {
+  readonly jobId: string;
+  readonly notBefore: string;
+  readonly ownerLockHash: string;
+  readonly recipientAmount: {
+    readonly perExecution: string;
+    readonly total: string;
+  };
+  readonly remainingRuns: string;
+  readonly template: "deadline" | "recurring";
 }
 
 function record(value: unknown, name: string): Record<string, unknown> {
@@ -651,6 +664,26 @@ export class TransactionBuildService {
     });
   }
 
+  async creationMetadata(
+    operationInput: unknown,
+    request: unknown,
+  ): Promise<PendingCreationMetadata> {
+    let operation: TransactionOperation;
+    try {
+      operation = parseOperation(operationInput);
+      if (operation !== "create_deadline_job" && operation !== "create_recurring_job") {
+        throw new TypeError("only creation transactions can be registered");
+      }
+      const artifact = await this.#artifact(operation, request);
+      if (artifact.pendingCreation === undefined) {
+        throw new TypeError("creation transaction metadata is unavailable");
+      }
+      return artifact.pendingCreation;
+    } catch (error) {
+      return this.#mapBuildError(error);
+    }
+  }
+
   async #assertCreationReviewContext(
     artifact: TransactionBuildResponse,
     value: unknown,
@@ -764,6 +797,17 @@ export class TransactionBuildService {
     return Object.freeze({
       response,
       lockResolutions: resolutions,
+      pendingCreation: Object.freeze({
+        jobId: build.jobId,
+        notBefore: request.deadlineBlock,
+        ownerLockHash: request.cancelLockHash,
+        recipientAmount: Object.freeze({
+          perExecution: pledged.toString(),
+          total: pledged.toString(),
+        }),
+        remainingRuns: "1",
+        template: "deadline" as const,
+      }),
       assertCompletion: (transaction: UnsignedDeadlineTransaction) =>
         assertDeadlineCompletion(build, transaction),
     });
@@ -807,6 +851,17 @@ export class TransactionBuildService {
     return Object.freeze({
       response,
       lockResolutions: resolutions,
+      pendingCreation: Object.freeze({
+        jobId: build.jobId,
+        notBefore: request.firstNotBefore,
+        ownerLockHash: request.ownerLockHash,
+        recipientAmount: Object.freeze({
+          perExecution: request.amount,
+          total: (BigInt(request.amount) * BigInt(request.totalRuns)).toString(),
+        }),
+        remainingRuns: request.totalRuns,
+        template: "recurring" as const,
+      }),
       assertCompletion: (transaction: UnsignedDeadlineTransaction) =>
         assertRecurringCompletion(build, transaction),
     });

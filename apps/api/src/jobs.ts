@@ -26,6 +26,8 @@ import { inspectJobData } from "@ckb-automata/core";
 
 import type { AutomataDatabase } from "./database/client.ts";
 import { indexerCheckpoints, jobs } from "./database/schema.ts";
+import type { PendingCreationReadModel, PendingCreationService } from "./pending-creations.ts";
+import type { JobQuoteService, JobTerms } from "./quotes.ts";
 
 const HASH_PATTERN = /^0x[0-9a-f]{64}$/;
 const CURSOR_VERSION = 1;
@@ -33,6 +35,8 @@ const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 const UINT32_MAX = 4_294_967_295n;
 const UINT64_MAX = 18_446_744_073_709_551_615n;
+const SUMMARY_TERMS_CONCURRENCY = 4;
+const TERMS_CACHE_LIMIT = 500;
 
 export const JOB_STATES = ["live", "spent", "orphaned"] as const;
 export const JOB_TEMPLATES = ["deadline", "recurring"] as const;
@@ -95,12 +99,28 @@ export interface JobReadModel {
 
 export interface JobListResponse {
   readonly items: readonly JobReadModel[];
+  readonly pendingItems: readonly PendingCreationReadModel[];
   readonly page: {
     readonly limit: number;
     readonly nextCursor: string | null;
     readonly totalItems: number;
   };
+  readonly summary: JobListSummary;
   readonly indexCheckpoint: JobSourceProvenance["indexCheckpoint"];
+}
+
+export interface JobListSummary {
+  readonly nextJob: JobReadModel | null;
+  readonly nextRecipientAmount: JobTerms["payout"] | null;
+  readonly recipientTotal: string | null;
+  readonly states: {
+    readonly confirming: number;
+    readonly live: number;
+    readonly orphaned: number;
+    readonly spent: number;
+    readonly submitting: number;
+  };
+  readonly totalItems: number;
 }
 
 export interface JobTemplate {
@@ -341,10 +361,22 @@ function cursorCondition(cursor: CursorPayload): SQL {
 export class JobReadService {
   readonly #database: AutomataDatabase;
   readonly #network: string;
+  readonly #pending: Pick<PendingCreationService, "list"> | undefined;
+  readonly #quotes: Pick<JobQuoteService, "terms"> | undefined;
+  readonly #termsCache = new Map<string, Promise<JobTerms>>();
 
-  constructor(database: AutomataDatabase, network: string) {
+  constructor(
+    database: AutomataDatabase,
+    network: string,
+    dependencies: {
+      readonly pending?: Pick<PendingCreationService, "list">;
+      readonly quotes?: Pick<JobQuoteService, "terms">;
+    } = {},
+  ) {
     this.#database = database;
     this.#network = network;
+    this.#pending = dependencies.pending;
+    this.#quotes = dependencies.quotes;
   }
 
   templates(): readonly JobTemplate[] {
@@ -422,7 +454,21 @@ export class JobReadService {
             desc(jobs.jobId),
           )
           .limit(query.limit + 1);
-        return { checkpoint, rows, totalItems: total.totalItems };
+        const summaryRows =
+          this.#quotes === undefined
+            ? rows.slice(0, query.limit)
+            : await tx
+                .select()
+                .from(jobs)
+                .where(and(...filters));
+        const allIndexedJobIds =
+          this.#pending === undefined
+            ? summaryRows.map((row) => ({ jobId: row.jobId }))
+            : await tx
+                .select({ jobId: jobs.jobId })
+                .from(jobs)
+                .where(eq(jobs.networkId, this.#network));
+        return { allIndexedJobIds, checkpoint, rows, summaryRows, totalItems: total.totalItems };
       },
       { accessMode: "read only", isolationLevel: "repeatable read" },
     );
@@ -441,11 +487,110 @@ export class JobReadService {
             j: last.jobId,
           })
         : null;
+    const indexedJobIds = new Set(result.allIndexedJobIds.map((row) => row.jobId));
+    const pendingItems =
+      this.#pending === undefined
+        ? Object.freeze([])
+        : await this.#pending.list({
+            indexedJobIds,
+            ...(ownerLockHash === undefined ? {} : { ownerLockHash }),
+            ...(query.state === undefined ? {} : { state: query.state }),
+            ...(query.template === undefined ? {} : { template: query.template }),
+          });
+    const summary = await this.#summary(result.summaryRows, pendingItems, result.checkpoint);
 
     return Object.freeze({
       items: Object.freeze(pageRows.map((row) => readModel(row, result.checkpoint))),
+      pendingItems: query.cursor === undefined ? pendingItems : Object.freeze([]),
       page: Object.freeze({ limit: query.limit, nextCursor, totalItems: result.totalItems }),
+      summary,
       indexCheckpoint: result.checkpoint,
+    });
+  }
+
+  async #terms(row: JobRow): Promise<JobTerms> {
+    if (this.#quotes === undefined) throw new Error("job terms reader is unavailable");
+    const key = `${row.jobId}:${row.outpointTxHash}:${row.outpointIndex}`;
+    const cached = this.#termsCache.get(key);
+    if (cached !== undefined) return cached;
+    const loading = this.#quotes.terms(row.jobId).catch((error: unknown) => {
+      this.#termsCache.delete(key);
+      throw error;
+    });
+    if (this.#termsCache.size >= TERMS_CACHE_LIMIT) {
+      const oldest = this.#termsCache.keys().next().value as string | undefined;
+      if (oldest !== undefined) this.#termsCache.delete(oldest);
+    }
+    this.#termsCache.set(key, loading);
+    return loading;
+  }
+
+  async #summary(
+    rows: readonly JobRow[],
+    pending: readonly PendingCreationReadModel[],
+    checkpoint: Checkpoint,
+  ): Promise<JobListSummary> {
+    const states = { confirming: 0, live: 0, orphaned: 0, spent: 0, submitting: 0 };
+    for (const row of rows) states[row.state as JobState] += 1;
+    for (const item of pending) {
+      states[
+        item.status === "submitting"
+          ? "submitting"
+          : item.status === "waiting"
+            ? "live"
+            : "confirming"
+      ] += 1;
+    }
+    const checkpointBlock = checkpoint === null ? undefined : BigInt(checkpoint.blockNumber);
+    const liveRows = rows.filter((row) => row.state === "live");
+    const futureRows = liveRows.filter((row) => {
+      if (checkpointBlock === undefined) return true;
+      const inspection = inspectJobData(row.data);
+      return inspection.status === "ok" && inspection.job.notBefore > checkpointBlock;
+    });
+    const scheduledRows = futureRows.length > 0 ? futureRows : liveRows;
+    const nextRow = scheduledRows.reduce<JobRow | undefined>((next, row) => {
+      if (next === undefined) return row;
+      const rowJob = inspectJobData(row.data);
+      const nextJob = inspectJobData(next.data);
+      if (rowJob.status !== "ok") return next;
+      if (nextJob.status !== "ok") return row;
+      return rowJob.job.notBefore < nextJob.job.notBefore ? row : next;
+    }, undefined);
+    let unavailable = false;
+    let recipientTotal = pending.reduce(
+      (total, item) => total + BigInt(item.recipientAmount.total),
+      0n,
+    );
+    let nextRecipientAmount: JobTerms["payout"] | null = null;
+    const canonicalRows = rows.filter((row) => row.state !== "orphaned");
+    const terms: Array<{ readonly row: JobRow; readonly value: JobTerms | undefined }> = [];
+    for (let index = 0; index < canonicalRows.length; index += SUMMARY_TERMS_CONCURRENCY) {
+      const batch = canonicalRows.slice(index, index + SUMMARY_TERMS_CONCURRENCY);
+      terms.push(
+        ...(await Promise.all(
+          batch.map(async (row) => {
+            try {
+              return { row, value: await this.#terms(row) } as const;
+            } catch {
+              unavailable = true;
+              return { row, value: undefined } as const;
+            }
+          }),
+        )),
+      );
+    }
+    for (const item of terms) {
+      if (item.value === undefined) continue;
+      recipientTotal += BigInt(item.value.payout.total);
+      if (item.row.jobId === nextRow?.jobId) nextRecipientAmount = item.value.payout;
+    }
+    return Object.freeze({
+      nextJob: nextRow === undefined ? null : readModel(nextRow, checkpoint),
+      nextRecipientAmount,
+      recipientTotal: unavailable ? null : recipientTotal.toString(),
+      states: Object.freeze(states),
+      totalItems: rows.length + pending.length,
     });
   }
 }
@@ -588,15 +733,81 @@ const jobSchema = {
 };
 const listSchema = {
   type: "object",
-  required: ["items", "page", "indexCheckpoint"],
+  required: ["items", "pendingItems", "page", "summary", "indexCheckpoint"],
   properties: {
     items: { type: "array", items: jobSchema },
+    pendingItems: {
+      type: "array",
+      items: {
+        type: "object",
+        required: [
+          "jobId",
+          "notBefore",
+          "ownerLockHash",
+          "recipientAmount",
+          "remainingRuns",
+          "template",
+          "confirmations",
+          "requiredConfirmations",
+          "status",
+          "submittedAt",
+          "transactionHash",
+        ],
+        properties: {
+          jobId: hashSchema,
+          notBefore: decimalSchema,
+          ownerLockHash: hashSchema,
+          recipientAmount: {
+            type: "object",
+            required: ["perExecution", "total"],
+            properties: { perExecution: decimalSchema, total: decimalSchema },
+          },
+          remainingRuns: decimalSchema,
+          template: { type: "string", enum: [...JOB_TEMPLATES] },
+          confirmations: decimalSchema,
+          requiredConfirmations: { type: "integer", minimum: 1 },
+          status: { type: "string", enum: ["submitting", "confirming", "waiting"] },
+          submittedAt: { type: "string", format: "date-time" },
+          transactionHash: hashSchema,
+        },
+      },
+    },
     page: {
       type: "object",
       required: ["limit", "nextCursor", "totalItems"],
       properties: {
         limit: { type: "integer" },
         nextCursor: { type: "string", nullable: true },
+        totalItems: { type: "integer", minimum: 0 },
+      },
+    },
+    summary: {
+      type: "object",
+      required: ["nextJob", "nextRecipientAmount", "recipientTotal", "states", "totalItems"],
+      properties: {
+        nextJob: { ...jobSchema, nullable: true },
+        nextRecipientAmount: {
+          nullable: true,
+          oneOf: [
+            {
+              type: "object",
+              required: ["perExecution", "total"],
+              properties: { perExecution: decimalSchema, total: decimalSchema },
+            },
+          ],
+        },
+        recipientTotal: { ...decimalSchema, nullable: true },
+        states: {
+          type: "object",
+          required: ["confirming", "live", "orphaned", "spent", "submitting"],
+          properties: {
+            confirming: { type: "integer", minimum: 0 },
+            live: { type: "integer", minimum: 0 },
+            orphaned: { type: "integer", minimum: 0 },
+            spent: { type: "integer", minimum: 0 },
+            submitting: { type: "integer", minimum: 0 },
+          },
+        },
         totalItems: { type: "integer", minimum: 0 },
       },
     },

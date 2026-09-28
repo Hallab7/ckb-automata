@@ -18,6 +18,7 @@ export interface SubmissionRecord {
 export interface SubmissionOutcome {
   readonly persisted: boolean;
   readonly record: SubmissionRecord;
+  readonly registered: boolean;
   readonly recovered: boolean;
 }
 
@@ -28,6 +29,10 @@ export interface SubmissionDependencies {
   ) => Promise<string>;
   readonly now: () => string;
   readonly persist: (record: SubmissionRecord) => boolean;
+  readonly register?: (
+    transaction: UnsignedDeadlineTransaction,
+    transactionHash: string,
+  ) => Promise<void>;
   readonly readPersisted: () => SubmissionRecord | undefined;
   readonly refreshArtifact: () => Promise<ApiTransactionBuild>;
   readonly reverify: () => Promise<void>;
@@ -151,7 +156,7 @@ export async function submitCreationReview(
 ): Promise<SubmissionOutcome> {
   const existing = dependencies.readPersisted();
   if (existing !== undefined && matchesReview(existing, review)) {
-    return Object.freeze({ persisted: true, record: existing, recovered: true });
+    return Object.freeze({ persisted: true, record: existing, registered: true, recovered: true });
   }
 
   const refreshed = await dependencies.refreshArtifact();
@@ -182,9 +187,16 @@ export async function submitCreationReview(
     transactionHash,
     version: STORAGE_VERSION,
   }) satisfies SubmissionRecord;
+  let registered = true;
+  try {
+    await dependencies.register?.(signed, transactionHash);
+  } catch {
+    registered = false;
+  }
   return Object.freeze({
     persisted: dependencies.persist(stored),
     record: stored,
+    registered,
     recovered: false,
   });
 }

@@ -12,14 +12,22 @@ import {
   Plus,
   RefreshCw,
   RotateCcw,
+  Send,
   ShieldAlert,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 
+import type { ApiJobList } from "@ckb-automata/api-client";
 import { Amount, Button, InlineNotice, SelectField } from "@ckb-automata/ui";
 
-import { calendarDateParts, formatDateTime } from "../time/chain-time.ts";
+import { ckbTestnetTransactionUrl, formatCkbBalance } from "../ccc/wallet-display.ts";
+import {
+  calendarDateParts,
+  estimateBlockDate,
+  formatBlockDate,
+  formatDateTime,
+} from "../time/chain-time.ts";
 
 import {
   dashboardJobPresentation,
@@ -42,10 +50,12 @@ interface DashboardStatusPresentation {
 
 const DASHBOARD_STATUS: Record<DashboardStatus, DashboardStatusPresentation> = {
   completed: { icon: CircleCheck, label: "Completed", tone: "neutral" },
+  confirming: { icon: LoaderCircle, label: "Confirming", tone: "info" },
   needs_funding: { icon: CircleDollarSign, label: "Needs funding", tone: "warning" },
   processing: { icon: LoaderCircle, label: "Processing", tone: "success" },
   recovery_required: { icon: ShieldAlert, label: "Recovery required", tone: "danger" },
   reorged: { icon: RotateCcw, label: "Reorged", tone: "warning" },
+  submitting: { icon: Send, label: "Submitting", tone: "neutral" },
   waiting: { icon: Clock3, label: "Waiting", tone: "info" },
 };
 
@@ -60,23 +70,15 @@ function DashboardStatusBadge({ status }: Readonly<{ status: DashboardStatus }>)
   );
 }
 
-function Summary({
-  items,
-  recipientAmounts,
-  totalItems,
-}: Readonly<{
-  items: readonly DashboardJob[];
-  recipientAmounts: RecipientAmountsByJob;
-  totalItems: number;
-}>) {
-  const summary = dashboardSummary(items, recipientAmounts, totalItems);
+function Summary({ value }: Readonly<{ value: ApiJobList["summary"] }>) {
+  const summary = dashboardSummary(value);
   return (
     <section className="automation-funds" aria-label="Loaded automation summary">
       <div className="automation-funds__heading">
         <div>
-          <span>Recipient amount on this page</span>
+          <span>Total recipient amount</span>
           <strong>{summary.recipientTotal}</strong>
-          <small>Across the automations shown below</small>
+          <small>Across all matching automations</small>
         </div>
         <div className="automation-funds__count">
           <strong>{summary.total.toLocaleString("en-US")}</strong>
@@ -85,6 +87,8 @@ function Summary({
       </div>
       <div aria-hidden="true" className="automation-distribution">
         <span data-state="live" style={{ flexGrow: summary.live }} />
+        <span data-state="confirming" style={{ flexGrow: summary.confirming }} />
+        <span data-state="submitting" style={{ flexGrow: summary.submitting }} />
         <span data-state="spent" style={{ flexGrow: summary.spent }} />
         <span data-state="orphaned" style={{ flexGrow: summary.orphaned }} />
       </div>
@@ -93,6 +97,18 @@ function Summary({
           <dt>Live</dt>
           <dd>{summary.live.toLocaleString("en-US")}</dd>
         </div>
+        {summary.confirming > 0 ? (
+          <div data-state="confirming">
+            <dt>Confirming</dt>
+            <dd>{summary.confirming.toLocaleString("en-US")}</dd>
+          </div>
+        ) : null}
+        {summary.submitting > 0 ? (
+          <div data-state="submitting">
+            <dt>Submitting</dt>
+            <dd>{summary.submitting.toLocaleString("en-US")}</dd>
+          </div>
+        ) : null}
         <div data-state="spent">
           <dt>Completed</dt>
           <dd>{summary.spent.toLocaleString("en-US")}</dd>
@@ -109,30 +125,20 @@ function Summary({
 function NextAutomation({
   checkpointAt,
   checkpointBlock,
-  items,
-  recipientAmounts,
+  summary,
   titles,
 }: Readonly<{
   checkpointAt: string | undefined;
   checkpointBlock: string | undefined;
-  items: readonly DashboardJob[];
-  recipientAmounts: RecipientAmountsByJob;
+  summary: ApiJobList["summary"];
   titles: Readonly<Record<string, string>>;
 }>) {
-  const liveJobs = items.filter((item) => item.state === "live");
-  const job =
-    liveJobs.find(
-      (item) =>
-        dashboardJobPresentation(item, checkpointBlock, recipientAmounts[item.jobId], checkpointAt)
-          .status === "waiting",
-    ) ??
-    liveJobs[0] ??
-    items[0];
-  if (job === undefined) return null;
+  const job = summary.nextJob;
+  if (job === null) return null;
   const presentation = dashboardJobPresentation(
     job,
     checkpointBlock,
-    recipientAmounts[job.jobId],
+    summary.nextRecipientAmount,
     checkpointAt,
   );
   const title =
@@ -177,6 +183,79 @@ function NextAutomation({
   );
 }
 
+function PendingAutomationRows({
+  checkpointAt,
+  checkpointBlock,
+  items,
+  titles,
+}: Readonly<{
+  checkpointAt: string | undefined;
+  checkpointBlock: string | undefined;
+  items: ApiJobList["pendingItems"];
+  titles: Readonly<Record<string, string>>;
+}>) {
+  const checkpoint = checkpointBlock === undefined ? undefined : BigInt(checkpointBlock);
+  return items.map((item) => {
+    const scheduledAt =
+      checkpoint === undefined
+        ? undefined
+        : estimateBlockDate(
+            BigInt(item.notBefore),
+            checkpoint,
+            checkpointAt ?? item.submittedAt,
+          )?.toISOString();
+    const calendar = calendarDateParts(scheduledAt);
+    const schedule =
+      checkpoint === undefined
+        ? "Schedule time syncing"
+        : formatBlockDate(BigInt(item.notBefore), checkpoint, checkpointAt ?? item.submittedAt);
+    const title =
+      titles[item.jobId] ??
+      (item.template === "deadline" ? "Scheduled payment" : "Recurring distribution");
+    const confirmations = Math.min(Number(item.confirmations), item.requiredConfirmations);
+    return (
+      <a
+        aria-label={`Open submitted transaction for ${title}`}
+        className="automation-row automation-row--pending"
+        href={ckbTestnetTransactionUrl(item.transactionHash)}
+        key={item.transactionHash}
+        rel="noreferrer"
+        target="_blank"
+      >
+        <span aria-hidden="true" className="automation-row__template automation-date-tile">
+          <small>{calendar.month}</small>
+          <strong>{calendar.day}</strong>
+        </span>
+        <div className="automation-row__identity">
+          <strong>{title}</strong>
+          <code title={item.jobId}>{shortJobId(item.jobId)}</code>
+        </div>
+        <div className="automation-row__status">
+          <DashboardStatusBadge status={item.status} />
+          <span>
+            {item.status === "submitting"
+              ? "Waiting for the network"
+              : item.status === "confirming"
+                ? `${confirmations} / ${item.requiredConfirmations} confirmations`
+                : "Ready for its schedule"}
+          </span>
+        </div>
+        <div className="automation-row__detail">
+          <span className="automation-row__mobile-label">Next schedule</span>
+          <strong>{schedule}</strong>
+          <span>{item.template === "deadline" ? "Scheduled payment" : "Recurring payment"}</span>
+        </div>
+        <div className="automation-row__amount">
+          <span className="automation-row__mobile-label">Recipient amount</span>
+          <Amount>{formatCkbBalance(BigInt(item.recipientAmount.perExecution))}</Amount>
+          <span>{item.remainingRuns} runs remaining</span>
+        </div>
+        <ArrowUpRight aria-hidden="true" className="automation-row__arrow" size={17} />
+      </a>
+    );
+  });
+}
+
 function LoadingRows() {
   return (
     <div className="automation-loading" aria-label="Loading automations" aria-live="polite">
@@ -202,15 +281,7 @@ function AutomationRows({
   titles: Readonly<Record<string, string>>;
 }>) {
   return (
-    <div className="automation-list">
-      <div aria-hidden="true" className="automation-list__header">
-        <span>Date</span>
-        <span>Automation</span>
-        <span>Status</span>
-        <span>Next schedule</span>
-        <span>Recipient amount</span>
-        <span />
-      </div>
+    <>
       {items.map((job) => {
         const presentation = dashboardJobPresentation(
           job,
@@ -255,7 +326,7 @@ function AutomationRows({
           </Link>
         );
       })}
-    </div>
+    </>
   );
 }
 
@@ -267,6 +338,7 @@ export interface AutomationDashboardViewProperties {
   readonly hasNextPage?: boolean | undefined;
   readonly hasPreviousPage?: boolean | undefined;
   readonly items: readonly DashboardJob[];
+  readonly pendingItems?: ApiJobList["pendingItems"] | undefined;
   readonly loadState: DashboardLoadState;
   readonly loadingPage?: boolean | undefined;
   readonly mode: DashboardMode;
@@ -274,6 +346,7 @@ export interface AutomationDashboardViewProperties {
   readonly pageSize?: number | undefined;
   readonly paginationError?: string | undefined;
   readonly recipientAmounts?: RecipientAmountsByJob | undefined;
+  readonly summary?: ApiJobList["summary"] | undefined;
   readonly onConnect?: (() => void) | undefined;
   readonly onNextPage?: (() => void) | undefined;
   readonly onPreviousPage?: (() => void) | undefined;
@@ -295,6 +368,7 @@ export function AutomationDashboardView({
   hasNextPage = false,
   hasPreviousPage = false,
   items,
+  pendingItems = [],
   loadState,
   loadingPage = false,
   mode,
@@ -302,6 +376,7 @@ export function AutomationDashboardView({
   pageSize = 12,
   paginationError,
   recipientAmounts = {},
+  summary,
   onConnect,
   onNextPage,
   onPreviousPage,
@@ -333,14 +408,13 @@ export function AutomationDashboardView({
         </div>
       </header>
 
-      {items.length > 0 ? (
+      {summary !== undefined && summary.totalItems > 0 ? (
         <div className="automation-overview">
-          <Summary items={items} recipientAmounts={recipientAmounts} totalItems={totalItems} />
+          <Summary value={summary} />
           <NextAutomation
             checkpointAt={checkpointAt}
             checkpointBlock={checkpointBlock}
-            items={items}
-            recipientAmounts={recipientAmounts}
+            summary={summary}
             titles={titles}
           />
         </div>
@@ -429,7 +503,7 @@ export function AutomationDashboardView({
             </InlineNotice>
           </div>
         ) : null}
-        {loadState === "ready" && items.length === 0 ? (
+        {loadState === "ready" && items.length === 0 && pendingItems.length === 0 ? (
           <div className="app-empty-state">
             <h2>
               {mode === "owner" ? "No automations for this wallet" : "No public automations found"}
@@ -437,14 +511,30 @@ export function AutomationDashboardView({
             <p>Adjust the filters or create a testnet automation.</p>
           </div>
         ) : null}
-        {items.length > 0 ? (
-          <AutomationRows
-            checkpointAt={checkpointAt}
-            checkpointBlock={checkpointBlock}
-            items={items}
-            recipientAmounts={recipientAmounts}
-            titles={titles}
-          />
+        {items.length > 0 || pendingItems.length > 0 ? (
+          <div className="automation-list">
+            <div aria-hidden="true" className="automation-list__header">
+              <span>Date</span>
+              <span>Automation</span>
+              <span>Status</span>
+              <span>Next schedule</span>
+              <span>Recipient amount</span>
+              <span />
+            </div>
+            <PendingAutomationRows
+              checkpointAt={checkpointAt}
+              checkpointBlock={checkpointBlock}
+              items={pendingItems}
+              titles={titles}
+            />
+            <AutomationRows
+              checkpointAt={checkpointAt}
+              checkpointBlock={checkpointBlock}
+              items={items}
+              recipientAmounts={recipientAmounts}
+              titles={titles}
+            />
+          </div>
         ) : null}
         {paginationError === undefined ? null : (
           <div className="automation-pagination-error" role="status">

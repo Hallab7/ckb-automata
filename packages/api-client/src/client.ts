@@ -41,6 +41,7 @@ export type ApiTemplates = ApiSuccess<"TemplatesController_list">;
 export type ApiTransactionBuild = ApiSuccess<"TransactionController_createDeadline">;
 export type ApiTransactionValidation = ApiSuccess<"TransactionController_validateSigned">;
 export type ApiTransactionProgress = ApiSuccess<"TransactionProgressController_get">;
+export type ApiPendingCreation = ApiSuccess<"PendingCreationController_register">;
 export type ApiAuthChallenge = ApiSuccess<"AuthController_issue">;
 export type ApiAuthSession = ApiSuccess<"AuthController_verify">;
 export type ApiNotificationPreferences = ApiSuccess<"NotificationPreferencesController_get">;
@@ -276,6 +277,12 @@ export class AutomataApiClient {
     body: ApiRequestBody<"TransactionController_validateSigned">,
   ): Promise<ApiTransactionValidation> {
     return this.#post("v1/transactions/validate-signed", body);
+  }
+
+  registerCreation(
+    body: ApiRequestBody<"PendingCreationController_register">,
+  ): Promise<ApiPendingCreation> {
+    return this.#post("v1/transactions/register-creation", body);
   }
 
   getTransactionProgress(

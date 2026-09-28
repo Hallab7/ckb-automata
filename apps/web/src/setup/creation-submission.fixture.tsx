@@ -2,9 +2,7 @@
 
 import { useState } from "react";
 
-import { InlineNotice } from "@ckb-automata/ui";
-
-import { ApprovalPrompt } from "./creation-submission.tsx";
+import { ApprovalPrompt, SubmissionSuccess } from "./creation-submission.tsx";
 
 const TRANSACTION_HASH = `0x${"52".repeat(32)}`;
 type WalletOutcome = "approved" | "closed" | "rejected";
@@ -47,27 +45,41 @@ export function CreationSubmissionFixture() {
       </div>
       <div className="setup-step">
         {result === "submitted" ? (
-          <InlineNotice title="Transaction submitted" tone="success">
-            <p>The deterministic wallet approved the exact reviewed transaction.</p>
-          </InlineNotice>
+          <SubmissionSuccess
+            outcome={{
+              persisted: true,
+              record: {
+                operation: "create_recurring_job",
+                persistedAt: "2026-09-23T12:00:00.000Z",
+                reviewKey: "fixture",
+                reviewedTransactionHash: TRANSACTION_HASH,
+                transactionHash: TRANSACTION_HASH,
+                version: 1,
+              },
+              recovered: false,
+              registered: true,
+            }}
+          />
         ) : null}
-        <ApprovalPrompt
-          {...(result === "stopped"
-            ? {
-                error:
-                  outcome === "closed"
-                    ? "The wallet request was closed. No transaction was submitted."
-                    : "The wallet request was rejected. No transaction was submitted.",
-              }
-            : {})}
-          network="ckb_testnet"
-          onConnect={() => undefined}
-          onSubmit={() => setResult(outcome === "approved" ? "submitted" : "stopped")}
-          ready
-          submitting={false}
-          transactionHash={TRANSACTION_HASH}
-          walletName="CKB test wallet"
-        />
+        {result === "submitted" ? null : (
+          <ApprovalPrompt
+            {...(result === "stopped"
+              ? {
+                  error:
+                    outcome === "closed"
+                      ? "The wallet request was closed. No transaction was submitted."
+                      : "The wallet request was rejected. No transaction was submitted.",
+                }
+              : {})}
+            network="ckb_testnet"
+            onConnect={() => undefined}
+            onSubmit={() => setResult(outcome === "approved" ? "submitted" : "stopped")}
+            ready
+            submitting={false}
+            transactionHash={TRANSACTION_HASH}
+            walletName="CKB test wallet"
+          />
+        )}
       </div>
     </main>
   );

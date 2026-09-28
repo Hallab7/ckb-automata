@@ -126,6 +126,14 @@
   background: #1fa77b;
 }
 
+.automation-distribution span[data-state="confirming"] {
+  background: #3979b8;
+}
+
+.automation-distribution span[data-state="submitting"] {
+  background: #8c6bb1;
+}
+
 .automation-distribution span[data-state="spent"] {
   background: #6b7c74;
 }
@@ -157,6 +165,14 @@
 
 .automation-legend > div[data-state="live"]::before {
   background: #1fa77b;
+}
+
+.automation-legend > div[data-state="confirming"]::before {
+  background: #3979b8;
+}
+
+.automation-legend > div[data-state="submitting"]::before {
+  background: #8c6bb1;
 }
 
 .automation-legend > div[data-state="spent"]::before {
@@ -421,6 +437,10 @@
 
 .automation-row:hover {
   background: #f8faf7;
+}
+
+.automation-row--pending {
+  background: #fbfcff;
 }
 
 .automation-row__template {

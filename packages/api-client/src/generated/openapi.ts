@@ -395,6 +395,23 @@ export type paths = {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/v1/transactions/register-creation": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /** Register a submitted creation while it confirms */
+        readonly post: operations["PendingCreationController_register"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/v1/transactions/top-up-job": {
         readonly parameters: {
             readonly query?: never;
@@ -608,6 +625,92 @@ export interface operations {
                         readonly page: {
                             readonly limit: number;
                             readonly nextCursor: string | null;
+                            readonly totalItems: number;
+                        };
+                        readonly pendingItems: readonly {
+                            readonly confirmations: string;
+                            readonly jobId: string;
+                            readonly notBefore: string;
+                            readonly ownerLockHash: string;
+                            readonly recipientAmount: {
+                                readonly perExecution: string;
+                                readonly total: string;
+                            };
+                            readonly remainingRuns: string;
+                            readonly requiredConfirmations: number;
+                            /** @enum {string} */
+                            readonly status: "submitting" | "confirming" | "waiting";
+                            /** Format: date-time */
+                            readonly submittedAt: string;
+                            /** @enum {string} */
+                            readonly template: "deadline" | "recurring";
+                            readonly transactionHash: string;
+                        }[];
+                        readonly summary: {
+                            readonly nextJob: {
+                                readonly cancellationLockHash: string;
+                                readonly funds: {
+                                    readonly capacity: string;
+                                    readonly executorReward: string;
+                                    readonly remainingBudget: string;
+                                };
+                                readonly jobId: string;
+                                readonly network: string;
+                                readonly ownerLockHash: string;
+                                readonly payloadHash: string;
+                                readonly policyScriptHash: string;
+                                readonly protocol: {
+                                    /** @enum {integer} */
+                                    readonly flags: 0;
+                                    readonly rawData: string;
+                                    /** @enum {integer} */
+                                    readonly version: 1;
+                                };
+                                readonly remainingRuns: string;
+                                readonly sequence: string;
+                                readonly source: {
+                                    readonly block: {
+                                        readonly hash: string;
+                                        readonly number: string;
+                                        readonly transactionIndex: string;
+                                    };
+                                    readonly canonical: boolean;
+                                    readonly indexCheckpoint: {
+                                        readonly blockHash: string;
+                                        readonly blockNumber: string;
+                                    } | null;
+                                    readonly outPoint: {
+                                        readonly index: string;
+                                        readonly txHash: string;
+                                    };
+                                };
+                                /** @enum {string} */
+                                readonly state: "live" | "spent" | "orphaned";
+                                /** @enum {string} */
+                                readonly template: "deadline" | "recurring";
+                                readonly trigger: {
+                                    readonly kind: number;
+                                    /** @enum {string} */
+                                    readonly metric: "block" | "epoch" | "timestamp" | "none";
+                                    readonly notAfter: string;
+                                    readonly notBefore: string;
+                                    readonly paramsHash: string;
+                                };
+                                /** Format: date-time */
+                                readonly updatedAt: string;
+                            } | null;
+                            readonly nextRecipientAmount: {
+                                readonly perExecution: string;
+                                readonly total: string;
+                            } | null;
+                            readonly recipientTotal: string | null;
+                            readonly states: {
+                                readonly confirming: number;
+                                readonly live: number;
+                                readonly orphaned: number;
+                                readonly spent: number;
+                                readonly submitting: number;
+                            };
                             readonly totalItems: number;
                         };
                     };
@@ -1050,6 +1153,92 @@ export interface operations {
                         readonly page: {
                             readonly limit: number;
                             readonly nextCursor: string | null;
+                            readonly totalItems: number;
+                        };
+                        readonly pendingItems: readonly {
+                            readonly confirmations: string;
+                            readonly jobId: string;
+                            readonly notBefore: string;
+                            readonly ownerLockHash: string;
+                            readonly recipientAmount: {
+                                readonly perExecution: string;
+                                readonly total: string;
+                            };
+                            readonly remainingRuns: string;
+                            readonly requiredConfirmations: number;
+                            /** @enum {string} */
+                            readonly status: "submitting" | "confirming" | "waiting";
+                            /** Format: date-time */
+                            readonly submittedAt: string;
+                            /** @enum {string} */
+                            readonly template: "deadline" | "recurring";
+                            readonly transactionHash: string;
+                        }[];
+                        readonly summary: {
+                            readonly nextJob: {
+                                readonly cancellationLockHash: string;
+                                readonly funds: {
+                                    readonly capacity: string;
+                                    readonly executorReward: string;
+                                    readonly remainingBudget: string;
+                                };
+                                readonly jobId: string;
+                                readonly network: string;
+                                readonly ownerLockHash: string;
+                                readonly payloadHash: string;
+                                readonly policyScriptHash: string;
+                                readonly protocol: {
+                                    /** @enum {integer} */
+                                    readonly flags: 0;
+                                    readonly rawData: string;
+                                    /** @enum {integer} */
+                                    readonly version: 1;
+                                };
+                                readonly remainingRuns: string;
+                                readonly sequence: string;
+                                readonly source: {
+                                    readonly block: {
+                                        readonly hash: string;
+                                        readonly number: string;
+                                        readonly transactionIndex: string;
+                                    };
+                                    readonly canonical: boolean;
+                                    readonly indexCheckpoint: {
+                                        readonly blockHash: string;
+                                        readonly blockNumber: string;
+                                    } | null;
+                                    readonly outPoint: {
+                                        readonly index: string;
+                                        readonly txHash: string;
+                                    };
+                                };
+                                /** @enum {string} */
+                                readonly state: "live" | "spent" | "orphaned";
+                                /** @enum {string} */
+                                readonly template: "deadline" | "recurring";
+                                readonly trigger: {
+                                    readonly kind: number;
+                                    /** @enum {string} */
+                                    readonly metric: "block" | "epoch" | "timestamp" | "none";
+                                    readonly notAfter: string;
+                                    readonly notBefore: string;
+                                    readonly paramsHash: string;
+                                };
+                                /** Format: date-time */
+                                readonly updatedAt: string;
+                            } | null;
+                            readonly nextRecipientAmount: {
+                                readonly perExecution: string;
+                                readonly total: string;
+                            } | null;
+                            readonly recipientTotal: string | null;
+                            readonly states: {
+                                readonly confirming: number;
+                                readonly live: number;
+                                readonly orphaned: number;
+                                readonly spent: number;
+                                readonly submitting: number;
+                            };
                             readonly totalItems: number;
                         };
                     };
@@ -2213,6 +2402,63 @@ export interface operations {
             };
             /** @description Chain or deployment evidence is unavailable */
             readonly 503: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly PendingCreationController_register: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": {
+                    readonly intentHash: string;
+                    /** @enum {string} */
+                    readonly operation: "create_deadline_job" | "create_recurring_job";
+                    readonly policyCriticalHash: string;
+                    readonly request: Record<string, unknown>;
+                    readonly reviewContext: Record<string, unknown>;
+                    readonly transaction: Record<string, unknown>;
+                    readonly transactionHash: string;
+                };
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        readonly confirmations: string;
+                        readonly jobId: string;
+                        readonly notBefore: string;
+                        readonly ownerLockHash: string;
+                        readonly recipientAmount: {
+                            readonly perExecution: string;
+                            readonly total: string;
+                        };
+                        readonly remainingRuns: string;
+                        readonly requiredConfirmations: number;
+                        /** @enum {string} */
+                        readonly status: "submitting" | "confirming" | "waiting";
+                        /** Format: date-time */
+                        readonly submittedAt: string;
+                        /** @enum {string} */
+                        readonly template: "deadline" | "recurring";
+                        readonly transactionHash: string;
+                    };
+                };
+            };
+            /** @description Malformed or invalid creation submission */
+            readonly 400: {
                 headers: {
                     readonly [name: string]: unknown;
                 };

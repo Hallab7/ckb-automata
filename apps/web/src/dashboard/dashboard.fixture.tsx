@@ -77,6 +77,22 @@ const FIXTURE_JOBS = [
   fixtureJob("6", "orphaned", {}),
 ] as const;
 
+const PENDING_ITEMS: ApiJobList["pendingItems"] = [
+  {
+    confirmations: "8",
+    jobId: `0x${"99".repeat(32)}`,
+    notBefore: "150",
+    ownerLockHash: `0x${"22".repeat(32)}`,
+    recipientAmount: { perExecution: "10000000000", total: "10000000000" },
+    remainingRuns: "1",
+    requiredConfirmations: 24,
+    status: "confirming",
+    submittedAt: "2026-09-23T00:01:00.000Z",
+    template: "deadline",
+    transactionHash: `0x${"aa".repeat(32)}`,
+  },
+];
+
 export function AutomationDashboardFixture() {
   const [fixtureState, setFixtureState] = useState<DashboardLoadState | "empty">("ready");
   const [mode, setMode] = useState<DashboardMode>("public");
@@ -106,6 +122,7 @@ export function AutomationDashboardFixture() {
         error={loadState === "error" ? "Fixture API outage" : undefined}
         hasNextPage={loadState === "ready"}
         items={items}
+        pendingItems={fixtureState === "ready" ? PENDING_ITEMS : []}
         loadState={loadState}
         mode={mode}
         recipientAmounts={Object.fromEntries(
@@ -119,6 +136,17 @@ export function AutomationDashboardFixture() {
         onStateChange={() => undefined}
         onTemplateChange={() => undefined}
         stateFilter=""
+        summary={
+          fixtureState === "ready"
+            ? {
+                nextJob: FIXTURE_JOBS[0],
+                nextRecipientAmount: { perExecution: "10000000000", total: "40000000000" },
+                recipientTotal: "49000000000",
+                states: { confirming: 1, live: 8, orphaned: 2, spent: 2, submitting: 0 },
+                totalItems: 13,
+              }
+            : undefined
+        }
         templateFilter=""
         totalItems={loadState === "ready" ? items.length * 2 : items.length}
       />

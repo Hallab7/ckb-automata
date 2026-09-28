@@ -1,6 +1,8 @@
 "use client";
 
-import { RefreshCw, Send, ShieldCheck, WalletCards } from "lucide-react";
+import { CheckCircle2, RefreshCw, Send, ShieldCheck, WalletCards } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -27,12 +29,13 @@ import {
   writeSubmissionRecord,
   type SubmissionOutcome,
 } from "./submission-model.ts";
-import { TransactionProgressTracker } from "./transaction-progress.tsx";
 
 export type CreationSubmissionState =
   | { readonly key: string; readonly status: "idle" | "submitting" }
   | { readonly error: string; readonly key: string; readonly status: "error" }
   | { readonly key: string; readonly outcome: SubmissionOutcome; readonly status: "submitted" };
+
+const REDIRECT_SECONDS = 5;
 
 function browserApiClient() {
   const environment = browserWebEnvironment();
@@ -204,6 +207,7 @@ export function CreationApproval({
   template: SetupTemplateId;
 }>) {
   const session = useWalletSession();
+  const router = useRouter();
   const key = creationReviewKey(template, draft, session.ownerLockHash);
   const review =
     reviewState.status === "ready" && reviewState.key === key ? reviewState.result : undefined;
@@ -226,7 +230,7 @@ export function CreationApproval({
     ) {
       update({
         key,
-        outcome: { persisted: true, record: stored, recovered: true },
+        outcome: { persisted: true, record: stored, registered: true, recovered: true },
         status: "submitted",
       });
     }
@@ -243,6 +247,12 @@ export function CreationApproval({
         now: () => new Date().toISOString(),
         persist: (record) => writeSubmissionRecord(window.localStorage, template, record),
         readPersisted: () => readSubmissionRecord(window.localStorage, template),
+        register: async (transaction, transactionHash) => {
+          await api.registerCreation({
+            ...signedValidationBody(review, transaction),
+            transactionHash,
+          } as unknown as Parameters<typeof api.registerCreation>[0]);
+        },
         refreshArtifact: () => refreshedArtifact(review),
         reverify: async () => {
           const deployment = await deploymentRegistry.load(review.model.genesisHash);
@@ -286,6 +296,12 @@ export function CreationApproval({
     }
   }, [draft, key, review, session, state.status, template, update]);
 
+  useEffect(() => {
+    if (state.status !== "submitted") return;
+    const timer = window.setTimeout(() => router.push("/automations"), REDIRECT_SECONDS * 1_000);
+    return () => window.clearTimeout(timer);
+  }, [router, state.status]);
+
   if (review === undefined) {
     return (
       <InlineNotice title="Fresh review required" tone="warning">
@@ -294,12 +310,7 @@ export function CreationApproval({
     );
   }
   if (state.status === "submitted") {
-    return (
-      <TransactionProgressTracker
-        persisted={state.outcome.persisted}
-        record={state.outcome.record}
-      />
-    );
+    return <SubmissionSuccess outcome={state.outcome} />;
   }
 
   return (
@@ -326,5 +337,41 @@ export function CreationSubmissionResult({ template }: Readonly<{ template: Setu
       </InlineNotice>
     );
   }
-  return <TransactionProgressTracker record={record} />;
+  return (
+    <SubmissionSuccess outcome={{ persisted: true, record, registered: true, recovered: true }} />
+  );
+}
+
+export function SubmissionSuccess({ outcome }: Readonly<{ outcome: SubmissionOutcome }>) {
+  return (
+    <section className="setup-submission-success" aria-live="polite">
+      <span className="setup-submission-success__icon">
+        <CheckCircle2 aria-hidden="true" size={28} />
+      </span>
+      <div>
+        <p className="setup-submission-success__eyebrow">Submitted successfully</p>
+        <h2>Your automation is being confirmed</h2>
+        <p>
+          {outcome.registered
+            ? "It is already available in Automations and will move from Submitting to Confirming, then Waiting when confirmation is complete."
+            : "The transaction was accepted and confirmation will continue on the CKB network."}
+        </p>
+      </div>
+      {outcome.registered ? null : (
+        <InlineNotice title="Live list update delayed" tone="warning">
+          <p>
+            The transaction was submitted, but the list could not register it yet. Keep the hash
+            below.
+          </p>
+        </InlineNotice>
+      )}
+      <code>{outcome.record.transactionHash}</code>
+      <div className="setup-submission-success__actions">
+        <Link className="ui-button ui-button--primary" href="/automations">
+          View automations
+        </Link>
+        <span>Opening automatically in {REDIRECT_SECONDS} seconds</span>
+      </div>
+    </section>
+  );
 }

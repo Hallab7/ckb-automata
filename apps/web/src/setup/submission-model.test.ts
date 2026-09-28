@@ -52,6 +52,9 @@ function dependencies(overrides: Partial<SubmissionDependencies> = {}) {
       persisted = record;
       return true;
     },
+    register: async () => {
+      calls.push("register");
+    },
     readPersisted: () => undefined,
     refreshArtifact: async () => {
       calls.push("refresh");
@@ -82,6 +85,7 @@ test("approved transaction is revalidated, signed, submitted, then persisted", a
     "sign",
     "validate",
     "broadcast",
+    "register",
     "persist",
   ]);
   assert.equal(result.record.transactionHash, HASH_A);
@@ -105,7 +109,14 @@ test("a newer canonical tip does not invalidate an unchanged reviewed artifact",
       ({ ...artifact, policyCriticalHash: "55".repeat(32) }) as ApiTransactionBuild,
   });
   await submitCreationReview(review, context.dependencies);
-  assert.deepEqual(context.calls, ["reverify", "sign", "validate", "broadcast", "persist"]);
+  assert.deepEqual(context.calls, [
+    "reverify",
+    "sign",
+    "validate",
+    "broadcast",
+    "register",
+    "persist",
+  ]);
 });
 
 test("a changed quote blocks the wallet invocation", async () => {
@@ -137,6 +148,27 @@ test("RPC failure records no false submission", async () => {
   await assert.rejects(submitCreationReview(review, context.dependencies), /RPC unavailable/);
   assert.deepEqual(context.calls, ["refresh", "reverify", "sign", "validate"]);
   assert.equal(context.persisted(), undefined);
+});
+
+test("a registration outage preserves the successful broadcast and local recovery", async () => {
+  const context = dependencies({
+    register: async () => {
+      context.calls.push("register");
+      throw new Error("registration unavailable");
+    },
+  });
+  const result = await submitCreationReview(review, context.dependencies);
+  assert.equal(result.registered, false);
+  assert.equal(result.persisted, true);
+  assert.deepEqual(context.calls, [
+    "refresh",
+    "reverify",
+    "sign",
+    "validate",
+    "broadcast",
+    "register",
+    "persist",
+  ]);
 });
 
 test("matching persisted submission makes resubmission idempotent", async () => {

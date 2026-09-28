@@ -108,6 +108,7 @@ test("job routes publish an OpenAPI contract with decimal-string integer fields"
       "/v1/jobs",
       "/v1/jobs/{jobId}",
       "/v1/accounts/{lockHash}/jobs",
+      "/v1/transactions/register-creation",
     ]) {
       assert.ok(document.paths[path], `missing OpenAPI path ${path}`);
     }
