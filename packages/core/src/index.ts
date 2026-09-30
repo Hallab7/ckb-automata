@@ -75,8 +75,14 @@ export {
 
 export {
   ABSOLUTE_BLOCK_TRIGGER_KIND,
+  ABSOLUTE_EPOCH_TRIGGER_KIND,
   TRIGGER_PARAMS_DOMAIN,
+  decodeAbsoluteEpochSince,
+  decodeRelativeEpochSince,
   deriveAbsoluteBlockTriggerHash,
+  deriveAbsoluteEpochTriggerHash,
+  encodeAbsoluteEpochSince,
+  encodeRelativeEpochSince,
 } from "./triggers.ts";
 
 export {
@@ -107,6 +113,43 @@ export {
   type DaoHarvestDaoState,
   type DaoHarvestOperation,
 } from "./dao-harvest.ts";
+
+export {
+  DAO_CYCLE_EPOCHS,
+  addEpochs,
+  calculateDaoHarvestQuote,
+  calculateDaoMaximumWithdraw,
+  compareEpochFractions,
+  nextDaoBoundary,
+  selectDaoPrepareWindow,
+  subtractEpochs,
+  type DaoHarvestQuote,
+  type DaoHarvestQuoteInput,
+  type DaoPrepareWindow,
+} from "./dao-harvest-math.ts";
+
+export {
+  DAO_HARVEST_SETUP_INTENT_DOMAIN,
+  DaoHarvestBuilderError,
+  buildDaoHarvestOwnerExit,
+  buildDaoHarvestPrepare,
+  buildDaoHarvestRecovery,
+  buildDaoHarvestRoll,
+  buildDaoHarvestSetup,
+  buildDaoHarvestStopRecurrence,
+  type DaoHarvestActionInput,
+  type DaoHarvestBuilderErrorCode,
+  type DaoHarvestContractDeployment,
+  type DaoHarvestDeployment,
+  type DaoHarvestOwnerBuildInput,
+  type DaoHarvestOwnerExitInput,
+  type DaoHarvestPrepareInput,
+  type DaoHarvestRollInput,
+  type DaoHarvestSetupBuild,
+  type DaoHarvestSetupInput,
+  type DaoHarvestSigningEntry,
+  type DaoHarvestTransitionBuild,
+} from "./dao-harvest-builders.ts";
 
 export {
   ERROR_CATALOG,
