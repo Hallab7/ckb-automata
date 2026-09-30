@@ -57,11 +57,19 @@ const COVERED_OPERATIONS = Object.freeze([
   "AuthController_issue",
   "AuthController_revoke",
   "AuthController_verify",
+  "DaoHarvestController_detail",
+  "DaoHarvestController_exit",
+  "DaoHarvestController_list",
+  "DaoHarvestController_quote",
+  "DaoHarvestController_recover",
+  "DaoHarvestController_setup",
+  "DaoHarvestController_stop",
   "HealthController_live",
   "HealthController_ready",
   "JobEventsController_list",
   "JobEventStreamController_stream",
   "JobQuoteController_get",
+  "JobQuoteController_terms",
   "JobsController_detail",
   "JobsController_list",
   "MetricsController_get",
@@ -69,6 +77,7 @@ const COVERED_OPERATIONS = Object.freeze([
   "NotificationPreferencesController_get",
   "NotificationPreferencesController_reset",
   "NotificationPreferencesController_update",
+  "PendingCreationController_register",
   "TemplatesController_list",
   "TransactionController_cancel",
   "TransactionController_createDeadline",
@@ -495,6 +504,22 @@ async function runComposedSuite(scenario) {
     assert.equal(quote.status, 200);
     assert.equal(quote.body.jobId, recurring.creation.jobId);
     assert.equal((await request(fastify, "GET", `/v1/jobs/${hash(89)}/quote`)).status, 404);
+    const terms = await request(fastify, "GET", `/v1/jobs/${recurring.creation.jobId}/terms`);
+    assert.equal(terms.status, 200);
+    assert.equal(terms.body.jobId, recurring.creation.jobId);
+
+    const harvestList = await request(fastify, "GET", "/v1/dao-harvest?limit=1");
+    assert.equal(harvestList.status, 200);
+    assert.deepEqual(harvestList.body.items, []);
+    assert.equal((await request(fastify, "GET", "/v1/dao-harvest?limit=101")).status, 400);
+    assert.equal((await request(fastify, "GET", `/v1/dao-harvest/${hash(90)}`)).status, 404);
+    assert.equal((await request(fastify, "GET", `/v1/dao-harvest/${hash(90)}/quote`)).status, 404);
+    for (const action of ["setup", "stop", "exit", "recover"]) {
+      assert.equal(
+        (await request(fastify, "POST", `/v1/dao-harvest/${action}`, { payload: {} })).status,
+        503,
+      );
+    }
 
     const recurringCreated = await request(
       fastify,
@@ -566,6 +591,14 @@ async function runComposedSuite(scenario) {
     assert.equal(
       (
         await request(fastify, "POST", "/v1/transactions/create-recurring-job", {
+          payload: {},
+        })
+      ).status,
+      400,
+    );
+    assert.equal(
+      (
+        await request(fastify, "POST", "/v1/transactions/register-creation", {
           payload: {},
         })
       ).status,

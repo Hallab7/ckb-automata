@@ -40,6 +40,21 @@ test("completes both deterministic setup journeys", async ({ page }) => {
   }
 });
 
+test("keeps DAO harvest setup simple and blocks incomplete wallet approval", async ({ page }) => {
+  await page.goto("/fixtures/setup-harvest");
+  await page.getByLabel("Automation title").fill("Quarterly compensation");
+  await page.getByLabel("Original amount (CKB)").fill("1000");
+  await page.getByRole("radio", { name: "Several harvests" }).click();
+  await page.getByLabel("Number of harvests").fill("2");
+
+  await expect(page.getByText(/original amount stays protected/i)).toBeVisible();
+  await expect(page.getByText("Estimated charges").locator("..")).toContainText("245 CKB");
+  await expect(page.getByText("Total to deposit").locator("..")).toContainText("1245 CKB");
+  await expect(page.getByRole("button", { name: "Connect wallet" })).toBeVisible();
+  await expect(page.getByText(/block number|epoch/i)).toHaveCount(0);
+  await expectNoHorizontalOverflow(page);
+});
+
 test("reproduces wallet outcomes and transaction progress", async ({ page }) => {
   await page.goto("/fixtures/transaction-submission");
   await page.getByRole("button", { name: "Reject", exact: true }).click();
