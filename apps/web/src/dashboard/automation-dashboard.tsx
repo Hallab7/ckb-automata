@@ -21,6 +21,7 @@ import {
   type DashboardMode,
 } from "./dashboard-view.tsx";
 import type { DashboardJob, RecipientAmountsByJob } from "./dashboard-model.ts";
+import { DaoHarvestDashboard } from "../dao-harvest/dao-harvest-dashboard.tsx";
 
 const PAGE_SIZE = 12;
 const FIRST_PAGE_REFRESH_MS = 15_000;
@@ -252,37 +253,40 @@ export function AutomationDashboard() {
   }, [loadingPage, pageIndex]);
 
   return (
-    <AutomationDashboardView
-      checkpointAt={checkpointAt}
-      checkpointBlock={checkpointBlock}
-      dataSourceLabel={LIVE_DATA_LABEL}
-      hasNextPage={currentPage?.response.page.nextCursor != null}
-      hasPreviousPage={pageIndex > 0}
-      items={items}
-      pendingItems={pendingItems}
-      loadState={loadState}
-      loadingPage={loadingPage}
-      mode={mode}
-      pageIndex={pageIndex}
-      pageSize={PAGE_SIZE}
-      paginationError={paginationError}
-      recipientAmounts={recipientAmounts}
-      summary={summary}
-      totalItems={totalItems}
-      onConnect={session.open}
-      onNextPage={loadNextPage}
-      onPreviousPage={loadPreviousPage}
-      onModeChange={setMode}
-      onRetry={() => {
-        session.refreshDetails();
-        setPaginationError(undefined);
-        setRefreshKey((current) => current + 1);
-      }}
-      onStateChange={setStateFilter}
-      onTemplateChange={setTemplateFilter}
-      stateFilter={stateFilter}
-      templateFilter={templateFilter}
-      titles={titles}
-    />
+    <>
+      <AutomationDashboardView
+        checkpointAt={checkpointAt}
+        checkpointBlock={checkpointBlock}
+        dataSourceLabel={LIVE_DATA_LABEL}
+        hasNextPage={currentPage?.response.page.nextCursor != null}
+        hasPreviousPage={pageIndex > 0}
+        items={items}
+        pendingItems={pendingItems}
+        loadState={loadState}
+        loadingPage={loadingPage}
+        mode={mode}
+        pageIndex={pageIndex}
+        pageSize={PAGE_SIZE}
+        paginationError={paginationError}
+        recipientAmounts={recipientAmounts}
+        summary={summary}
+        totalItems={totalItems}
+        onConnect={session.open}
+        onNextPage={loadNextPage}
+        onPreviousPage={loadPreviousPage}
+        onModeChange={setMode}
+        onRetry={() => {
+          session.refreshDetails();
+          setPaginationError(undefined);
+          setRefreshKey((current) => current + 1);
+        }}
+        onStateChange={setStateFilter}
+        onTemplateChange={setTemplateFilter}
+        stateFilter={stateFilter}
+        templateFilter={templateFilter}
+        titles={titles}
+      />
+      <DaoHarvestDashboard />
+    </>
   );
 }

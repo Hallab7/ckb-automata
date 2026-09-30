@@ -9,9 +9,12 @@ export const SETUP_STEPS = [
 
 export const DEADLINE_SETUP_STEPS = SETUP_STEPS.filter((step) => step.id !== "funding");
 export const RECURRING_SETUP_STEPS = SETUP_STEPS.filter((step) => step.id !== "funding");
+export const DAO_HARVEST_SETUP_STEPS = SETUP_STEPS.filter(
+  (step) => step.id !== "funding" && step.id !== "timing",
+);
 
 export type SetupStepId = (typeof SETUP_STEPS)[number]["id"];
-export type SetupTemplateId = "deadline" | "recurring";
+export type SetupTemplateId = "dao-harvest" | "deadline" | "recurring";
 export type SetupDraft = Readonly<Record<string, string>>;
 export type SetupErrors = Readonly<Record<string, string>>;
 

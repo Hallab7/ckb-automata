@@ -5,7 +5,7 @@ export interface TemplateCatalogItem {
   readonly approval: string;
   readonly capability: TemplateCapability;
   readonly description: string;
-  readonly id: "deadline" | "demo" | "nervdao" | "recurring";
+  readonly id: "dao-harvest" | "deadline" | "demo" | "recurring";
   readonly name: string;
   readonly recoverability: string;
   readonly risk: string;
@@ -45,14 +45,14 @@ export const TEMPLATE_CATALOG: readonly TemplateCatalogItem[] = Object.freeze([
     risk: "Demo records are illustrative and do not prove public testnet execution.",
   }),
   Object.freeze({
-    action: Object.freeze({ href: "/research/nervdao", label: "Read research" }),
-    approval: "No wallet signature, vault deposit, or automation schedule is available.",
-    capability: "research",
-    description: "Explore the proposed NervDAO Cycle Guard and its two withdrawal phases.",
-    id: "nervdao",
-    name: "NervDAO Cycle Guard",
-    recoverability:
-      "No funds are locked. A future design requires a separately audited vault and exit path.",
-    risk: "DAO maturity handling and vault security are not implemented or testnet-proven.",
+    action: Object.freeze({ href: "/automations/new/dao-harvest", label: "Set up harvest" }),
+    approval:
+      "Your wallet approves a limited testnet policy that preserves the original DAO amount.",
+    capability: "executable",
+    description: "Keep your original amount in the DAO and send earned compensation to you.",
+    id: "dao-harvest",
+    name: "Harvest compensation",
+    recoverability: "The owner wallet can stop future cycles, exit, or recover without CKAutomata.",
+    risk: "Testnet pilot only. Timing and compensation estimates can change with the CKB chain.",
   }),
 ]);

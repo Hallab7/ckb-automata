@@ -2,6 +2,7 @@
 @import "@ckb-automata/ui/styles.css";
 @import "../src/shell/app-shell.css";
 @import "../src/dashboard/dashboard.css";
+@import "../src/dao-harvest/dao-harvest.css";
 @import "../src/activity/activity.css";
 @import "../src/settings/settings.css";
 @import "../src/research/nervdao.css";

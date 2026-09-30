@@ -11,13 +11,13 @@ test("template availability matches implemented product boundaries", () => {
       ["deadline", "executable"],
       ["recurring", "executable"],
       ["demo", "demo"],
-      ["nervdao", "research"],
+      ["dao-harvest", "executable"],
     ],
   );
   const executable = TEMPLATE_CATALOG.filter((template) => template.capability === "executable");
   assert.deepEqual(
     executable.map((template) => template.action.href),
-    ["/automations/new/deadline", "/automations/new/recurring"],
+    ["/automations/new/deadline", "/automations/new/recurring", "/automations/new/dao-harvest"],
   );
   assert.ok(
     TEMPLATE_CATALOG.filter((template) => template.capability !== "executable").every(
@@ -26,7 +26,7 @@ test("template availability matches implemented product boundaries", () => {
   );
 });
 
-test("creation gallery stays focused on executable payment choices", async () => {
+test("creation gallery stays focused on executable automation choices", async () => {
   for (const template of TEMPLATE_CATALOG) {
     assert.ok(template.risk.length > 20, `${template.id} risk is too vague`);
     assert.ok(template.approval.length > 20, `${template.id} approval is too vague`);

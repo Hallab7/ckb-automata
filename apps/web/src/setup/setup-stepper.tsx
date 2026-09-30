@@ -257,7 +257,11 @@ export function SetupStepper({
         <div className="app-page-header__copy">
           <p className="setup-flow__eyebrow">CKB Testnet</p>
           <h1 id="page-title">
-            {template === "deadline" ? "Scheduled payment" : "Recurring payments"}
+            {template === "deadline"
+              ? "Scheduled payment"
+              : template === "recurring"
+                ? "Recurring payments"
+                : "Harvest compensation"}
           </h1>
           <p>
             Step {currentIndex + 1} of {steps.length}

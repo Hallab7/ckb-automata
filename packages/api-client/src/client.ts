@@ -1,4 +1,5 @@
 import type { operations } from "./generated/openapi.ts";
+import type { UnsignedDeadlineTransaction } from "@ckb-automata/core";
 
 type OperationName = keyof operations;
 
@@ -42,6 +43,17 @@ export type ApiTransactionBuild = ApiSuccess<"TransactionController_createDeadli
 export type ApiTransactionValidation = ApiSuccess<"TransactionController_validateSigned">;
 export type ApiTransactionProgress = ApiSuccess<"TransactionProgressController_get">;
 export type ApiPendingCreation = ApiSuccess<"PendingCreationController_register">;
+export type ApiDaoHarvestList = ApiSuccess<"DaoHarvestController_list">;
+export type ApiDaoHarvest = ApiSuccess<"DaoHarvestController_detail">;
+export type ApiDaoHarvestQuote = ApiSuccess<"DaoHarvestController_quote">;
+export interface ApiDaoHarvestBuild {
+  readonly intent: Readonly<Record<string, unknown>>;
+  readonly jobId?: string;
+  readonly operation: "exit" | "recover" | "setup" | "stop";
+  readonly policyCriticalHash: string;
+  readonly signingEntries: readonly unknown[];
+  readonly transaction: UnsignedDeadlineTransaction;
+}
 export type ApiAuthChallenge = ApiSuccess<"AuthController_issue">;
 export type ApiAuthSession = ApiSuccess<"AuthController_verify">;
 export type ApiNotificationPreferences = ApiSuccess<"NotificationPreferencesController_get">;
@@ -233,6 +245,38 @@ export class AutomataApiClient {
 
   listActivity(query?: ApiQuery<"ActivityController_list">): Promise<ApiActivity> {
     return this.#request("v1/activity", { query });
+  }
+
+  listDaoHarvest(query?: ApiQuery<"DaoHarvestController_list">): Promise<ApiDaoHarvestList> {
+    return this.#request("v1/dao-harvest", { query });
+  }
+
+  getDaoHarvest(jobId: string): Promise<ApiDaoHarvest> {
+    return this.#request(`v1/dao-harvest/${encodeURIComponent(jobId)}`);
+  }
+
+  getDaoHarvestQuote(jobId: string): Promise<ApiDaoHarvestQuote> {
+    return this.#request(`v1/dao-harvest/${encodeURIComponent(jobId)}/quote`);
+  }
+
+  createDaoHarvest(
+    body: ApiRequestBody<"DaoHarvestController_setup">,
+  ): Promise<ApiDaoHarvestBuild> {
+    return this.#post("v1/dao-harvest/setup", body);
+  }
+
+  stopDaoHarvest(body: ApiRequestBody<"DaoHarvestController_stop">): Promise<ApiDaoHarvestBuild> {
+    return this.#post("v1/dao-harvest/stop", body);
+  }
+
+  exitDaoHarvest(body: ApiRequestBody<"DaoHarvestController_exit">): Promise<ApiDaoHarvestBuild> {
+    return this.#post("v1/dao-harvest/exit", body);
+  }
+
+  recoverDaoHarvest(
+    body: ApiRequestBody<"DaoHarvestController_recover">,
+  ): Promise<ApiDaoHarvestBuild> {
+    return this.#post("v1/dao-harvest/recover", body);
   }
 
   getJobQuote(jobId: string): Promise<ApiJobQuote> {

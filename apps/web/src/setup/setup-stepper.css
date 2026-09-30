@@ -196,6 +196,41 @@
   border-color: var(--ui-color-danger);
 }
 
+.harvest-count-field {
+  max-width: 20rem;
+}
+
+.harvest-cost-preview {
+  background: var(--ui-color-surface-subtle);
+  border: 1px solid var(--ui-color-border);
+  border-radius: var(--ui-radius-md);
+  display: grid;
+  gap: var(--ui-space-2);
+  margin: 0;
+  padding: var(--ui-space-4);
+}
+
+.harvest-cost-preview > div {
+  display: flex;
+  gap: var(--ui-space-4);
+  justify-content: space-between;
+}
+
+.harvest-cost-preview dt {
+  color: var(--ui-color-text-muted);
+}
+
+.harvest-cost-preview dd {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  margin: 0;
+}
+
+.harvest-cost-preview > div:last-child {
+  border-top: 1px solid var(--ui-color-border);
+  padding-top: var(--ui-space-2);
+}
+
 .setup-review,
 .setup-review-loading {
   display: grid;
@@ -667,6 +702,10 @@
   color: var(--ui-color-text-muted);
   line-height: 1.5;
   margin: 0;
+}
+
+.setup-step .ui-notice p {
+  color: inherit;
 }
 
 .setup-actions {

@@ -1,9 +1,10 @@
-import { ArrowRight, CircleCheck, Flag, Repeat2, type LucideIcon } from "lucide-react";
+import { ArrowRight, CircleCheck, Flag, Landmark, Repeat2, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 
 import { TEMPLATE_CATALOG } from "./template-catalog.ts";
 
-const TEMPLATE_ICONS: Readonly<Record<"deadline" | "recurring", LucideIcon>> = {
+const TEMPLATE_ICONS: Readonly<Record<"dao-harvest" | "deadline" | "recurring", LucideIcon>> = {
+  "dao-harvest": Landmark,
   deadline: Flag,
   recurring: Repeat2,
 };
@@ -12,7 +13,7 @@ const CREATION_TEMPLATES = TEMPLATE_CATALOG.filter(
   (
     template,
   ): template is (typeof TEMPLATE_CATALOG)[number] & {
-    readonly id: "deadline" | "recurring";
+    readonly id: "dao-harvest" | "deadline" | "recurring";
   } => template.capability === "executable",
 );
 
@@ -22,7 +23,7 @@ export function TemplateGallery() {
       <header className="app-page-header">
         <div className="app-page-header__copy">
           <h1 id="page-title">New automation</h1>
-          <p>Choose how you want to automate a payment on CKB Testnet.</p>
+          <p>Choose what you want CKAutomata to handle on CKB Testnet.</p>
         </div>
       </header>
 

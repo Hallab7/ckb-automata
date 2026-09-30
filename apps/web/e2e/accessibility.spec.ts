@@ -24,6 +24,16 @@ async function expectNoSeriousAccessibilityViolations(page: Page) {
   expect(violations, violationSummary(violations)).toEqual([]);
 }
 
+async function expectNoHorizontalOverflow(page: Page) {
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      ),
+    )
+    .toBe(true);
+}
+
 test("primary flows and representative states have no serious automated violations", async ({
   page,
 }) => {
@@ -31,6 +41,7 @@ test("primary flows and representative states have no serious automated violatio
   for (const route of [
     "/automations/new/deadline",
     "/automations/new/recurring",
+    "/fixtures/setup-harvest",
     "/fixtures/transaction-submission",
     "/fixtures/automation-detail",
     "/fixtures/settings",
@@ -118,4 +129,16 @@ test("mobile setup controls retain touch target sizing", async ({ page }, testIn
       }),
     );
   expect(undersized).toEqual([]);
+});
+
+test("harvest setup stays understandable and keyboard operable", async ({ page }) => {
+  await page.goto("/fixtures/setup-harvest");
+  await expect(page.getByRole("heading", { level: 1, name: "Harvest compensation" })).toBeVisible();
+  await expect(page.getByLabel("Original amount (CKB)")).toBeVisible();
+  await expect(page.getByLabel("Compensation address")).toBeVisible();
+  await page.getByRole("radio", { name: "Several harvests" }).click();
+  await expect(page.getByLabel("Number of harvests")).toBeVisible();
+  await expect(page.getByText("original amount stays protected", { exact: false })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  await expectNoSeriousAccessibilityViolations(page);
 });

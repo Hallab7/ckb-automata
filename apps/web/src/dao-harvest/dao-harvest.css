@@ -1,0 +1,277 @@
+.harvest-dashboard {
+  background: var(--ui-color-surface);
+  border: 1px solid var(--ui-color-border);
+  border-radius: var(--ui-radius-lg);
+  display: grid;
+  gap: var(--ui-space-4);
+  margin: var(--ui-space-5) auto 0;
+  max-width: 72rem;
+  padding: var(--ui-space-5);
+  width: 100%;
+}
+
+.harvest-dashboard__header,
+.harvest-dashboard__header > div,
+.harvest-detail__summary > div,
+.harvest-row,
+.harvest-timeline li {
+  align-items: center;
+  display: flex;
+}
+
+.harvest-dashboard__header {
+  justify-content: space-between;
+}
+.harvest-dashboard__header > div {
+  gap: var(--ui-space-3);
+}
+.harvest-dashboard__header h2,
+.harvest-dashboard__header p {
+  margin: 0;
+}
+.harvest-dashboard__header h2 {
+  font-size: 1rem;
+}
+.harvest-dashboard__header p {
+  color: var(--ui-color-text-muted);
+  font-size: 0.8125rem;
+  margin-top: var(--ui-space-1);
+}
+.harvest-dashboard__icon {
+  align-items: center;
+  background: var(--ui-color-surface-subtle);
+  border-radius: var(--ui-radius-md);
+  color: var(--ui-color-accent);
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 2.5rem;
+  justify-content: center;
+  width: 2.5rem;
+}
+.harvest-dashboard__rows {
+  border-top: 1px solid var(--ui-color-border);
+  display: grid;
+}
+.harvest-row {
+  color: inherit;
+  gap: var(--ui-space-4);
+  min-width: 0;
+  padding: var(--ui-space-4) 0;
+  text-decoration: none;
+}
+.harvest-row + .harvest-row {
+  border-top: 1px solid var(--ui-color-border);
+}
+.harvest-row > div:first-child {
+  display: grid;
+  flex: 1;
+  gap: var(--ui-space-1);
+  min-width: 0;
+}
+.harvest-row > div:first-child span,
+.harvest-row small {
+  color: var(--ui-color-text-muted);
+  font-size: 0.8125rem;
+}
+.harvest-row > div:nth-child(2) {
+  align-items: end;
+  display: grid;
+  gap: var(--ui-space-1);
+  justify-items: end;
+}
+.harvest-row > svg {
+  color: var(--ui-color-text-muted);
+  flex: 0 0 auto;
+}
+.harvest-dashboard__empty {
+  border-top: 1px solid var(--ui-color-border);
+  color: var(--ui-color-text-muted);
+  padding-top: var(--ui-space-4);
+}
+.harvest-dashboard__skeleton,
+.harvest-detail__skeleton {
+  display: grid;
+  gap: var(--ui-space-3);
+}
+.harvest-dashboard__skeleton span,
+.harvest-detail__skeleton span {
+  animation: harvest-pulse 1.2s ease-in-out infinite alternate;
+  background: var(--ui-color-surface-subtle);
+  display: block;
+  height: 4.5rem;
+}
+
+.harvest-detail {
+  margin-inline: auto;
+  max-width: 72rem;
+}
+.harvest-detail__header {
+  align-items: start;
+}
+.harvest-detail__summary {
+  background: var(--ui-color-surface);
+  border: 1px solid var(--ui-color-border);
+  display: grid;
+  gap: var(--ui-space-4);
+  grid-template-columns: 1.3fr 1fr 1fr;
+  padding: var(--ui-space-5);
+}
+.harvest-detail__summary > div {
+  gap: var(--ui-space-3);
+  min-width: 0;
+}
+.harvest-detail__summary > div:not(:first-child) {
+  align-items: start;
+  display: grid;
+  gap: var(--ui-space-1);
+}
+.harvest-detail__summary small {
+  color: var(--ui-color-text-muted);
+}
+.harvest-detail__summary strong {
+  overflow-wrap: anywhere;
+}
+.harvest-detail__section {
+  border-top: 1px solid var(--ui-color-border);
+  display: grid;
+  gap: var(--ui-space-4);
+  padding: var(--ui-space-5) 0;
+}
+.harvest-detail__section h2,
+.harvest-detail__section p {
+  margin: 0;
+}
+.harvest-detail__section h2 {
+  font-size: 1rem;
+}
+.harvest-detail__section p {
+  color: var(--ui-color-text-muted);
+}
+.harvest-timeline,
+.harvest-history {
+  display: grid;
+  gap: var(--ui-space-4);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.harvest-timeline li {
+  align-items: start;
+  gap: var(--ui-space-3);
+}
+.harvest-timeline li > div {
+  display: grid;
+  gap: var(--ui-space-1);
+}
+.harvest-timeline li svg {
+  color: var(--ui-color-text-muted);
+  flex: 0 0 auto;
+}
+.harvest-timeline li[data-complete="true"] svg {
+  color: var(--ui-color-success);
+}
+.harvest-timeline li[data-current="true"] svg {
+  color: var(--ui-color-accent);
+}
+.harvest-timeline span {
+  color: var(--ui-color-text-muted);
+  font-size: 0.875rem;
+}
+.harvest-history li {
+  align-items: center;
+  background: var(--ui-color-surface-subtle);
+  display: flex;
+  justify-content: space-between;
+  padding: var(--ui-space-3);
+}
+.harvest-detail__owner {
+  font-family: var(--ui-font-mono);
+  font-size: 0.8125rem;
+}
+.harvest-detail__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+}
+.harvest-detail__technical summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.harvest-detail__technical dl,
+.harvest-action-dialog dl {
+  display: grid;
+  gap: var(--ui-space-3);
+}
+.harvest-detail__technical dl > div,
+.harvest-action-dialog dl > div {
+  display: grid;
+  gap: var(--ui-space-1);
+}
+.harvest-detail__technical dd,
+.harvest-action-dialog dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.harvest-action-dialog {
+  display: grid;
+  gap: var(--ui-space-4);
+}
+.harvest-action-dialog__loading {
+  align-items: center;
+  display: flex;
+  gap: var(--ui-space-3);
+}
+
+@keyframes harvest-pulse {
+  to {
+    opacity: 0.45;
+  }
+}
+
+@media (max-width: 48rem) {
+  .harvest-detail__summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .harvest-dashboard__header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--ui-space-3);
+  }
+  .harvest-dashboard__header > .ui-button {
+    width: 100%;
+  }
+  .harvest-row {
+    align-items: start;
+  }
+  .harvest-row > div:nth-child(2) {
+    justify-items: start;
+  }
+}
+
+@media (max-width: 32rem) {
+  .harvest-dashboard {
+    border-left: 0;
+    border-radius: 0;
+    border-right: 0;
+    padding: var(--ui-space-4);
+  }
+  .harvest-row {
+    align-items: start;
+    flex-direction: column;
+  }
+  .harvest-row > svg {
+    display: none;
+  }
+  .harvest-history li {
+    align-items: start;
+    flex-direction: column;
+    gap: var(--ui-space-1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .harvest-dashboard__skeleton span,
+  .harvest-detail__skeleton span {
+    animation: none;
+  }
+}
