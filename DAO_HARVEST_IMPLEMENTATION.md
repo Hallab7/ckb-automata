@@ -72,7 +72,7 @@ their current phase, header dependencies, and lock script cannot be changed as o
 | Owner control    | The owner path requires a co-spent input whose full lock hash matches the committed owner lock                                           |
 | Principal        | Every automated transition preserves the exact `principal_capacity`; only the owner exit path may return it to the owner                 |
 | Compensation     | `maximum_withdraw - principal_capacity` is paid only to the committed payout lock                                                        |
-| Executor rewards | Prepare and roll rewards are fixed, capped, pre-funded in the Job Cell, and separate from principal                                      |
+| Executor rewards | One fixed per-action reward is capped, pre-funded in the Job Cell, and separate from principal                                           |
 | Network fees     | Executors provide fee inputs; the policy never silently reduces principal or compensation for fees                                       |
 | Phase-one timing | An absolute epoch `since` enforces the lower bound; an approved executor set and operational cutoff manage the unenforceable upper bound |
 | Phase two        | Claim, compensation payout, principal re-deposit, and successor creation occur atomically                                                |
@@ -89,32 +89,32 @@ pilot restricts that transition to an owner-approved executor set.
 
 ### 4.1 Harvest policy data
 
-Add a canonical Molecule payload committed by the existing Job Cell:
+Add a canonical immutable Molecule payload committed by the existing Job Cell:
 
 ```text
-table DaoHarvestDataV1 {
+table DaoHarvestPayloadV1 {
   version: Uint16,
   owner_lock_hash: Byte32,
   payout_lock_hash: Byte32,
   vault_lock_hash: Byte32,
   principal_capacity: Uint64,
-  deposit_out_point: OutPoint,
-  deposit_epoch: Uint64,
-  target_boundary: Uint64,
-  prepare_start: Uint64,
-  prepare_cutoff: Uint64,
   prepare_executor_set_hash: Byte32,
-  prepare_reward: Uint64,
-  roll_reward: Uint64,
+  executor_reward: Uint64,
   min_compensation: Uint64,
-  remaining_cycles: Uint32,
-  end_epoch: Uint64,
+  prepare_buffer_epochs: Uint64,
+  confirmation_margin_epochs: Uint64,
+  total_cycles: Uint32,
+  end_epoch_since: Uint64,
 }
 ```
 
 The final schema must define byte order, hash domains, optional-field encoding, supported versions,
-and whether an outpoint or stable vault identifier is used after each transition. Large executor
-sets should be committed by a Merkle or SMT root instead of stored in full.
+and exact epoch encodings. Mutable progress remains in `JobDataV1`: sequence, remaining actions,
+budget, lower bound, immutable end epoch, and trigger commitment. Setup derives exactly two actions
+per selected harvest cycle. The co-spent DAO cell data proves deposited or withdrawing state, and
+the stable vault lock binds it to the job, so changing state and outpoints do not weaken the
+immutable payload commitment. The first pilot commits a sorted set of no more than eight executor
+lock hashes; a later version may replace it with a Merkle or SMT root.
 
 ### 4.2 Authoritative on-chain states
 
@@ -133,14 +133,14 @@ states unless a contract transition needs them.
 
 1. The automated path cannot send principal to the executor or payout address.
 2. Phase one creates the required withdrawing DAO cell at the same output index and capacity.
-3. Phase one pays only the committed prepare reward to a proven approved executor.
+3. Phase one pays only the committed executor reward to a proven approved executor.
 4. Phase two consumes the exact withdrawing cell and required deposit/withdraw headers.
 5. Phase two creates a new DAO deposit with eight zero data bytes and exactly the committed
    principal capacity.
 6. Phase two sends exactly the allowed compensation to the committed payout lock.
-7. Phase two pays no more than the committed roll reward.
-8. A recurring transition creates exactly one successor with `sequence + 1` and
-   `remaining_cycles - 1`.
+7. Phase two pays no more than the committed executor reward.
+8. A non-final transition creates exactly one successor with `sequence + 1` and
+   `remaining_runs - 1`; every full harvest cycle consumes exactly two actions.
 9. No successor is allowed after the end epoch, with zero cycles, or with insufficient reward
    budget.
 10. Cancellation and recovery pay no executor reward and cannot depend on the hosted API.
@@ -164,7 +164,7 @@ Before phase one, the service must show:
 
 - original amount;
 - currently accrued and projected compensation;
-- fixed prepare and roll rewards;
+- the fixed executor reward and total funded action budget;
 - estimated time outside the DAO;
 - estimated net user benefit;
 - the preparation window and its uncertainty; and
@@ -209,7 +209,7 @@ or an undefined claim of automatic compounding.
 
 **Depends on:** Phase 00
 
-**Implement:** Add `DaoHarvestDataV1`, state and error constants, payload hashing, executor-set
+**Implement:** Add `DaoHarvestPayloadV1`, state and error constants, payload hashing, executor-set
 commitment, transition diagrams, canonical JSON fixtures, and generated Rust/TypeScript codecs.
 Define setup, prepare, claim/redeposit, terminal, cancellation, and recovery transaction layouts.
 

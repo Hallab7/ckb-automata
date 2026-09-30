@@ -36,7 +36,7 @@ The pilot supports:
 - one immutable original amount and one immutable compensation payout lock per automation;
 - one harvest or a finite number of recurring harvests;
 - exact rational-epoch scheduling from canonical CKB headers;
-- separately pre-funded and capped prepare and roll rewards;
+- one separately pre-funded and capped executor reward per on-chain action;
 - owner-approved setup, stop, exit, and recovery transactions; and
 - public transaction, status, failure, and recovery evidence.
 
@@ -61,7 +61,7 @@ The setup transaction gives the automation only enough authority to:
 - claim that same withdrawing cell after it becomes mature;
 - return exactly the selected original amount to a new DAO deposit;
 - send only the resulting compensation to the selected payout address;
-- pay no more than the two disclosed executor rewards; and
+- pay no more than the disclosed fixed reward for each action; and
 - repeat no more than the selected number of times and never beyond the selected end epoch.
 
 The automation cannot change the payout address, reduce or redirect the original amount, increase
@@ -101,7 +101,7 @@ selection, or principal allocation.
 - Gross compensation is `maximum_withdraw - principal_capacity` using canonical deposit and
   phase-one headers.
 - The complete gross compensation is sent to the committed payout lock in V1.
-- Prepare and roll rewards come from the separately funded Job Cell.
+- The fixed reward for each prepare or roll action comes from the separately funded Job Cell.
 - Executor network fees come from executor-owned fee inputs.
 - The pilot has no protocol fee and may not silently deduct any charge from principal or
   compensation.

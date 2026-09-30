@@ -38,6 +38,7 @@ test("published schema names and field order match canonical Molecule sources", 
     ["job_v1.mol", "JobDataV1"],
     ["recurring_v1.mol", "RecurringPayloadV1"],
     ["campaign_v1.mol", "CampaignDataV1"],
+    ["dao_harvest_v1.mol", "DaoHarvestPayloadV1"],
   ];
   for (const [file, table] of schemas) {
     const molecule = await readFile(new URL(`contracts/schemas/${file}`, root), "utf8");
@@ -73,7 +74,7 @@ test("witness modes and every script error are documented from Rust sources", as
 
   const errors = await readFile(new URL("contracts/shared/error_codes.rs", root), "utf8");
   const variants = [...errors.matchAll(/^\s+([A-Za-z]+) = (\d+),$/gm)];
-  assert.equal(variants.length, 26);
+  assert.equal(variants.length, 33);
   for (const [, variant, code] of variants) {
     assert.match(
       spec,

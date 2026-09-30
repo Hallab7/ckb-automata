@@ -1,0 +1,58 @@
+// Canonical immutable policy for a CKAutomata Nervos DAO compensation harvest.
+//
+// Integer byte arrays are unsigned little-endian values. Capacity and reward
+// values are shannons. Epoch values use canonical CKB epoch-since encoding.
+//
+// version: 1 is DaoHarvestPayloadV1; every other value is reserved.
+// owner_lock_hash: full CKB Script hash required on a distinct co-spent owner
+// input for stop, exit, recovery, or any policy replacement.
+// payout_lock_hash: full CKB Script hash receiving gross compensation.
+// vault_lock_hash: full Harvest Vault Lock script hash protecting every DAO
+// cell in this automation.
+// principal_capacity: exact full capacity preserved in phase one and atomically
+// returned to a new DAO deposit in phase two.
+// prepare_executor_set_hash: H("ckb-automata/dao-harvest-executors/v1",
+// uint32_le(count) || sorted unique executor lock hashes). Count is 1..8.
+// executor_reward: exact separately funded reward for each prepare or roll
+// action. V1 uses one fixed reward so the shared Job Lock reward remains
+// immutable across successors.
+// min_compensation: phase one is forbidden below this gross compensation.
+// prepare_buffer_epochs: non-zero relative epoch duration before the target
+// boundary at which phase one becomes eligible.
+// confirmation_margin_epochs: non-zero relative epoch duration before the
+// target boundary at which compliant executors stop phase-one submission. It
+// MUST be less than prepare_buffer_epochs. This cutoff is operational metadata;
+// CKB since cannot enforce an upper bound.
+// total_cycles: exact non-zero cycle count approved at setup. The initial
+// JobDataV1.remaining_runs is total_cycles * 2 because each cycle has prepare
+// and roll actions.
+// end_epoch_since: zero means no separate end bound; otherwise a valid absolute
+// epoch since that an executor cannot extend.
+//
+// JobDataV1.payload_hash commits this complete immutable payload using
+// H("ckb-automata/policy-payload/v1", policy_script_hash || molecule_bytes).
+// JobDataV1 sequence, trigger_params_hash, remaining_budget, not_before, and
+// remaining_runs carry mutable progress. JobDataV1.not_after mirrors the
+// immutable end_epoch_since. The co-spent DAO cell data determines DEPOSITED
+// (eight zero bytes) or WITHDRAWING (original deposit block number), so neither
+// state nor a changing DAO outpoint belongs here.
+
+array Uint16 [byte; 2];
+array Uint32 [byte; 4];
+array Uint64 [byte; 8];
+array Byte32 [byte; 32];
+
+table DaoHarvestPayloadV1 {
+  version: Uint16,
+  owner_lock_hash: Byte32,
+  payout_lock_hash: Byte32,
+  vault_lock_hash: Byte32,
+  principal_capacity: Uint64,
+  prepare_executor_set_hash: Byte32,
+  executor_reward: Uint64,
+  min_compensation: Uint64,
+  prepare_buffer_epochs: Uint64,
+  confirmation_margin_epochs: Uint64,
+  total_cycles: Uint32,
+  end_epoch_since: Uint64,
+}

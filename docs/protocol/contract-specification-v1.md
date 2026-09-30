@@ -10,6 +10,10 @@ The deployed scripts are `job-lock`, `deadline-policy`, `recurring-policy`,
 `demo-campaign-type`, and `campaign-lock`. V1 is for local development and CKB
 testnet evaluation; no mainnet deployment is supported.
 
+The DAO harvest payload is a checked schema for the planned testnet policy. Its
+vault and policy scripts are not deployed until the contract gate in the focused
+DAO Harvest plan is complete.
+
 ## Encoding and Hashing
 
 - Integers are unsigned little-endian values with the width declared by the schema.
@@ -23,17 +27,20 @@ testnet evaluation; no mainnet deployment is supported.
 
 ## Canonical Schemas
 
-| Type                 | Canonical source                                               | Fields in order                                                                                                                                                                                                                                                                                         |
-| -------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `JobDataV1`          | [`job_v1.mol`](../../contracts/schemas/job_v1.mol)             | `version:u16`, `flags:u16`, `job_id:byte32`, `sequence:u64`, `state:u8`, `trigger_kind:u16`, `trigger_params_hash:byte32`, `policy_script_hash:byte32`, `payload_hash:byte32`, `reward:u64`, `remaining_budget:u64`, `not_before:u64`, `not_after:u64`, `remaining_runs:u32`, `cancel_lock_hash:byte32` |
-| `RecurringPayloadV1` | [`recurring_v1.mol`](../../contracts/schemas/recurring_v1.mol) | `version:u16`, `owner_lock_hash:byte32`, `recipient_lock_hash:byte32`, `amount:u64`, `interval_blocks:u64`, `first_not_before:u64`, `total_runs:u32`, `reward:u64`, `final_refund_kind:u8`                                                                                                              |
-| `CampaignDataV1`     | [`campaign_v1.mol`](../../contracts/schemas/campaign_v1.mol)   | `version:u16`, `state:u8`, `campaign_id:byte32`, `pledged:u64`, `pledge_count:u32`, `target:u64`, `deadline_since:u64`, `success_lock_hash:byte32`, `refund_commitment:byte32`                                                                                                                          |
+| Type                  | Canonical source                                                   | Fields in order                                                                                                                                                                                                                                                                                                     |
+| --------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JobDataV1`           | [`job_v1.mol`](../../contracts/schemas/job_v1.mol)                 | `version:u16`, `flags:u16`, `job_id:byte32`, `sequence:u64`, `state:u8`, `trigger_kind:u16`, `trigger_params_hash:byte32`, `policy_script_hash:byte32`, `payload_hash:byte32`, `reward:u64`, `remaining_budget:u64`, `not_before:u64`, `not_after:u64`, `remaining_runs:u32`, `cancel_lock_hash:byte32`             |
+| `RecurringPayloadV1`  | [`recurring_v1.mol`](../../contracts/schemas/recurring_v1.mol)     | `version:u16`, `owner_lock_hash:byte32`, `recipient_lock_hash:byte32`, `amount:u64`, `interval_blocks:u64`, `first_not_before:u64`, `total_runs:u32`, `reward:u64`, `final_refund_kind:u8`                                                                                                                          |
+| `CampaignDataV1`      | [`campaign_v1.mol`](../../contracts/schemas/campaign_v1.mol)       | `version:u16`, `state:u8`, `campaign_id:byte32`, `pledged:u64`, `pledge_count:u32`, `target:u64`, `deadline_since:u64`, `success_lock_hash:byte32`, `refund_commitment:byte32`                                                                                                                                      |
+| `DaoHarvestPayloadV1` | [`dao_harvest_v1.mol`](../../contracts/schemas/dao_harvest_v1.mol) | `version:u16`, `owner_lock_hash:byte32`, `payout_lock_hash:byte32`, `vault_lock_hash:byte32`, `principal_capacity:u64`, `prepare_executor_set_hash:byte32`, `executor_reward:u64`, `min_compensation:u64`, `prepare_buffer_epochs:u64`, `confirmation_margin_epochs:u64`, `total_cycles:u32`, `end_epoch_since:u64` |
 
 The generated Rust and TypeScript bindings and the JSON fixtures under
 `contracts/fixtures` are checked representations of these sources. See
 [`job-data-v1.md`](job-data-v1.md),
 [`recurring-payload-v1.md`](recurring-payload-v1.md), and
-[`campaign-state-v1.md`](campaign-state-v1.md) for field semantics.
+[`campaign-state-v1.md`](campaign-state-v1.md) for deployed field semantics. See
+[`dao-harvest-v1.md`](dao-harvest-v1.md) for the planned harvest payload and
+transaction layouts.
 
 ## Witness Envelopes
 
@@ -181,6 +188,13 @@ copy and off-chain ranges are in [`error-codes.md`](error-codes.md) and
 | `33` | `MissingHeader`              | A required transaction header dependency is absent          |
 | `34` | `ArithmeticOverflow`         | A protected amount, counter, or schedule overflowed         |
 | `35` | `UnsupportedRecovery`        | The requested recovery path is unavailable                  |
+| `36` | `InvalidDaoCell`             | A DAO cell is malformed, unrelated, or in the wrong phase   |
+| `37` | `PrincipalMismatch`          | The protected original amount changed                       |
+| `38` | `PayoutMismatch`             | Compensation has the wrong recipient or amount              |
+| `39` | `UnauthorizedExecutor`       | An unapproved executor attempted DAO preparation            |
+| `40` | `CompensationBelowMinimum`   | Gross compensation is below the approved minimum            |
+| `41` | `CycleLimitReached`          | A cycle or end-epoch limit forbids the transition           |
+| `42` | `InvalidExecutorSet`         | The prepare executor proof differs from the approved set    |
 
 ## Deployment Manifest
 

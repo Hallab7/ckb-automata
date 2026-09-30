@@ -164,6 +164,48 @@ export const ERROR_CATALOG = {
     copy: "This recovery operation is not supported for the job.",
     rustVariant: "UnsupportedRecovery",
   },
+  SCRIPT_INVALID_DAO_CELL: {
+    code: 36,
+    domain: "script",
+    copy: "The transaction uses an invalid or unrelated Nervos DAO cell.",
+    rustVariant: "InvalidDaoCell",
+  },
+  SCRIPT_PRINCIPAL_MISMATCH: {
+    code: 37,
+    domain: "script",
+    copy: "The transaction changed the protected original amount.",
+    rustVariant: "PrincipalMismatch",
+  },
+  SCRIPT_PAYOUT_MISMATCH: {
+    code: 38,
+    domain: "script",
+    copy: "The compensation payout does not match the approved address or amount.",
+    rustVariant: "PayoutMismatch",
+  },
+  SCRIPT_UNAUTHORIZED_EXECUTOR: {
+    code: 39,
+    domain: "script",
+    copy: "This executor is not approved to prepare the DAO withdrawal.",
+    rustVariant: "UnauthorizedExecutor",
+  },
+  SCRIPT_COMPENSATION_BELOW_MINIMUM: {
+    code: 40,
+    domain: "script",
+    copy: "The available compensation is below the approved minimum.",
+    rustVariant: "CompensationBelowMinimum",
+  },
+  SCRIPT_CYCLE_LIMIT_REACHED: {
+    code: 41,
+    domain: "script",
+    copy: "The automation has reached its approved cycle or end-epoch limit.",
+    rustVariant: "CycleLimitReached",
+  },
+  SCRIPT_INVALID_EXECUTOR_SET: {
+    code: 42,
+    domain: "script",
+    copy: "The preparation executor proof does not match the approved set.",
+    rustVariant: "InvalidExecutorSet",
+  },
   SDK_MALFORMED_DATA: {
     code: 1000,
     domain: "sdk",
@@ -453,6 +495,13 @@ export const INVALID_TRANSITION_DIAGNOSTICS = {
   missing_required_header: "SCRIPT_MISSING_HEADER",
   arithmetic_overflow: "SCRIPT_ARITHMETIC_OVERFLOW",
   unsupported_recovery: "SCRIPT_UNSUPPORTED_RECOVERY",
+  invalid_dao_cell: "SCRIPT_INVALID_DAO_CELL",
+  changed_principal: "SCRIPT_PRINCIPAL_MISMATCH",
+  redirected_compensation: "SCRIPT_PAYOUT_MISMATCH",
+  unauthorized_prepare_executor: "SCRIPT_UNAUTHORIZED_EXECUTOR",
+  compensation_below_minimum: "SCRIPT_COMPENSATION_BELOW_MINIMUM",
+  cycle_limit_reached: "SCRIPT_CYCLE_LIMIT_REACHED",
+  invalid_prepare_executor_set: "SCRIPT_INVALID_EXECUTOR_SET",
 } as const satisfies Record<string, ScriptErrorKey>;
 
 export function getErrorDefinition(key: ErrorKey): ErrorDefinition {

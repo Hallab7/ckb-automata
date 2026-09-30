@@ -94,6 +94,21 @@ export {
 } from "./recurring.ts";
 
 export {
+  DAO_HARVEST_DAO_STATES,
+  DAO_HARVEST_EXECUTOR_SET_DOMAIN,
+  DAO_HARVEST_OPERATIONS,
+  DAO_HARVEST_PAYLOAD_DOMAIN,
+  DAO_HARVEST_PAYLOAD_VERSION,
+  MAX_DAO_HARVEST_PREPARE_EXECUTORS,
+  classifyDaoHarvestCellData,
+  deriveDaoHarvestPayloadHash,
+  derivePrepareExecutorSetHash,
+  normalizePrepareExecutorSet,
+  type DaoHarvestDaoState,
+  type DaoHarvestOperation,
+} from "./dao-harvest.ts";
+
+export {
   ERROR_CATALOG,
   INVALID_TRANSITION_DIAGNOSTICS,
   getErrorDefinition,

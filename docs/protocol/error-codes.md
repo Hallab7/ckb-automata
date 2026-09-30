@@ -26,3 +26,8 @@ New entries must use the next free value in their domain. Existing values and
 meanings are never reused; a retired diagnostic remains reserved. CI rejects
 duplicate values, missing user copy, incomplete planned failures, unmapped
 invalid transitions, and Rust/TypeScript script drift.
+
+DAO Harvest V1 reserves script codes `36` through `42` for its DAO cell,
+principal, payout, prepare-executor, minimum-compensation, cycle-limit, and
+executor-set invariants. The canonical names and plain-language copy remain in
+the TypeScript registry; the Rust enum mirrors the numeric allocations.

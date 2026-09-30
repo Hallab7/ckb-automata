@@ -64,8 +64,24 @@ pub mod generated_recurring {
     include!("../../generated/recurring_v1.rs");
 }
 
+#[allow(
+    clippy::clone_on_copy,
+    clippy::derivable_impls,
+    clippy::if_same_then_else,
+    clippy::manual_is_multiple_of,
+    clippy::needless_borrow,
+    clippy::write_literal
+)]
+pub mod generated_dao_harvest {
+    include!("../../generated/dao_harvest_v1.rs");
+}
+
 pub mod recurring {
     include!("../../shared/recurring.rs");
+}
+
+pub mod dao_harvest {
+    include!("../../shared/dao_harvest.rs");
 }
 
 pub mod execution_witness {
@@ -114,6 +130,9 @@ mod recurring_payout;
 
 #[cfg(test)]
 mod recurring_final;
+
+#[cfg(test)]
+mod dao_harvest_payload;
 
 #[cfg(test)]
 mod conformance;
@@ -219,7 +238,7 @@ mod tests {
     fn native_harness_compiles_and_runs() {
         assert!(native_harness_ready());
         assert_eq!(i8::from(ScriptError::InvalidData), 10);
-        assert_eq!(i8::from(ScriptError::UnsupportedRecovery), 35);
+        assert_eq!(i8::from(ScriptError::InvalidExecutorSet), 42);
     }
 
     #[test]

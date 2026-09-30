@@ -32,3 +32,14 @@ export {
   type RecurringPayloadV1Like,
   type RecurringPayloadV1Value,
 } from "./generated/recurring_v1.ts";
+
+export {
+  Byte32 as DaoHarvestByte32,
+  DAO_HARVEST_V1_SCHEMA_SHA256,
+  DaoHarvestPayloadV1,
+  Uint16 as DaoHarvestUint16,
+  Uint32 as DaoHarvestUint32,
+  Uint64 as DaoHarvestUint64,
+  type DaoHarvestPayloadV1Like,
+  type DaoHarvestPayloadV1Value,
+} from "./generated/dao_harvest_v1.ts";

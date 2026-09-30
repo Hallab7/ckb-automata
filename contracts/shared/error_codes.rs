@@ -27,6 +27,13 @@ pub enum ScriptError {
     MissingHeader = 33,
     ArithmeticOverflow = 34,
     UnsupportedRecovery = 35,
+    InvalidDaoCell = 36,
+    PrincipalMismatch = 37,
+    PayoutMismatch = 38,
+    UnauthorizedExecutor = 39,
+    CompensationBelowMinimum = 40,
+    CycleLimitReached = 41,
+    InvalidExecutorSet = 42,
 }
 
 impl From<ScriptError> for i8 {
