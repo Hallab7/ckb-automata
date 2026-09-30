@@ -90,6 +90,125 @@ export type paths = {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/v1/dao-harvest": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /** List indexed DAO harvest automations */
+        readonly get: operations["DaoHarvestController_list"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/v1/dao-harvest/{jobId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /** Read one DAO harvest automation */
+        readonly get: operations["DaoHarvestController_detail"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/v1/dao-harvest/{jobId}/quote": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /** Read a canonical DAO harvest economics quote */
+        readonly get: operations["DaoHarvestController_quote"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/v1/dao-harvest/exit": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /** Build an unsigned owner exit transaction */
+        readonly post: operations["DaoHarvestController_exit"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/v1/dao-harvest/recover": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /** Build an unsigned owner recovery transaction */
+        readonly post: operations["DaoHarvestController_recover"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/v1/dao-harvest/setup": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /** Build an unsigned DAO harvest setup transaction */
+        readonly post: operations["DaoHarvestController_setup"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/v1/dao-harvest/stop": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /** Build an unsigned stop-recurrence transaction */
+        readonly post: operations["DaoHarvestController_stop"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/v1/events/stream": {
         readonly parameters: {
             readonly query?: never;
@@ -995,6 +1114,289 @@ export interface operations {
             };
             /** @description Invalid, expired, or already-used authentication proof */
             readonly 401: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly DaoHarvestController_list: {
+        readonly parameters: {
+            readonly query?: {
+                readonly cursor?: string;
+                readonly limit?: number;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        readonly items?: readonly {
+                            readonly economics: Record<string, unknown>;
+                            readonly jobId: string;
+                            readonly ownerLockHash: string;
+                            readonly payoutLockHash: string;
+                            readonly principal: string;
+                            readonly progress: {
+                                readonly completedCycles: string;
+                                readonly totalCycles: string;
+                            };
+                            readonly schedule: {
+                                readonly claimMaturitySince: string | null;
+                                readonly depositEpochSince: string;
+                                readonly prepareCutoffSince: string;
+                                readonly prepareStartSince: string;
+                            };
+                            readonly source: Record<string, unknown>;
+                            /** @enum {string} */
+                            readonly state: "deposited" | "withdrawing" | "claim_ready" | "completed" | "recovery_required";
+                            /** Format: date-time */
+                            readonly updatedAt: string;
+                            readonly vaultOutPoint: Record<string, unknown>;
+                        }[];
+                        readonly page?: Record<string, unknown>;
+                    };
+                };
+            };
+        };
+    };
+    readonly DaoHarvestController_detail: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly jobId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        readonly economics: Record<string, unknown>;
+                        readonly jobId: string;
+                        readonly ownerLockHash: string;
+                        readonly payoutLockHash: string;
+                        readonly principal: string;
+                        readonly progress: {
+                            readonly completedCycles: string;
+                            readonly totalCycles: string;
+                        };
+                        readonly schedule: {
+                            readonly claimMaturitySince: string | null;
+                            readonly depositEpochSince: string;
+                            readonly prepareCutoffSince: string;
+                            readonly prepareStartSince: string;
+                        };
+                        readonly source: Record<string, unknown>;
+                        /** @enum {string} */
+                        readonly state: "deposited" | "withdrawing" | "claim_ready" | "completed" | "recovery_required";
+                        /** Format: date-time */
+                        readonly updatedAt: string;
+                        readonly vaultOutPoint: Record<string, unknown>;
+                    };
+                };
+            };
+            /** @description Malformed job ID */
+            readonly 400: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description DAO harvest automation not found */
+            readonly 404: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly DaoHarvestController_quote: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly jobId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": Record<string, unknown>;
+                };
+            };
+            /** @description Malformed job ID */
+            readonly 400: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description DAO harvest automation not found */
+            readonly 404: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly DaoHarvestController_exit: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": Record<string, unknown>;
+            };
+        };
+        readonly responses: {
+            /** @description Unsigned transaction and review intent */
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Malformed or stale request */
+            readonly 400: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Harvest deployment or chain read unavailable */
+            readonly 503: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly DaoHarvestController_recover: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": Record<string, unknown>;
+            };
+        };
+        readonly responses: {
+            /** @description Unsigned transaction and review intent */
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Malformed or stale request */
+            readonly 400: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Harvest deployment or chain read unavailable */
+            readonly 503: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly DaoHarvestController_setup: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": Record<string, unknown>;
+            };
+        };
+        readonly responses: {
+            /** @description Unsigned transaction and review intent */
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Malformed or stale request */
+            readonly 400: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Harvest deployment or chain read unavailable */
+            readonly 503: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly DaoHarvestController_stop: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": Record<string, unknown>;
+            };
+        };
+        readonly responses: {
+            /** @description Unsigned transaction and review intent */
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Malformed or stale request */
+            readonly 400: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Harvest deployment or chain read unavailable */
+            readonly 503: {
                 headers: {
                     readonly [name: string]: unknown;
                 };

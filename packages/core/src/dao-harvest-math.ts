@@ -80,10 +80,26 @@ export function addEpochs(epoch: Epoch, wholeEpochs: IntegerInput): Epoch {
   return fromFraction(numerator(epoch) + amount * denominator(epoch), denominator(epoch));
 }
 
+export function addEpochFractions(left: Epoch, right: Epoch): Epoch {
+  const divisor = denominator(left) * denominator(right);
+  return fromFraction(
+    numerator(left) * denominator(right) + numerator(right) * denominator(left),
+    divisor,
+  );
+}
+
 export function subtractEpochs(epoch: Epoch, wholeEpochs: IntegerInput): Epoch {
   const amount = BigInt(wholeEpochs);
   if (amount < 0n) throw new RangeError("epoch duration must not be negative");
   return fromFraction(numerator(epoch) - amount * denominator(epoch), denominator(epoch));
+}
+
+export function subtractEpochFractions(left: Epoch, right: Epoch): Epoch {
+  const divisor = denominator(left) * denominator(right);
+  return fromFraction(
+    numerator(left) * denominator(right) - numerator(right) * denominator(left),
+    divisor,
+  );
 }
 
 export function nextDaoBoundary(deposit: Epoch, tip: Epoch): Epoch {

@@ -253,6 +253,109 @@ export const jobEvents = pgTable(
   ],
 );
 
+export const daoHarvestJobs = pgTable(
+  "dao_harvest_jobs",
+  {
+    networkId: varchar("network_id", { length: 64 }).notNull(),
+    jobId: hash("job_id").notNull(),
+    vaultOutpointTxHash: hash("vault_outpoint_tx_hash").notNull(),
+    vaultOutpointIndex: uint32("vault_outpoint_index").notNull(),
+    vaultState: varchar("vault_state", { length: 24 }).notNull(),
+    depositEpochSince: uint64("deposit_epoch_since").notNull(),
+    prepareStartSince: uint64("prepare_start_since").notNull(),
+    prepareCutoffSince: uint64("prepare_cutoff_since").notNull(),
+    claimMaturitySince: uint64("claim_maturity_since"),
+    prepareBlockHash: hash("prepare_block_hash"),
+    prepareBlockNumber: uint64("prepare_block_number"),
+    completedCycles: uint32("completed_cycles").notNull().default("0"),
+    totalCycles: uint32("total_cycles").notNull(),
+    principalCapacity: uint64("principal_capacity").notNull(),
+    payoutLockHash: hash("payout_lock_hash").notNull(),
+    economicsSnapshot: jsonb("economics_snapshot").notNull(),
+    payload: bytea("payload").notNull(),
+    observedBlockNumber: uint64("observed_block_number").notNull(),
+    observedBlockHash: hash("observed_block_hash").notNull(),
+    canonical: boolean("canonical").notNull().default(true),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.networkId, table.jobId] }),
+    foreignKey({
+      columns: [table.networkId, table.jobId],
+      foreignColumns: [jobs.networkId, jobs.jobId],
+    }).onDelete("cascade"),
+    uniqueIndex("dao_harvest_jobs_vault_uq").on(
+      table.networkId,
+      table.vaultOutpointTxHash,
+      table.vaultOutpointIndex,
+    ),
+    index("dao_harvest_jobs_state_schedule_idx").on(
+      table.networkId,
+      table.vaultState,
+      table.prepareStartSince,
+      table.claimMaturitySince,
+    ),
+    check(
+      "dao_harvest_jobs_state_ck",
+      sql`${table.vaultState} IN ('deposited', 'withdrawing', 'claim_ready', 'completed', 'recovery_required')`,
+    ),
+    check(
+      "dao_harvest_jobs_prepare_header_pair_ck",
+      sql`(${table.prepareBlockHash} IS NULL) = (${table.prepareBlockNumber} IS NULL)`,
+    ),
+    check(
+      "dao_harvest_jobs_economics_ck",
+      sql`jsonb_typeof(${table.economicsSnapshot}) = 'object'`,
+    ),
+  ],
+);
+
+export const daoHarvestTransitionAttempts = pgTable(
+  "dao_harvest_transition_attempts",
+  {
+    id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+    networkId: varchar("network_id", { length: 64 }).notNull(),
+    jobId: hash("job_id").notNull(),
+    sequence: uint64("sequence").notNull(),
+    operation: varchar("operation", { length: 24 }).notNull(),
+    state: varchar("state", { length: 24 }).notNull(),
+    txHash: hash("tx_hash"),
+    blockNumber: uint64("block_number"),
+    blockHash: hash("block_hash"),
+    evidence: jsonb("evidence").notNull().default({}),
+    canonical: boolean("canonical").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.networkId, table.jobId],
+      foreignColumns: [daoHarvestJobs.networkId, daoHarvestJobs.jobId],
+    }).onDelete("cascade"),
+    uniqueIndex("dao_harvest_attempts_tx_uq")
+      .on(table.networkId, table.txHash)
+      .where(sql`${table.txHash} IS NOT NULL`),
+    index("dao_harvest_attempts_job_idx").on(
+      table.networkId,
+      table.jobId,
+      table.sequence,
+      table.createdAt,
+    ),
+    check(
+      "dao_harvest_attempts_operation_ck",
+      sql`${table.operation} IN ('setup', 'prepare', 'roll', 'stop', 'exit', 'recover')`,
+    ),
+    check(
+      "dao_harvest_attempts_state_ck",
+      sql`${table.state} IN ('ready', 'submitted', 'committed', 'confirmed', 'conflicted', 'dropped', 'reorged', 'failed')`,
+    ),
+    check(
+      "dao_harvest_attempts_block_pair_ck",
+      sql`(${table.blockNumber} IS NULL) = (${table.blockHash} IS NULL)`,
+    ),
+  ],
+);
+
 export const transactionAttempts = pgTable(
   "transaction_attempts",
   {
@@ -627,6 +730,8 @@ export const schema = {
   authChallenges,
   authSessions,
   canonicalBlocks,
+  daoHarvestJobs,
+  daoHarvestTransitionAttempts,
   deadLetterActions,
   deadLetters,
   demoScenarios,

@@ -116,6 +116,7 @@ export {
 
 export {
   DAO_CYCLE_EPOCHS,
+  addEpochFractions,
   addEpochs,
   calculateDaoHarvestQuote,
   calculateDaoMaximumWithdraw,
@@ -123,6 +124,7 @@ export {
   nextDaoBoundary,
   selectDaoPrepareWindow,
   subtractEpochs,
+  subtractEpochFractions,
   type DaoHarvestQuote,
   type DaoHarvestQuoteInput,
   type DaoPrepareWindow,

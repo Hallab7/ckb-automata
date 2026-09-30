@@ -53,14 +53,18 @@ test("loads paired migrations in numeric order with stable checksums", async () 
   );
 });
 
-test("repository migrations include the five-confirmation testnet policy", async () => {
+test("repository migrations retain confirmation policy and add the harvest projection", async () => {
   const migrations = await loadMigrations();
+  const confirmations = migrations.find(({ version }) => version === 13);
   const latest = migrations.at(-1);
 
-  assert.equal(latest?.version, 13);
-  assert.equal(latest?.name, "testnet_confirmation_depth");
-  assert.match(latest?.upSql ?? "", /confirmation_depth = 5/);
-  assert.match(latest?.downSql ?? "", /confirmation_depth = 24/);
+  assert.equal(confirmations?.name, "testnet_confirmation_depth");
+  assert.match(confirmations?.upSql ?? "", /confirmation_depth = 5/);
+  assert.match(confirmations?.downSql ?? "", /confirmation_depth = 24/);
+  assert.equal(latest?.version, 14);
+  assert.equal(latest?.name, "dao_harvest_projection");
+  assert.match(latest?.upSql ?? "", /CREATE TABLE dao_harvest_jobs/);
+  assert.match(latest?.downSql ?? "", /DROP TABLE IF EXISTS dao_harvest_jobs/);
 });
 
 test("rejects gaps and unpaired migration files", async () => {

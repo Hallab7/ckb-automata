@@ -8,6 +8,11 @@ import { CkbClient, createCkbClient } from "./ckb-client.ts";
 import { AuthController, AuthService } from "./auth.ts";
 import { DatabaseClient, createDatabaseClient } from "./database/client.ts";
 import {
+  DaoHarvestController,
+  DaoHarvestMutationService,
+  DaoHarvestReadService,
+} from "./dao-harvest.ts";
+import {
   ActivityController,
   JobEventStreamController,
   JobEventStreamService,
@@ -66,6 +71,7 @@ Module({
     TransactionController,
     PendingCreationController,
     TransactionProgressController,
+    DaoHarvestController,
   ],
 })(AppModule);
 
@@ -272,6 +278,16 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
         inject: [CkbClient],
         useFactory: (ckbClient: CkbClient) =>
           new TransactionProgressService(environment, ckbClient),
+      },
+      {
+        provide: DaoHarvestReadService,
+        inject: [DatabaseClient],
+        useFactory: (databaseClient: DatabaseClient) =>
+          new DaoHarvestReadService(databaseClient.database, environment.CKB_NETWORK),
+      },
+      {
+        provide: DaoHarvestMutationService,
+        useFactory: () => new DaoHarvestMutationService(),
       },
       {
         provide: PendingCreationService,

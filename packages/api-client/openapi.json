@@ -797,6 +797,290 @@
         "tags": ["authentication"]
       }
     },
+    "/v1/dao-harvest": {
+      "get": {
+        "operationId": "DaoHarvestController_list",
+        "parameters": [
+          { "in": "query", "name": "cursor", "required": false, "schema": { "type": "string" } },
+          { "in": "query", "name": "limit", "required": false, "schema": { "type": "number" } }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "properties": {
+                          "economics": { "type": "object" },
+                          "jobId": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                          "ownerLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                          "payoutLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                          "principal": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                          "progress": {
+                            "properties": {
+                              "completedCycles": {
+                                "pattern": "^(0|[1-9][0-9]*)$",
+                                "type": "string"
+                              },
+                              "totalCycles": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" }
+                            },
+                            "required": ["completedCycles", "totalCycles"],
+                            "type": "object"
+                          },
+                          "schedule": {
+                            "properties": {
+                              "claimMaturitySince": {
+                                "nullable": true,
+                                "pattern": "^(0|[1-9][0-9]*)$",
+                                "type": "string"
+                              },
+                              "depositEpochSince": {
+                                "pattern": "^(0|[1-9][0-9]*)$",
+                                "type": "string"
+                              },
+                              "prepareCutoffSince": {
+                                "pattern": "^(0|[1-9][0-9]*)$",
+                                "type": "string"
+                              },
+                              "prepareStartSince": {
+                                "pattern": "^(0|[1-9][0-9]*)$",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "depositEpochSince",
+                              "prepareStartSince",
+                              "prepareCutoffSince",
+                              "claimMaturitySince"
+                            ],
+                            "type": "object"
+                          },
+                          "source": { "type": "object" },
+                          "state": {
+                            "enum": [
+                              "deposited",
+                              "withdrawing",
+                              "claim_ready",
+                              "completed",
+                              "recovery_required"
+                            ],
+                            "type": "string"
+                          },
+                          "updatedAt": { "format": "date-time", "type": "string" },
+                          "vaultOutPoint": { "type": "object" }
+                        },
+                        "required": [
+                          "jobId",
+                          "ownerLockHash",
+                          "state",
+                          "vaultOutPoint",
+                          "schedule",
+                          "progress",
+                          "principal",
+                          "payoutLockHash",
+                          "economics",
+                          "source",
+                          "updatedAt"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "page": { "type": "object" }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "List indexed DAO harvest automations",
+        "tags": ["DAO harvest"]
+      }
+    },
+    "/v1/dao-harvest/exit": {
+      "post": {
+        "operationId": "DaoHarvestController_exit",
+        "parameters": [],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "type": "object" } } },
+          "required": true
+        },
+        "responses": {
+          "200": { "description": "Unsigned transaction and review intent" },
+          "400": { "description": "Malformed or stale request" },
+          "503": { "description": "Harvest deployment or chain read unavailable" }
+        },
+        "summary": "Build an unsigned owner exit transaction",
+        "tags": ["DAO harvest"]
+      }
+    },
+    "/v1/dao-harvest/recover": {
+      "post": {
+        "operationId": "DaoHarvestController_recover",
+        "parameters": [],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "type": "object" } } },
+          "required": true
+        },
+        "responses": {
+          "200": { "description": "Unsigned transaction and review intent" },
+          "400": { "description": "Malformed or stale request" },
+          "503": { "description": "Harvest deployment or chain read unavailable" }
+        },
+        "summary": "Build an unsigned owner recovery transaction",
+        "tags": ["DAO harvest"]
+      }
+    },
+    "/v1/dao-harvest/setup": {
+      "post": {
+        "operationId": "DaoHarvestController_setup",
+        "parameters": [],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "type": "object" } } },
+          "required": true
+        },
+        "responses": {
+          "200": { "description": "Unsigned transaction and review intent" },
+          "400": { "description": "Malformed or stale request" },
+          "503": { "description": "Harvest deployment or chain read unavailable" }
+        },
+        "summary": "Build an unsigned DAO harvest setup transaction",
+        "tags": ["DAO harvest"]
+      }
+    },
+    "/v1/dao-harvest/stop": {
+      "post": {
+        "operationId": "DaoHarvestController_stop",
+        "parameters": [],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "type": "object" } } },
+          "required": true
+        },
+        "responses": {
+          "200": { "description": "Unsigned transaction and review intent" },
+          "400": { "description": "Malformed or stale request" },
+          "503": { "description": "Harvest deployment or chain read unavailable" }
+        },
+        "summary": "Build an unsigned stop-recurrence transaction",
+        "tags": ["DAO harvest"]
+      }
+    },
+    "/v1/dao-harvest/{jobId}": {
+      "get": {
+        "operationId": "DaoHarvestController_detail",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "economics": { "type": "object" },
+                    "jobId": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                    "ownerLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                    "payoutLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                    "principal": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                    "progress": {
+                      "properties": {
+                        "completedCycles": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                        "totalCycles": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" }
+                      },
+                      "required": ["completedCycles", "totalCycles"],
+                      "type": "object"
+                    },
+                    "schedule": {
+                      "properties": {
+                        "claimMaturitySince": {
+                          "nullable": true,
+                          "pattern": "^(0|[1-9][0-9]*)$",
+                          "type": "string"
+                        },
+                        "depositEpochSince": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                        "prepareCutoffSince": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                        "prepareStartSince": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" }
+                      },
+                      "required": [
+                        "depositEpochSince",
+                        "prepareStartSince",
+                        "prepareCutoffSince",
+                        "claimMaturitySince"
+                      ],
+                      "type": "object"
+                    },
+                    "source": { "type": "object" },
+                    "state": {
+                      "enum": [
+                        "deposited",
+                        "withdrawing",
+                        "claim_ready",
+                        "completed",
+                        "recovery_required"
+                      ],
+                      "type": "string"
+                    },
+                    "updatedAt": { "format": "date-time", "type": "string" },
+                    "vaultOutPoint": { "type": "object" }
+                  },
+                  "required": [
+                    "jobId",
+                    "ownerLockHash",
+                    "state",
+                    "vaultOutPoint",
+                    "schedule",
+                    "progress",
+                    "principal",
+                    "payoutLockHash",
+                    "economics",
+                    "source",
+                    "updatedAt"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": { "description": "Malformed job ID" },
+          "404": { "description": "DAO harvest automation not found" }
+        },
+        "summary": "Read one DAO harvest automation",
+        "tags": ["DAO harvest"]
+      }
+    },
+    "/v1/dao-harvest/{jobId}/quote": {
+      "get": {
+        "operationId": "DaoHarvestController_quote",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": { "application/json": { "schema": { "type": "object" } } },
+            "description": ""
+          },
+          "400": { "description": "Malformed job ID" },
+          "404": { "description": "DAO harvest automation not found" }
+        },
+        "summary": "Read a canonical DAO harvest economics quote",
+        "tags": ["DAO harvest"]
+      }
+    },
     "/v1/events/stream": {
       "get": {
         "operationId": "JobEventStreamController_stream",

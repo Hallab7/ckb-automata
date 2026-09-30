@@ -15,6 +15,8 @@ import type { CkbReadClient } from "../ckb-client.ts";
 import type { AutomataDatabase } from "../database/client.ts";
 import {
   canonicalBlocks,
+  daoHarvestJobs,
+  daoHarvestTransitionAttempts,
   indexerCheckpoints,
   jobEvents,
   jobs,
@@ -196,6 +198,26 @@ export class JobProjectionRollback {
             ),
           );
       }
+      await transaction
+        .update(daoHarvestJobs)
+        .set({ canonical: false, updatedAt: orphanedAt })
+        .where(
+          and(
+            eq(daoHarvestJobs.networkId, targetNetwork),
+            eq(daoHarvestJobs.canonical, true),
+            gt(daoHarvestJobs.observedBlockNumber, parentNumber.toString()),
+          ),
+        );
+      await transaction
+        .update(daoHarvestTransitionAttempts)
+        .set({ canonical: false, state: "reorged", updatedAt: orphanedAt })
+        .where(
+          and(
+            eq(daoHarvestTransitionAttempts.networkId, targetNetwork),
+            eq(daoHarvestTransitionAttempts.canonical, true),
+            gt(daoHarvestTransitionAttempts.blockNumber, parentNumber.toString()),
+          ),
+        );
 
       let restoredJobs = 0;
       let orphanedJobs = 0;

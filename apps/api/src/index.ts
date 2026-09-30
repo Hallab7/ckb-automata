@@ -179,6 +179,23 @@ export {
 } from "./network-metadata.ts";
 export { createOpenApiDocument } from "./openapi.ts";
 export {
+  DAO_HARVEST_READ_STATES,
+  DaoHarvestController,
+  DaoHarvestMutationService,
+  DaoHarvestReadService,
+  type DaoHarvestListResponse,
+  type DaoHarvestMutationAdapter,
+  type DaoHarvestQuoteReadModel,
+  type DaoHarvestReadModel,
+  type DaoHarvestReadState,
+  type DaoHarvestUnsignedBuild,
+} from "./dao-harvest.ts";
+export {
+  extractDaoHarvestProjections,
+  type DaoHarvestProjection,
+  type DaoHarvestProjectionExtraction,
+} from "./indexer/dao-harvest-projection.ts";
+export {
   JOB_QUOTE_ASSUMPTIONS,
   JobQuoteController,
   JobQuoteService,
