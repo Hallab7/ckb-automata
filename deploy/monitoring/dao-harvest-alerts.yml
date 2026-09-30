@@ -1,0 +1,35 @@
+groups:
+  - name: ckb-automata-dao-harvest
+    rules:
+      - alert: DaoHarvestPreparationWindowMissed
+        expr: increase(automata_dao_harvest_missed_windows_total[15m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: A DAO harvest preparation window was missed
+          runbook: docs/operations/dao-harvest.md#missed-preparation-window
+      - alert: DaoHarvestRecoveryRequired
+        expr: increase(automata_dao_harvest_recovery_required_total[15m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: A DAO harvest automation requires owner recovery
+          runbook: docs/operations/dao-harvest.md#owner-recovery
+      - alert: DaoHarvestActionOverdue
+        expr: automata_dao_harvest_next_action_seconds < -300
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: A DAO harvest action is more than five minutes overdue
+          runbook: docs/operations/dao-harvest.md#operator-controls
+      - alert: DaoHarvestTransitionFailures
+        expr: increase(automata_dao_harvest_transitions_total{outcome="failed"}[15m]) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: DAO harvest transition failures are repeating
+          runbook: docs/operations/dao-harvest.md#incident-runbooks

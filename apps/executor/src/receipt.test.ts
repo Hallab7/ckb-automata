@@ -20,6 +20,7 @@ const ATTEMPT = Object.freeze({
   state: "committed",
   submittedAt: new Date("2026-09-23T14:00:00.000Z"),
   committedBlockNumber: "100",
+  automation: Object.freeze({ policy: "dao_harvest", operation: "prepare" }),
 } satisfies ConfirmationAttempt);
 const TRANSITION = Object.freeze({
   state: "confirmed",
@@ -55,6 +56,7 @@ test("signed executor receipts are portable and explicitly non-authoritative", (
   assert.equal(receipt.payload.outcome.state, "confirmed");
   assert.equal(receipt.payload.chain.block?.number, "100");
   assert.equal(receipt.payload.software.revision, "1234567");
+  assert.deepEqual(receipt.payload.automation, { policy: "dao_harvest", operation: "prepare" });
   assert.equal(verifyExecutorReceipt(receipt), true);
 
   const tamperedPayload = {
@@ -65,6 +67,15 @@ test("signed executor receipts are portable and explicitly non-authoritative", (
     },
   };
   assert.equal(verifyExecutorReceipt(tamperedPayload), false);
+
+  const changedOperation = {
+    ...receipt,
+    payload: {
+      ...receipt.payload,
+      automation: { policy: "dao_harvest" as const, operation: "roll" as const },
+    },
+  };
+  assert.equal(verifyExecutorReceipt(changedOperation), false);
 
   const last = receipt.signature.at(-1);
   assert.ok(last);

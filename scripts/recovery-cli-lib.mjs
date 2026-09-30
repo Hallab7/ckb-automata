@@ -11,6 +11,7 @@ import {
   parseOutPoint,
   validateDeploymentManifest,
 } from "../packages/core/src/index.ts";
+import { executeDaoHarvestRecoveryCli } from "./dao-harvest-recovery-cli-lib.mjs";
 
 function json(value) {
   return JSON.stringify(
@@ -199,6 +200,9 @@ export async function executeRecoveryCli(
   argv,
   { fetchImpl = globalThis.fetch, writeFileImpl = writeFile } = {},
 ) {
+  if (argv[0]?.startsWith("harvest-")) {
+    return executeDaoHarvestRecoveryCli(argv, { fetchImpl, writeFileImpl });
+  }
   if (typeof fetchImpl !== "function") throw new TypeError("fetch is required");
   const { command, values } = parseCommand(argv);
   const deployment = await loadDeployment(requireOption(values, "manifest"));

@@ -25,6 +25,10 @@ test("publishes every Section 18 metric with bounded labels", async () => {
   metrics.rpcErrorsTotal.inc({ endpoint: "rpc", method: "get_tip_header" });
   metrics.rewardsEarnedShannonsTotal.inc(100);
   metrics.webhookDeliveriesTotal.inc({ outcome: "delivered" });
+  metrics.daoHarvestTransitionsTotal.inc({ operation: "prepare", outcome: "confirmed" });
+  metrics.daoHarvestMissedWindowsTotal.inc();
+  metrics.daoHarvestRecoveryRequiredTotal.inc();
+  metrics.daoHarvestNextActionSeconds.set({ state: "deposited" }, 3600);
 
   const rendered = await metrics.render();
   for (const name of AUTOMATA_METRIC_NAMES) assert.match(rendered, new RegExp(`\\b${name}`));

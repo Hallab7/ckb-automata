@@ -40,6 +40,10 @@ export interface CellDepIdentity {
   readonly depType: "code" | "depGroup";
 }
 
+export function scriptIdentityHash(script: ScriptIdentity): Hash32 {
+  return parseHash32(scriptToHash(script));
+}
+
 export interface DeployedContract {
   readonly codeHash: Hash32;
   readonly hashType: ScriptHashType;

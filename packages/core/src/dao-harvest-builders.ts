@@ -186,6 +186,30 @@ export interface DaoHarvestOwnerExitInput extends DaoHarvestOwnerBuildInput {
   readonly depositBlockNumber: IntegerInput;
 }
 
+export interface DaoHarvestMatureRecoveryInput {
+  readonly deployment: DaoHarvestDeployment;
+  readonly expectedGenesisHash: Hash32;
+  readonly resolver: LiveCellResolver;
+  readonly vaultOutPoint: OutPoint;
+  readonly ownerOutPoint: OutPoint;
+  readonly ownerLock: ScriptIdentity;
+  readonly ownerLockHash: Hash32;
+  readonly depositHeaderHash: Hash32;
+  readonly prepareHeaderHash: Hash32;
+  readonly depositAccumulatedRate: IntegerInput;
+  readonly withdrawingAccumulatedRate: IntegerInput;
+  readonly vaultOccupiedCapacity: IntegerInput;
+  readonly claimSince: IntegerInput;
+  readonly currentEpochSince: IntegerInput;
+}
+
+export interface DaoHarvestMatureRecoveryBuild {
+  readonly transaction: UnsignedTransaction;
+  readonly signingEntries: readonly DaoHarvestSigningEntry[];
+  readonly intent: Readonly<Record<string, string | number | boolean>>;
+  readonly vaultLockHash: Hash32;
+}
+
 function deploymentScript(contract: DaoHarvestContractDeployment, args: Hex): ScriptIdentity {
   return Object.freeze({ ...contract.script, args });
 }
@@ -1053,4 +1077,104 @@ export function buildDaoHarvestRecovery(
   input: DaoHarvestOwnerBuildInput,
 ): Promise<DaoHarvestTransitionBuild> {
   return buildOwnerJobRefund(input, "recovery", "0x02");
+}
+
+export async function buildDaoHarvestMatureRecovery(
+  inputValue: DaoHarvestMatureRecoveryInput,
+): Promise<DaoHarvestMatureRecoveryBuild> {
+  assertNetwork(inputValue.deployment, inputValue.expectedGenesisHash);
+  const claimEpoch = decodeAbsoluteEpochSince(inputValue.claimSince);
+  const currentEpoch = decodeAbsoluteEpochSince(inputValue.currentEpochSince);
+  if (compareEpochFractions(currentEpoch, claimEpoch) < 0) {
+    throw new DaoHarvestBuilderError(
+      "INVALID_HEADER",
+      "mature recovery cannot be built before the DAO claim epoch",
+    );
+  }
+  const [vault, ownerCell] = await Promise.all([
+    resolveRequired(inputValue.resolver, inputValue.vaultOutPoint, "vault"),
+    resolveRequired(inputValue.resolver, inputValue.ownerOutPoint, "owner"),
+  ]);
+  const ownerHash = parseHash32(inputValue.ownerLockHash);
+  const vaultLockArgs = hexToBytes(vault.output.lock.args);
+  const committedOwner =
+    vaultLockArgs.length === 128 ? bytesToHex(vaultLockArgs.slice(32, 64)) : null;
+  const expectedVaultScript = inputValue.deployment.vaultLock.script;
+  const expectedDaoType = deploymentScript(inputValue.deployment.daoType, "0x");
+  if (
+    vault.output.lock.codeHash !== expectedVaultScript.codeHash ||
+    vault.output.lock.hashType !== expectedVaultScript.hashType ||
+    committedOwner !== ownerHash ||
+    !sameScript(vault.output.type, expectedDaoType) ||
+    scriptToHash(inputValue.ownerLock) !== ownerHash ||
+    scriptToHash(ownerCell.output.lock) !== ownerHash
+  ) {
+    throw new DaoHarvestBuilderError(
+      "INVALID_CELL",
+      "mature recovery input does not match the committed owner",
+    );
+  }
+  const vaultData = typeof vault.data === "string" ? hexToBytes(vault.data) : vault.data;
+  if (vaultData.length !== 8 || vaultData.every((byte) => byte === 0)) {
+    throw new DaoHarvestBuilderError(
+      "INVALID_CELL",
+      "mature recovery requires a withdrawing DAO vault",
+    );
+  }
+  const maximum = calculateDaoMaximumWithdraw({
+    principal: vault.output.capacity,
+    occupiedCapacity: inputValue.vaultOccupiedCapacity,
+    depositAccumulatedRate: inputValue.depositAccumulatedRate,
+    withdrawingAccumulatedRate: inputValue.withdrawingAccumulatedRate,
+  });
+  const transaction: UnsignedTransaction = Object.freeze({
+    version: "0x0",
+    cellDeps: Object.freeze([
+      inputValue.deployment.secp256k1Blake160.cellDep,
+      inputValue.deployment.vaultLock.cellDep,
+      inputValue.deployment.daoType.cellDep,
+    ]),
+    headerDeps: Object.freeze([
+      parseHash32(inputValue.depositHeaderHash),
+      parseHash32(inputValue.prepareHeaderHash),
+    ]),
+    inputs: Object.freeze([
+      cellInput(inputValue.vaultOutPoint, BigInt(inputValue.claimSince)),
+      cellInput(inputValue.ownerOutPoint),
+    ]),
+    outputs: Object.freeze([
+      Object.freeze({
+        capacity: toRpcHex(maximum),
+        lock: inputValue.ownerLock,
+        type: null,
+      }),
+      Object.freeze({
+        capacity: toRpcHex(parseShannons(ownerCell.output.capacity)),
+        lock: inputValue.ownerLock,
+        type: null,
+      }),
+    ]),
+    outputsData: Object.freeze(["0x" as Hex, "0x" as Hex]),
+    witnesses: Object.freeze([
+      serializeWitnessArgs({
+        lock: bytesToHex(Uint8Array.of(1, DAO_HARVEST_OPERATIONS.OWNER_RECOVER)),
+        inputType: "",
+        outputType: "",
+      }) as Hex,
+      "0x" as Hex,
+    ]),
+  });
+  return Object.freeze({
+    transaction,
+    signingEntries: Object.freeze<DaoHarvestSigningEntry[]>([
+      { role: "owner", inputIndexes: Object.freeze([1]), lockHash: ownerHash },
+    ]),
+    intent: Object.freeze({
+      kind: "mature_recovery",
+      paysExecutorReward: false,
+      returnsMaximumWithdraw: maximum.toString(),
+      terminatesAutomation: true,
+    }),
+    vaultLockHash: parseHash32(scriptToHash(vault.output.lock)),
+  });
 }

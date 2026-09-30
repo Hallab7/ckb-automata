@@ -2,6 +2,8 @@ export {
   AUTOMATA_METRIC_NAMES,
   AutomataMetrics,
   type AttemptMetricLabels,
+  type DaoHarvestNextActionMetricLabels,
+  type DaoHarvestTransitionMetricLabels,
   type QueueMetricLabels,
   type RpcErrorMetricLabels,
   type WebhookMetricLabels,

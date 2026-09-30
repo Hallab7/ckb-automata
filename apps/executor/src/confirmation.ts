@@ -20,6 +20,10 @@ export interface ConfirmationAttempt {
   readonly state: "submitted" | "proposed" | "committed" | "reorged";
   readonly submittedAt: Date;
   readonly committedBlockNumber?: string;
+  readonly automation?: {
+    readonly policy: "dao_harvest";
+    readonly operation: "prepare" | "roll";
+  };
 }
 
 export interface ConfirmationInclusion {

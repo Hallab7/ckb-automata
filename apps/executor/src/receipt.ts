@@ -35,6 +35,10 @@ export interface ExecutorReceiptPayload {
   readonly sequence: string;
   readonly attemptId: string;
   readonly transactionHash: Hash32;
+  readonly automation?: {
+    readonly policy: "dao_harvest";
+    readonly operation: "prepare" | "roll";
+  };
   readonly executor: {
     readonly lockHash: Hash32;
     readonly lock: ScriptIdentity;
@@ -143,6 +147,9 @@ export function verifyExecutorReceipt(receipt: ExecutorReceipt): boolean {
       payload.timestamps.submittedAt > payload.timestamps.issuedAt ||
       !VERSION_PATTERN.test(payload.software.version) ||
       !REVISION_PATTERN.test(payload.software.revision) ||
+      (payload.automation !== undefined &&
+        (payload.automation.policy !== "dao_harvest" ||
+          !["prepare", "roll"].includes(payload.automation.operation))) ||
       receipt.createdAt.toISOString() !== payload.timestamps.issuedAt
     ) {
       return false;
@@ -245,6 +252,7 @@ export class ExecutorReceiptSigner implements ConfirmationReceiptIssuer {
       sequence: attempt.sequence,
       attemptId: attempt.attemptId,
       transactionHash: attempt.transactionHash,
+      ...(attempt.automation === undefined ? {} : { automation: attempt.automation }),
       executor: Object.freeze({
         lockHash: this.#executorLockHash,
         lock: this.#executorLock,

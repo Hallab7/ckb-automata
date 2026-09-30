@@ -185,6 +185,30 @@ test("shutdown rejects new work and waits for active work before closing the cha
   assert.equal(result.runtime.readiness().status, "stopped");
 });
 
+test("pause blocks new work while preserving active chain access and supports resume", async () => {
+  const chain = chainFixture();
+  const result = await createExecutorApplication(environment(), {
+    createChainClient: () => chain.client,
+    enableConfirmationWorkers: false,
+    enableEligibilityWorkers: false,
+    queues: readyQueues,
+    writer: () => undefined,
+  });
+  try {
+    result.runtime.pause("scheduled operator maintenance", "operator-a");
+    assert.equal(result.runtime.readiness().status, "paused");
+    await assert.rejects(
+      result.runtime.run(async () => "late"),
+      /not accepting work/,
+    );
+    await assert.rejects(result.runtime.getTipHeader(), /tip header is not used/);
+    result.runtime.resume("operator-a");
+    assert.equal(await result.runtime.run(async () => "accepted"), "accepted");
+  } finally {
+    await result.app.close();
+  }
+});
+
 test("invalid configuration prevents context creation", async () => {
   let creations = 0;
   await assert.rejects(

@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { DaoHarvestPayloadV1, JobDataV1 } from "@ckb-automata/molecule";
-import { hexToBytes } from "@nervosnetwork/ckb-sdk-utils";
+import { hexToBytes, scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
 
 import { createEpoch, parseHash32, parseOutPoint } from "./chain-values.ts";
 import {
   DaoHarvestBuilderError,
+  buildDaoHarvestMatureRecovery,
   buildDaoHarvestPrepare,
   buildDaoHarvestSetup,
   type DaoHarvestDeployment,
@@ -136,5 +137,80 @@ test("prepare rejects a spent vault outpoint before constructing a transaction",
       claimSince: encodeAbsoluteEpochSince(createEpoch({ number: 380n, index: 0n, length: 0n })),
     }),
     (error) => error instanceof DaoHarvestBuilderError && error.code === "STALE_OUTPOINT",
+  );
+});
+
+test("mature owner recovery returns the full DAO withdrawal and terminates the job", async () => {
+  const ownerLock = { codeHash: hash("1"), hashType: "type" as const, args: "0x1234" as const };
+  const ownerLockHash = parseHash32(scriptToHash(ownerLock));
+  const setup = buildDaoHarvestSetup(setupInput({ ownerLockHash, payoutLockHash: hash("7") }));
+  const vaultOutPoint = parseOutPoint({ txHash: hash("a"), index: "0" });
+  const ownerOutPoint = parseOutPoint({ txHash: hash("c"), index: "2" });
+  const cells = new Map([
+    [
+      `${vaultOutPoint.txHash}:${vaultOutPoint.index}`,
+      {
+        outPoint: vaultOutPoint,
+        output: setup.transaction.outputs[0]!,
+        data: "0x6400000000000000" as const,
+      },
+    ],
+    [
+      `${ownerOutPoint.txHash}:${ownerOutPoint.index}`,
+      {
+        outPoint: ownerOutPoint,
+        output: { capacity: 7_000_000_000n, lock: ownerLock, type: null },
+        data: "0x" as const,
+      },
+    ],
+  ]);
+  const claimSince = encodeAbsoluteEpochSince(createEpoch({ number: 380n, index: 0n, length: 0n }));
+  const build = await buildDaoHarvestMatureRecovery({
+    deployment,
+    expectedGenesisHash: deployment.genesisHash,
+    resolver: {
+      resolve: async (outPoint) => cells.get(`${outPoint.txHash}:${outPoint.index}`) ?? null,
+    },
+    vaultOutPoint,
+    ownerOutPoint,
+    ownerLock,
+    ownerLockHash,
+    depositHeaderHash: hash("d"),
+    prepareHeaderHash: hash("e"),
+    depositAccumulatedRate: 1_000n,
+    withdrawingAccumulatedRate: 1_100n,
+    vaultOccupiedCapacity: 6_100_000_000n,
+    claimSince,
+    currentEpochSince: claimSince,
+  });
+  assert.equal(build.transaction.inputs[0]?.since, `0x${claimSince.toString(16)}`);
+  assert.equal(build.transaction.outputs[0]?.capacity, "0x26b4ad180");
+  assert.equal(build.transaction.outputs[0]?.lock, ownerLock);
+  assert.equal(build.transaction.outputs[0]?.type, null);
+  assert.equal(build.intent["kind"], "mature_recovery");
+  assert.equal(build.intent["paysExecutorReward"], false);
+
+  await assert.rejects(
+    buildDaoHarvestMatureRecovery({
+      deployment,
+      expectedGenesisHash: deployment.genesisHash,
+      resolver: {
+        resolve: async (outPoint) => cells.get(`${outPoint.txHash}:${outPoint.index}`) ?? null,
+      },
+      vaultOutPoint,
+      ownerOutPoint,
+      ownerLock,
+      ownerLockHash,
+      depositHeaderHash: hash("d"),
+      prepareHeaderHash: hash("e"),
+      depositAccumulatedRate: 1_000n,
+      withdrawingAccumulatedRate: 1_100n,
+      vaultOccupiedCapacity: 6_100_000_000n,
+      claimSince,
+      currentEpochSince: encodeAbsoluteEpochSince(
+        createEpoch({ number: 379n, index: 0n, length: 0n }),
+      ),
+    }),
+    (error) => error instanceof DaoHarvestBuilderError && error.code === "INVALID_HEADER",
   );
 });

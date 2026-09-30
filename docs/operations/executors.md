@@ -53,3 +53,6 @@ pnpm deploy:verify:public-runtime
 
 Never rotate both operators simultaneously. A key change affects only executor-owned fee cells and
 receipt identity; it does not require user jobs or owner wallets to migrate.
+
+DAO harvest pause, dead-letter, alert, and independent owner recovery procedures are documented in
+[DAO Harvest Operations](./dao-harvest.md).

@@ -151,7 +151,18 @@ export {
   type DaoHarvestSetupInput,
   type DaoHarvestSigningEntry,
   type DaoHarvestTransitionBuild,
+  type DaoHarvestMatureRecoveryInput,
+  type DaoHarvestMatureRecoveryBuild,
+  buildDaoHarvestMatureRecovery,
 } from "./dao-harvest-builders.ts";
+
+export {
+  planDaoHarvestRecovery,
+  type DaoHarvestOwnerAction,
+  type DaoHarvestRecoveryCondition,
+  type DaoHarvestRecoveryPlan,
+  type DaoHarvestRecoveryStatus,
+} from "./dao-harvest-recovery.ts";
 
 export {
   ERROR_CATALOG,
@@ -174,6 +185,7 @@ export {
 export {
   DEPLOYED_CONTRACT_NAMES,
   inspectJobData,
+  scriptIdentityHash,
   validateDeploymentManifest,
   type CellDepIdentity,
   type DeployedContract,

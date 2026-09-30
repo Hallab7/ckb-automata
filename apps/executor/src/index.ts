@@ -3,6 +3,14 @@ import { WORKSPACE_NAME } from "@ckb-automata/core";
 export const EXECUTOR_APP_ID = `${WORKSPACE_NAME}:executor` as const;
 
 export {
+  daoHarvestOperationalSignal,
+  inspectDaoHarvestDeadLetter,
+  type DaoHarvestDeadLetterInspection,
+  type DaoHarvestOperationalEvent,
+  type DaoHarvestOperationalSignal,
+} from "./dao-harvest-operations.ts";
+
+export {
   DAO_HARVEST_MAX_WAKE_DELAY_MS,
   DAO_HARVEST_MIN_WAKE_DELAY_MS,
   DaoHarvestScheduler,

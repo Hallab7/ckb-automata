@@ -21,6 +21,10 @@ export const AUTOMATA_METRIC_NAMES = Object.freeze([
   "automata_rpc_errors_total",
   "automata_rewards_earned_shannons_total",
   "automata_webhook_deliveries_total",
+  "automata_dao_harvest_transitions_total",
+  "automata_dao_harvest_missed_windows_total",
+  "automata_dao_harvest_recovery_required_total",
+  "automata_dao_harvest_next_action_seconds",
 ] as const);
 
 export interface AttemptMetricLabels {
@@ -39,6 +43,15 @@ export interface RpcErrorMetricLabels {
 
 export interface WebhookMetricLabels {
   readonly outcome: string;
+}
+
+export interface DaoHarvestTransitionMetricLabels {
+  readonly operation: "prepare" | "roll" | "owner_exit";
+  readonly outcome: "confirmed" | "failed" | "reorged" | "conflicted";
+}
+
+export interface DaoHarvestNextActionMetricLabels {
+  readonly state: "deposited" | "withdrawing" | "claim_ready";
 }
 
 function counter<T extends string>(
@@ -73,6 +86,10 @@ export class AutomataMetrics {
   readonly rpcErrorsTotal: Counter<"endpoint" | "method">;
   readonly rewardsEarnedShannonsTotal: Counter;
   readonly webhookDeliveriesTotal: Counter<"outcome">;
+  readonly daoHarvestTransitionsTotal: Counter<"operation" | "outcome">;
+  readonly daoHarvestMissedWindowsTotal: Counter;
+  readonly daoHarvestRecoveryRequiredTotal: Counter;
+  readonly daoHarvestNextActionSeconds: Gauge<"state">;
 
   constructor(registry = new Registry()) {
     this.registry = registry;
@@ -130,6 +147,24 @@ export class AutomataMetrics {
       name: "automata_webhook_deliveries_total",
       help: "Webhook delivery attempts by outcome",
       labelNames: ["outcome"],
+    });
+    this.daoHarvestTransitionsTotal = counter(registry, {
+      name: "automata_dao_harvest_transitions_total",
+      help: "DAO harvest transitions by bounded operation and outcome",
+      labelNames: ["operation", "outcome"],
+    });
+    this.daoHarvestMissedWindowsTotal = counter(registry, {
+      name: "automata_dao_harvest_missed_windows_total",
+      help: "DAO harvest preparation windows missed by compliant executors",
+    });
+    this.daoHarvestRecoveryRequiredTotal = counter(registry, {
+      name: "automata_dao_harvest_recovery_required_total",
+      help: "DAO harvest jobs that require an owner recovery action",
+    });
+    this.daoHarvestNextActionSeconds = gauge(registry, {
+      name: "automata_dao_harvest_next_action_seconds",
+      help: "Seconds until the next DAO harvest action by canonical vault state",
+      labelNames: ["state"],
     });
   }
 

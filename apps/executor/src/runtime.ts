@@ -7,7 +7,8 @@ import type { AutomataEnvironment } from "@ckb-automata/config";
 
 import type { ExecutorAdapterRegistry } from "./adapter.ts";
 
-export type ExecutorRuntimeState = "starting" | "ready" | "not_ready" | "draining" | "stopped";
+export type ExecutorRuntimeState =
+  "starting" | "ready" | "paused" | "not_ready" | "draining" | "stopped";
 
 export interface ExecutorReadinessReport {
   readonly status: ExecutorRuntimeState;
@@ -80,33 +81,39 @@ export class ExecutorRuntime implements OnApplicationBootstrap, OnModuleDestroy 
     return this.#registry;
   }
 
+  #assertChainAvailable(): void {
+    if (this.#state !== "ready" && this.#state !== "paused") {
+      throw new Error("executor chain reads require ready or paused state");
+    }
+  }
+
   getTipHeader(): ReturnType<ExecutorChainClient["getTipHeader"]> {
-    if (this.#state !== "ready") throw new Error("executor chain reads require ready state");
+    this.#assertChainAvailable();
     return this.#chain.getTipHeader();
   }
 
   dryRun(...args: Parameters<ExecutorChainClient["dryRun"]>) {
-    if (this.#state !== "ready") throw new Error("executor chain reads require ready state");
+    this.#assertChainAvailable();
     return this.#chain.dryRun(...args);
   }
 
   getCellLive(...args: Parameters<ExecutorChainClient["getCellLive"]>) {
-    if (this.#state !== "ready") throw new Error("executor chain reads require ready state");
+    this.#assertChainAvailable();
     return this.#chain.getCellLive(...args);
   }
 
   findCellsPaged(...args: Parameters<ExecutorChainClient["findCellsPaged"]>) {
-    if (this.#state !== "ready") throw new Error("executor chain reads require ready state");
+    this.#assertChainAvailable();
     return this.#chain.findCellsPaged(...args);
   }
 
   getTransactionStatus(...args: Parameters<ExecutorChainClient["getTransactionStatus"]>) {
-    if (this.#state !== "ready") throw new Error("executor chain reads require ready state");
+    this.#assertChainAvailable();
     return this.#chain.getTransactionStatus(...args);
   }
 
   send(...args: Parameters<ExecutorChainClient["send"]>) {
-    if (this.#state !== "ready") throw new Error("executor submission requires ready state");
+    this.#assertChainAvailable();
     return this.#chain.send(...args);
   }
 
@@ -167,6 +174,33 @@ export class ExecutorRuntime implements OnApplicationBootstrap, OnModuleDestroy 
         this.#idleWaiters.clear();
       }
     }
+  }
+
+  pause(reason: string, operator = "system"): void {
+    if (this.#state === "paused") return;
+    if (this.#state !== "ready") throw new Error("only a ready executor can be paused");
+    const normalizedReason = reason.trim();
+    if (normalizedReason.length < 8 || normalizedReason.length > 256) {
+      throw new TypeError("pause reason must contain 8 to 256 characters");
+    }
+    if (!/^[A-Za-z0-9][A-Za-z0-9._@-]{1,127}$/.test(operator)) {
+      throw new TypeError("pause operator is invalid");
+    }
+    this.#state = "paused";
+    this.#logger.info("executor.paused", "Executor stopped accepting new work", {
+      activeWork: this.#activeWork,
+      operator,
+      reason: normalizedReason,
+    });
+  }
+
+  resume(operator = "system"): void {
+    if (this.#state !== "paused") throw new Error("only a paused executor can be resumed");
+    if (!/^[A-Za-z0-9][A-Za-z0-9._@-]{1,127}$/.test(operator)) {
+      throw new TypeError("resume operator is invalid");
+    }
+    this.#state = "ready";
+    this.#logger.info("executor.resumed", "Executor is accepting work", { operator });
   }
 
   async onModuleDestroy(): Promise<void> {
