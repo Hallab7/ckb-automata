@@ -147,8 +147,13 @@ test("active deployment builds an exact unsigned setup and rejects understated f
     {
       getTipHeader: async () =>
         ({
-          dao: "0x7a14dc7d4756a958b57aabe58b5b2a003e230a79cfe5670a00fcfad744787909",
-          epoch: BigInt("0x708064f00365d"),
+          dao: {
+            c: 6_389_163_654_073_961_728n,
+            ar: 11_922_919_488_376_595n,
+            s: 749_970_336_604_435_714n,
+            u: 682_750_630_500_000_000n,
+          },
+          epoch: { integer: 13_920n, numerator: 1_151n, denominator: 1_800n },
           hash: `0x${"e".repeat(64)}`,
           number: 22_583_952n,
         }) as never,
@@ -178,7 +183,7 @@ test("active deployment builds an exact unsigned setup and rejects understated f
   const projected = extractDaoHarvestProjections(
     {
       header: {
-        epoch: BigInt("0x708064f00365d"),
+        epoch: { integer: 13_920n, numerator: 1_152n, denominator: 1_800n },
         hash: `0x${"ab".repeat(32)}`,
         number: 22_583_953n,
       },

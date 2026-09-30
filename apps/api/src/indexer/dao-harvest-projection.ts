@@ -1,8 +1,8 @@
-import { DaoHarvestPayloadV1, JobDataV1 } from "@ckb-automata/molecule";
 import type { ClientBlock } from "@ckb-ccc/shell";
 import { bytesToHex, hexToBytes, scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
+import { packClientEpoch } from "@ckb-automata/ccc";
 import {
   addEpochFractions,
   decodeAbsoluteEpochSince,
@@ -23,6 +23,7 @@ import {
   type RegisteredDeployment,
   type Shannons,
 } from "@ckb-automata/core";
+import { DaoHarvestPayloadV1, JobDataV1 } from "@ckb-automata/molecule";
 
 import type { AutomataDatabase } from "../database/client.ts";
 import { daoHarvestJobs, jobs } from "../database/schema.ts";
@@ -172,7 +173,9 @@ export function extractDaoHarvestProjections(
             vaultOutPoint: Object.freeze({ txHash, index: parseOutputIndex(BigInt(vaultIndex)) }),
             vaultState: vaultData.every((byte) => byte === 0) ? "deposited" : "withdrawing",
             principalCapacity: parseShannons(vaultOutput.capacity.toString()),
-            depositEpochSince: encodeAbsoluteEpochSince(parseEpoch(block.header.epoch.toString())),
+            depositEpochSince: encodeAbsoluteEpochSince(
+              parseEpoch(packClientEpoch(block.header.epoch)),
+            ),
             prepareStartSince,
             prepareCutoffSince: encodeAbsoluteEpochSince(cutoff),
             claimMaturitySince: sequence % 2n === 1n ? prepareStartSince : null,

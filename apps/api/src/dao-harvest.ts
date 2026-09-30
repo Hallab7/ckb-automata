@@ -27,6 +27,7 @@ import {
 import { and, desc, eq, getTableColumns, lt, or } from "drizzle-orm";
 import { scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
 
+import { clientDaoAccumulatedRate, packClientEpoch } from "@ckb-automata/ccc";
 import {
   DAO_HARVEST_JOB_OCCUPIED_CAPACITY,
   DAO_HARVEST_VAULT_OCCUPIED_CAPACITY,
@@ -218,12 +219,6 @@ function setupRequest(value: unknown): SetupRequest {
   });
 }
 
-function accumulatedRate(daoValue: unknown): bigint {
-  const value = String(daoValue);
-  if (!/^0x[0-9a-f]{64}$/.test(value)) throw new Error("tip DAO field is invalid");
-  return Buffer.from(value.slice(2, 18), "hex").readBigUInt64LE();
-}
-
 export class DaoHarvestTransactionAdapter implements DaoHarvestMutationAdapter {
   readonly #chain: Pick<CkbReadClient, "getTipHeader">;
   readonly #expectedGenesisHash: string;
@@ -258,7 +253,7 @@ export class DaoHarvestTransactionAdapter implements DaoHarvestMutationAdapter {
     }
     const deployment = registeredDaoHarvestDeployment(registered.deployment);
     const tip = await this.#chain.getTipHeader();
-    const tipEpoch = parseEpoch(tip.epoch.toString());
+    const tipEpoch = parseEpoch(packClientEpoch(tip.epoch));
     const anticipatedDepositEpoch = addEpochs(tipEpoch, 1n);
     const window = selectDaoPrepareWindow({
       deposit: anticipatedDepositEpoch,
@@ -267,7 +262,7 @@ export class DaoHarvestTransactionAdapter implements DaoHarvestMutationAdapter {
       confirmationMarginEpochs: CONFIRMATION_MARGIN_EPOCHS,
     });
     const actions = BigInt(request.totalCycles) * 2n;
-    const rate = accumulatedRate(tip.dao);
+    const rate = clientDaoAccumulatedRate(tip.dao);
     const quote = calculateDaoHarvestQuote({
       principal: request.principal,
       occupiedCapacity: DAO_HARVEST_VAULT_OCCUPIED_CAPACITY,

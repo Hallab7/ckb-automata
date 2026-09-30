@@ -166,7 +166,8 @@ fn dao_header(
     accumulated_rate: u64,
 ) -> ckb_testtool::ckb_types::core::HeaderView {
     let mut dao = [0_u8; 32];
-    dao[..8].copy_from_slice(&accumulated_rate.to_le_bytes());
+    dao[..8].copy_from_slice(&7_777_u64.to_le_bytes());
+    dao[8..16].copy_from_slice(&accumulated_rate.to_le_bytes());
     HeaderBuilder::default()
         .number(number)
         .epoch(EpochNumberWithFraction::new(epoch_number, 0, 1).full_value())

@@ -75,3 +75,22 @@ test("valid harvest details pass for a connected funded wallet", async () => {
   );
   assert.deepEqual(errors, {});
 });
+
+test("harvest validation rejects the owner wallet as the compensation address", async () => {
+  const errors = await validateDaoHarvestStep(
+    "details",
+    {
+      ...DAO_HARVEST_INITIAL_DRAFT,
+      payoutAddress: "ckt1owner",
+      principalCkb: "1000",
+    },
+    {
+      balanceShannons: 200_000_000_000n,
+      ownerLockHash: owner,
+      resolveLockHash: async () => owner,
+      walletAddress: "ckt1owner",
+      walletReady: true,
+    },
+  );
+  assert.match(errors["payoutAddress"] ?? "", /different from the owner wallet/);
+});

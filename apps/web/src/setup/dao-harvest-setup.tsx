@@ -112,11 +112,6 @@ function HarvestDetails(context: SetupStepRenderContext) {
         <TextField
           {...error(context, "payoutAddress")}
           autoComplete="off"
-          endAction={{
-            disabled: session.address === undefined,
-            label: "Use mine",
-            onClick: () => context.setField("payoutAddress", session.address ?? ""),
-          }}
           hint="Earned compensation is sent here after each completed harvest."
           label="Compensation address"
           name="payoutAddress"

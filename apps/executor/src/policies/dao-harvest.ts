@@ -1,6 +1,7 @@
 import { DaoHarvestPayloadV1, type DaoHarvestPayloadV1Value } from "@ckb-automata/molecule";
 import { bytesToHex, hexToBytes, scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
 
+import { clientDaoAccumulatedRate } from "@ckb-automata/ccc";
 import {
   DAO_HARVEST_VAULT_OCCUPIED_CAPACITY,
   addEpochFractions,
@@ -267,7 +268,7 @@ function headerRate(value: Hex | undefined): bigint {
   if (!value || !/^0x[0-9a-f]{64}$/.test(value)) {
     throw new DaoHarvestAdapterError("EXECUTOR_MISSING_HEADER", "DAO header data is unavailable");
   }
-  return Buffer.from(value.slice(2, 18), "hex").readBigUInt64LE();
+  return clientDaoAccumulatedRate(value);
 }
 
 function liveResolver(context: ExecutorContext, inspection: DaoHarvestInspection) {

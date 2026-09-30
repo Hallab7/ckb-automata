@@ -11,3 +11,5 @@ export {
   type CkbIndexerTip,
   type CkbReadClient,
 } from "./client.ts";
+export { clientDaoAccumulatedRate, clientDaoHex } from "./dao.ts";
+export { packClientEpoch } from "./epoch.ts";

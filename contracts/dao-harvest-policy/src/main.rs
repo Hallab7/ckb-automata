@@ -459,8 +459,8 @@ fn load_maximum_withdraw(input_index: usize) -> Result<u64, ScriptError> {
     if deposit_dao.len() != 32 || withdrawing_dao.len() != 32 {
         return Err(ScriptError::MissingHeader);
     }
-    let deposit_rate = read_u64(&deposit_dao[..8]);
-    let withdrawing_rate = read_u64(&withdrawing_dao[..8]);
+    let deposit_rate = read_u64(&deposit_dao[8..16]);
+    let withdrawing_rate = read_u64(&withdrawing_dao[8..16]);
     let principal =
         load_cell_capacity(input_index, Source::Input).map_err(|_| ScriptError::InvalidDaoCell)?;
     let occupied = load_cell_occupied_capacity(input_index, Source::Input)

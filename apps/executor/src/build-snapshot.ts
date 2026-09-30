@@ -1,6 +1,7 @@
 import { WitnessArgs, type ClientTransactionResponse } from "@ckb-ccc/shell";
 import { scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
 
+import { clientDaoHex, packClientEpoch } from "@ckb-automata/ccc";
 import {
   inspectJobData,
   parseBlockNumber,
@@ -51,9 +52,9 @@ function headerSnapshot(
   return Object.freeze({
     hash: parseHash32(header.hash),
     number: parseBlockNumber(header.number.toString()),
-    epoch: header.epoch.toString() as `0x${string}`,
+    epoch: `0x${packClientEpoch(header.epoch).toString(16)}`,
     timestamp: header.timestamp.toString() as `0x${string}`,
-    ...(header.dao === undefined ? {} : { dao: header.dao.toString() as `0x${string}` }),
+    ...(header.dao === undefined ? {} : { dao: clientDaoHex(header.dao) }),
   });
 }
 

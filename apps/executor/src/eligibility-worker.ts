@@ -2,6 +2,7 @@ import type { OnApplicationBootstrap, OnModuleDestroy } from "@nestjs/common";
 import { Worker, type Job } from "bullmq";
 import postgres from "postgres";
 
+import { packClientEpoch } from "@ckb-automata/ccc";
 import type { AutomataEnvironment } from "@ckb-automata/config";
 import {
   deploymentRegistry,
@@ -202,7 +203,7 @@ function headerSnapshot(
   return Object.freeze({
     hash: parseHash32(header.hash),
     number: parseBlockNumber(header.number.toString()),
-    epoch: header.epoch.toString() as `0x${string}`,
+    epoch: `0x${packClientEpoch(header.epoch).toString(16)}`,
     timestamp: header.timestamp.toString() as `0x${string}`,
   });
 }
