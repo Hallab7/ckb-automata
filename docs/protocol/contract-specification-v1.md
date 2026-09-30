@@ -7,12 +7,14 @@ binding generation, and the Rust scripts remain authoritative when prose and cod
 cannot be reconciled.
 
 The deployed scripts are `job-lock`, `deadline-policy`, `recurring-policy`,
-`demo-campaign-type`, and `campaign-lock`. V1 is for local development and CKB
-testnet evaluation; no mainnet deployment is supported.
+`demo-campaign-type`, and `campaign-lock`. The testnet-gated DAO extension adds
+the reproducibly built `harvest-vault-lock` and `dao-harvest-policy`; they are not
+part of the current public manifest. V1 is for local development and CKB testnet
+evaluation; no mainnet deployment is supported.
 
-The DAO harvest payload is a checked schema for the planned testnet policy. Its
-vault and policy scripts are not deployed until the contract gate in the focused
-DAO Harvest plan is complete.
+The DAO harvest payload and both scripts have CKB-VM conformance evidence. They
+remain undeployed until every later integration and pilot gate in the focused DAO
+Harvest plan is complete.
 
 ## Encoding and Hashing
 
@@ -27,12 +29,12 @@ DAO Harvest plan is complete.
 
 ## Canonical Schemas
 
-| Type                  | Canonical source                                                   | Fields in order                                                                                                                                                                                                                                                                                                     |
-| --------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `JobDataV1`           | [`job_v1.mol`](../../contracts/schemas/job_v1.mol)                 | `version:u16`, `flags:u16`, `job_id:byte32`, `sequence:u64`, `state:u8`, `trigger_kind:u16`, `trigger_params_hash:byte32`, `policy_script_hash:byte32`, `payload_hash:byte32`, `reward:u64`, `remaining_budget:u64`, `not_before:u64`, `not_after:u64`, `remaining_runs:u32`, `cancel_lock_hash:byte32`             |
-| `RecurringPayloadV1`  | [`recurring_v1.mol`](../../contracts/schemas/recurring_v1.mol)     | `version:u16`, `owner_lock_hash:byte32`, `recipient_lock_hash:byte32`, `amount:u64`, `interval_blocks:u64`, `first_not_before:u64`, `total_runs:u32`, `reward:u64`, `final_refund_kind:u8`                                                                                                                          |
-| `CampaignDataV1`      | [`campaign_v1.mol`](../../contracts/schemas/campaign_v1.mol)       | `version:u16`, `state:u8`, `campaign_id:byte32`, `pledged:u64`, `pledge_count:u32`, `target:u64`, `deadline_since:u64`, `success_lock_hash:byte32`, `refund_commitment:byte32`                                                                                                                                      |
-| `DaoHarvestPayloadV1` | [`dao_harvest_v1.mol`](../../contracts/schemas/dao_harvest_v1.mol) | `version:u16`, `owner_lock_hash:byte32`, `payout_lock_hash:byte32`, `vault_lock_hash:byte32`, `principal_capacity:u64`, `prepare_executor_set_hash:byte32`, `executor_reward:u64`, `min_compensation:u64`, `prepare_buffer_epochs:u64`, `confirmation_margin_epochs:u64`, `total_cycles:u32`, `end_epoch_since:u64` |
+| Type                  | Canonical source                                                   | Fields in order                                                                                                                                                                                                                                                                                                                             |
+| --------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JobDataV1`           | [`job_v1.mol`](../../contracts/schemas/job_v1.mol)                 | `version:u16`, `flags:u16`, `job_id:byte32`, `sequence:u64`, `state:u8`, `trigger_kind:u16`, `trigger_params_hash:byte32`, `policy_script_hash:byte32`, `payload_hash:byte32`, `reward:u64`, `remaining_budget:u64`, `not_before:u64`, `not_after:u64`, `remaining_runs:u32`, `cancel_lock_hash:byte32`                                     |
+| `RecurringPayloadV1`  | [`recurring_v1.mol`](../../contracts/schemas/recurring_v1.mol)     | `version:u16`, `owner_lock_hash:byte32`, `recipient_lock_hash:byte32`, `amount:u64`, `interval_blocks:u64`, `first_not_before:u64`, `total_runs:u32`, `reward:u64`, `final_refund_kind:u8`                                                                                                                                                  |
+| `CampaignDataV1`      | [`campaign_v1.mol`](../../contracts/schemas/campaign_v1.mol)       | `version:u16`, `state:u8`, `campaign_id:byte32`, `pledged:u64`, `pledge_count:u32`, `target:u64`, `deadline_since:u64`, `success_lock_hash:byte32`, `refund_commitment:byte32`                                                                                                                                                              |
+| `DaoHarvestPayloadV1` | [`dao_harvest_v1.mol`](../../contracts/schemas/dao_harvest_v1.mol) | `version:u16`, `owner_lock_hash:byte32`, `payout_lock_hash:byte32`, `vault_lock_hash:byte32`, `dao_type_hash:byte32`, `principal_capacity:u64`, `prepare_executor_set_hash:byte32`, `executor_reward:u64`, `min_compensation:u64`, `prepare_buffer_epochs:u64`, `confirmation_margin_epochs:u64`, `total_cycles:u32`, `end_epoch_since:u64` |
 
 The generated Rust and TypeScript bindings and the JSON fixtures under
 `contracts/fixtures` are checked representations of these sources. See
@@ -64,12 +66,15 @@ authorizes the transaction.
 
 ### Policy and Campaign Payloads
 
-| Script and action               | Witness field | Bytes                                                                                                                 |
-| ------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Recurring policy create/execute | `output_type` | Complete canonical `RecurringPayloadV1`                                                                               |
-| Campaign create                 | `output_type` | Ordered 76-byte pledge records containing `tx_hash:32`, `output_index:u32`, `refund_lock_hash:32`, and `amount:u64`   |
-| Campaign refund finalization    | `input_type`  | The same ordered pledge records committed at creation                                                                 |
-| Deadline policy finalization    | `input_type`  | The Job Lock execute request; the policy reads and independently checks its reward index and executor lock commitment |
+| Script and action               | Witness field | Bytes                                                                                                                  |
+| ------------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Recurring policy create/execute | `output_type` | Complete canonical `RecurringPayloadV1`                                                                                |
+| Campaign create                 | `output_type` | Ordered 76-byte pledge records containing `tx_hash:32`, `output_index:u32`, `refund_lock_hash:32`, and `amount:u64`    |
+| Campaign refund finalization    | `input_type`  | The same ordered pledge records committed at creation                                                                  |
+| Deadline policy finalization    | `input_type`  | The Job Lock execute request; the policy reads and independently checks its reward index and executor lock commitment  |
+| DAO harvest policy              | `output_type` | Canonical `DaoHarvestPayloadV1`, followed on setup and prepare by `count:u8` and that many sorted executor lock hashes |
+| Harvest vault automation        | `lock`        | `mode:0`, operation `0` or `1`, and the bound global Job input index as `u32`                                          |
+| Harvest vault owner exit        | `lock`        | `mode:1` and owner operation `2`, `3`, or `4`; DAO `input_type` remains reserved for the deposit-header index          |
 
 Pledge records are strictly ordered by transaction hash and then output index.
 Their checked amount sum equals `pledged`, their count equals `pledge_count`, and
@@ -124,6 +129,22 @@ their domain-separated hash equals `refund_commitment`.
   exact committed refunds. Both paths retain a terminal campaign marker at only
   its occupied capacity.
 
+### DAO Harvest Vault and Policy
+
+- Vault args bind the immutable Job ID, owner lock hash, and deployed Job Lock
+  hash. Automation spends require that exact co-spent Job Cell; owner spends
+  require a distinct input with the committed owner lock hash.
+- The policy commits the exact vault and Nervos DAO type script hashes. Setup
+  creates one deposited vault cell and an even action count of two per cycle.
+- Prepare requires a canonical approved executor proof and preserves the exact
+  principal, vault lock, and DAO type while changing eight zero data bytes to a
+  withdrawal deposit-block marker.
+- Roll uses the linked deposit and withdrawal headers to calculate maximum DAO
+  withdrawal capacity. It atomically creates a fresh zero-data deposit with the
+  exact principal and one plain payout containing all compensation.
+- Rewards remain in the Job Cell accounting. The vault never pays an executor
+  and does not consume `input_type`, which remains available to the DAO script.
+
 The detailed transition rules are indexed in
 [`job-lock-execution-mode.md`](job-lock-execution-mode.md),
 [`job-lock-owner-mode.md`](job-lock-owner-mode.md),
@@ -150,6 +171,8 @@ builders should still use the order below for deterministic review.
 | Campaign creation            | The campaign is the only output in its type group; pledge records, not transaction outputs, use strict outpoint ordering.                                       |
 | Campaign success             | Canonical Job-controlled order is executor reward, owner refund. The unique success payout and terminal marker are found by lock/type identity.                 |
 | Campaign refund              | Canonical Job-controlled order is executor reward, owner refund. Campaign refunds are contiguous in pledge-record order immediately before the terminal marker. |
+| DAO prepare                  | Canonical order is successor vault, executor reward, successor Job Cell, executor change; scripts locate protected outputs by identity.                         |
+| DAO roll                     | Canonical order is new vault deposit, executor reward, compensation payout, optional owner residual, executor change.                                           |
 
 Executor fee inputs and change are outside the job-controlled set. Their placement
 does not permit omission, duplication, or redirection of contract-controlled value.
@@ -195,6 +218,7 @@ copy and off-chain ranges are in [`error-codes.md`](error-codes.md) and
 | `40` | `CompensationBelowMinimum`   | Gross compensation is below the approved minimum            |
 | `41` | `CycleLimitReached`          | A cycle or end-epoch limit forbids the transition           |
 | `42` | `InvalidExecutorSet`         | The prepare executor proof differs from the approved set    |
+| `43` | `MissingBoundJob`            | A vault spend omitted or substituted its exact Job Cell     |
 
 ## Deployment Manifest
 
@@ -210,7 +234,7 @@ malformed outpoint.
 | `consensus`                               | Active hardfork name and activation epoch                      |
 | `nodeVersion`                             | Node build that accepted the deployment                        |
 | `artifacts.sourceRevision`                | Git revision used for the reproducible contract binaries       |
-| `artifacts.schemaSha256`                  | Aggregate hash of the three canonical Molecule schemas         |
+| `artifacts.schemaSha256`                  | Aggregate hash of the four canonical Molecule schemas          |
 | `secp256k1Blake160`                       | Local signing lock code hash, hash type, and dependency group  |
 | `contracts.<name>.codeHash`               | CKB BLAKE2b-256 data hash of the deployed binary               |
 | `contracts.<name>.hashType`               | `data1` for every V1 contract                                  |

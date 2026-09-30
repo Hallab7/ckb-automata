@@ -74,7 +74,7 @@ test("witness modes and every script error are documented from Rust sources", as
 
   const errors = await readFile(new URL("contracts/shared/error_codes.rs", root), "utf8");
   const variants = [...errors.matchAll(/^\s+([A-Za-z]+) = (\d+),$/gm)];
-  assert.equal(variants.length, 33);
+  assert.equal(variants.length, 34);
   for (const [, variant, code] of variants) {
     assert.match(
       spec,

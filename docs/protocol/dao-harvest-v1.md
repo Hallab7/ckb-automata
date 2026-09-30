@@ -22,10 +22,11 @@ TypeScript bindings and `dao_harvest_payload_v1.json` are checked representation
 | `owner_lock_hash`            | Full lock hash required on a distinct owner input                              |
 | `payout_lock_hash`           | Only lock allowed to receive compensation                                      |
 | `vault_lock_hash`            | Exact Harvest Vault Lock protecting the DAO cell                               |
+| `dao_type_hash`              | Exact deployed Nervos DAO type script required on the protected cell           |
 | `principal_capacity`         | Exact full capacity preserved through prepare and re-deposit                   |
 | `prepare_executor_set_hash`  | Commitment to 1 through 8 sorted, unique approved prepare executor lock hashes |
 | `executor_reward`            | Exact Job-funded reward for each prepare or claim/redeposit action             |
-| `min_compensation`           | Minimum gross compensation required before prepare                             |
+| `min_compensation`           | Minimum gross compensation required for claim and the pre-prepare quote        |
 | `prepare_buffer_epochs`      | Relative epoch duration before a boundary at which prepare opens               |
 | `confirmation_margin_epochs` | Smaller relative epoch duration defining the operational prepare cutoff        |
 | `total_cycles`               | Exact finite number of approved harvest cycles                                 |
@@ -101,22 +102,21 @@ cancel  = 0x01
 recover = 0x02
 ```
 
-The complete canonical `DaoHarvestPayloadV1` bytes are carried in the policy group witness
-`output_type` for setup and every later transition. The policy recomputes and compares the immutable
-payload hash before validating any output.
+The complete canonical `DaoHarvestPayloadV1` bytes are carried first in the policy group witness
+`output_type` for setup and every later transition. During setup and prepare it is followed by the
+executor-set proof: `count:u8 || sorted_unique_lock_hashes`. The policy reads the Molecule total
+size, hashes only those payload bytes, then validates the proof. During roll and owner operations no
+proof bytes follow the payload.
 
 ### Harvest Vault Lock group
 
-The first vault-group witness uses `WitnessArgs.input_type`:
+The first vault-group witness uses `WitnessArgs.lock`. The DAO type script owns
+`WitnessArgs.input_type`, including its deposit-header index during a claim:
 
 ```text
 automation = 0x00
           || operation:u8                 # 0 prepare, 1 roll
           || job_input_index:u32_le
-          || dao_output_index:u32_le
-          || payout_output_index:u32_le   # u32::MAX during prepare
-          || executor_count:u8            # 1..8 during prepare, 0 during roll
-          || executor_lock_hashes:byte32[]
 
 owner = 0x01 || operation:u8               # 2 stop, 3 exit, 4 recovery
 ```
@@ -134,7 +134,7 @@ Inputs
 
 Outputs
   [vault] new Nervos DAO deposit
-          lock = Harvest Vault Lock(job_id, owner_lock_hash)
+          lock = Harvest Vault Lock(job_id, owner_lock_hash, job_lock_hash, policy_script_hash)
           type = deployed Nervos DAO type
           data = eight zero bytes
           capacity = principal_capacity
@@ -146,7 +146,7 @@ Outputs
 
 Witness
   owner wallet signature
-  output_type = canonical DaoHarvestPayloadV1 for policy creation
+  output_type = canonical DaoHarvestPayloadV1 plus the sorted executor-set proof
 ```
 
 Setup requires `sequence = 0`, `remaining_runs = total_cycles * 2`, reward equal to

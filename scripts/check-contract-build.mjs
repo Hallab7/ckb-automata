@@ -11,12 +11,14 @@ const binaries = [
   "recurring-policy",
   "demo-campaign-type",
   "campaign-lock",
+  "harvest-vault-lock",
+  "dao-harvest-policy",
 ];
 const comparisonRoot = new URL("target/reproducibility/", root);
 const artifactRoot = new URL("target/contract-artifacts/", root);
 const artifactBinRoot = new URL("bin/", artifactRoot);
 const versions = JSON.parse(await readFile(new URL("config/versions.json", root), "utf8"));
-const schemaFiles = ["campaign_v1.mol", "job_v1.mol", "recurring_v1.mol"];
+const schemaFiles = ["campaign_v1.mol", "job_v1.mol", "recurring_v1.mol", "dao_harvest_v1.mol"];
 const builderFile = new URL("deploy/docker/contracts-builder.Dockerfile", root);
 const builderTag = `ckb-automata-contracts:${versions.toolchain.rust}`;
 const rootPath = fileURLToPath(root);

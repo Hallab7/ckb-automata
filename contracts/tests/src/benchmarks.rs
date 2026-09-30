@@ -13,9 +13,10 @@ use molecule::prelude::{Builder, Entity};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _};
 
 use crate::{
-    campaign_creation, campaign_success, execution_mode,
+    campaign_creation, campaign_success, dao_harvest_contract, execution_mode,
     fixtures::{job_data, seeded_script},
     generated_campaign::CampaignDataV1,
+    generated_dao_harvest::DaoHarvestPayloadV1,
     generated_recurring::RecurringPayloadV1,
     owner_mode, recurring_final, recurring_payout, top_up,
 };
@@ -143,7 +144,8 @@ fn cycle_measurements() -> Vec<CycleMeasurement> {
         .chain(campaign_creation::benchmark_cases())
         .chain(campaign_success::benchmark_cases())
         .chain(recurring_payout::benchmark_cases())
-        .chain(recurring_final::benchmark_cases());
+        .chain(recurring_final::benchmark_cases())
+        .chain(dao_harvest_contract::benchmark_cases());
 
     cases
         .map(|case| {
@@ -203,6 +205,22 @@ fn capacity_measurements() -> (Vec<CapacityMeasurement>, Vec<PayloadMeasurement>
         .final_refund_kind(0)
         .build()
         .as_bytes();
+    let dao_harvest = DaoHarvestPayloadV1::new_builder()
+        .version(1_u16.to_le_bytes())
+        .owner_lock_hash([0x11; 32])
+        .payout_lock_hash([0x22; 32])
+        .vault_lock_hash([0x33; 32])
+        .dao_type_hash([0x44; 32])
+        .principal_capacity(1_u64.to_le_bytes())
+        .prepare_executor_set_hash([0x55; 32])
+        .executor_reward(1_u64.to_le_bytes())
+        .min_compensation(1_u64.to_le_bytes())
+        .prepare_buffer_epochs(2_u64.to_le_bytes())
+        .confirmation_margin_epochs(1_u64.to_le_bytes())
+        .total_cycles(1_u32.to_le_bytes())
+        .end_epoch_since(0_u64.to_le_bytes())
+        .build()
+        .as_bytes();
 
     let plain_output = CellOutput::new_builder().lock(wallet_lock.clone()).build();
     let job_output = CellOutput::new_builder()
@@ -248,6 +266,10 @@ fn capacity_measurements() -> (Vec<CapacityMeasurement>, Vec<PayloadMeasurement>
             PayloadMeasurement {
                 id: "deadline-campaign-payload-v1".to_owned(),
                 encoded_bytes: 33,
+            },
+            PayloadMeasurement {
+                id: "dao-harvest-payload-v1".to_owned(),
+                encoded_bytes: dao_harvest.len(),
             },
         ],
     )

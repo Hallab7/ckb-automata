@@ -8,7 +8,9 @@
 // input for stop, exit, recovery, or any policy replacement.
 // payout_lock_hash: full CKB Script hash receiving gross compensation.
 // vault_lock_hash: full Harvest Vault Lock script hash protecting every DAO
-// cell in this automation.
+// cell in this automation. Its args bind job ID, owner, Job Lock, and policy.
+// dao_type_hash: full deployed Nervos DAO type script hash required on every
+// protected DAO input and output.
 // principal_capacity: exact full capacity preserved in phase one and atomically
 // returned to a new DAO deposit in phase two.
 // prepare_executor_set_hash: H("ckb-automata/dao-harvest-executors/v1",
@@ -16,7 +18,8 @@
 // executor_reward: exact separately funded reward for each prepare or roll
 // action. V1 uses one fixed reward so the shared Job Lock reward remains
 // immutable across successors.
-// min_compensation: phase one is forbidden below this gross compensation.
+// min_compensation: claim/redeposit is forbidden below this gross compensation;
+// approved executors also apply it to their pre-prepare quote.
 // prepare_buffer_epochs: non-zero relative epoch duration before the target
 // boundary at which phase one becomes eligible.
 // confirmation_margin_epochs: non-zero relative epoch duration before the
@@ -47,6 +50,7 @@ table DaoHarvestPayloadV1 {
   owner_lock_hash: Byte32,
   payout_lock_hash: Byte32,
   vault_lock_hash: Byte32,
+  dao_type_hash: Byte32,
   principal_capacity: Uint64,
   prepare_executor_set_hash: Byte32,
   executor_reward: Uint64,

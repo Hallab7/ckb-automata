@@ -34,6 +34,7 @@ pub enum ScriptError {
     CompensationBelowMinimum = 40,
     CycleLimitReached = 41,
     InvalidExecutorSet = 42,
+    MissingBoundJob = 43,
 }
 
 impl From<ScriptError> for i8 {

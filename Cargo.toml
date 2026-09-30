@@ -5,6 +5,8 @@ members = [
   "contracts/recurring-policy",
   "contracts/demo-campaign-type",
   "contracts/campaign-lock",
+  "contracts/harvest-vault-lock",
+  "contracts/dao-harvest-policy",
   "contracts/tests",
 ]
 resolver = "3"

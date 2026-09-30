@@ -68,7 +68,7 @@ their current phase, header dependencies, and lock script cannot be changed as o
 
 | Area             | Decision                                                                                                                                 |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Authorization    | A purpose-built Harvest Vault Lock authorizes only the specified prepare and claim/redeposit transitions                                 |
+| Authorization    | A purpose-built Harvest Vault Lock binds the Job ID, owner, Job Lock, and policy, then authorizes only specified transitions             |
 | Owner control    | The owner path requires a co-spent input whose full lock hash matches the committed owner lock                                           |
 | Principal        | Every automated transition preserves the exact `principal_capacity`; only the owner exit path may return it to the owner                 |
 | Compensation     | `maximum_withdraw - principal_capacity` is paid only to the committed payout lock                                                        |
@@ -97,6 +97,7 @@ table DaoHarvestPayloadV1 {
   owner_lock_hash: Byte32,
   payout_lock_hash: Byte32,
   vault_lock_hash: Byte32,
+  dao_type_hash: Byte32,
   principal_capacity: Uint64,
   prepare_executor_set_hash: Byte32,
   executor_reward: Uint64,

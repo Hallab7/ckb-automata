@@ -1,11 +1,14 @@
 use molecule::prelude::{Builder, Entity};
+use proptest::prelude::*;
 use serde::Deserialize;
 
 use crate::{
     dao_harvest::{
         DAO_HARVEST_PAYLOAD_VERSION, ExecutorSetError, dao_harvest_payload_hash,
-        is_withdrawing_dao_data, prepare_executor_set_hash,
+        decode_relative_epoch_duration, is_withdrawing_dao_data, maximum_withdraw_capacity,
+        prepare_executor_set_hash,
     },
+    dao_harvest_witness::{VaultOperation, parse_vault_operation},
     generated_dao_harvest::DaoHarvestPayloadV1,
 };
 
@@ -15,6 +18,7 @@ struct DaoHarvestFixture {
     owner_lock_hash: String,
     payout_lock_hash: String,
     vault_lock_hash: String,
+    dao_type_hash: String,
     principal_capacity: String,
     prepare_executor_lock_hashes: Vec<String>,
     prepare_executor_set_hash: String,
@@ -64,6 +68,7 @@ fn rust_dao_harvest_payload_matches_cross_language_vectors() {
         .owner_lock_hash(byte32(&fixture.owner_lock_hash))
         .payout_lock_hash(byte32(&fixture.payout_lock_hash))
         .vault_lock_hash(byte32(&fixture.vault_lock_hash))
+        .dao_type_hash(byte32(&fixture.dao_type_hash))
         .principal_capacity(
             fixture
                 .principal_capacity
@@ -134,4 +139,57 @@ fn executor_set_and_dao_state_boundaries_are_explicit() {
         Some(true)
     );
     assert_eq!(is_withdrawing_dao_data(&[0; 7]), None);
+    assert_eq!(maximum_withdraw_capacity(1_000, 100, 100, 110), Some(1_090));
+    assert_eq!(maximum_withdraw_capacity(100, 101, 100, 110), None);
+    assert_eq!(maximum_withdraw_capacity(1_000, 100, 0, 110), None);
+    assert_eq!(maximum_withdraw_capacity(1_000, 100, 110, 100), None);
+    assert_eq!(
+        decode_relative_epoch_duration((1 << 63) | (1 << 61) | 180),
+        Some((180, 0, 0))
+    );
+    assert_eq!(decode_relative_epoch_duration((1 << 61) | 180), None);
+}
+
+#[test]
+fn vault_witness_keeps_dao_input_type_available() {
+    let mut prepare = vec![0, 0];
+    prepare.extend_from_slice(&7_u32.to_le_bytes());
+    assert_eq!(
+        parse_vault_operation(&prepare),
+        Some(VaultOperation::Prepare { job_input_index: 7 })
+    );
+    let mut roll = vec![0, 1];
+    roll.extend_from_slice(&9_u32.to_le_bytes());
+    assert_eq!(
+        parse_vault_operation(&roll),
+        Some(VaultOperation::Roll { job_input_index: 9 })
+    );
+    assert_eq!(
+        parse_vault_operation(&[1, 3]),
+        Some(VaultOperation::OwnerExit)
+    );
+    assert_eq!(parse_vault_operation(&[0, 0]), None);
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(32))]
+
+    #[test]
+    fn maximum_withdraw_never_reduces_valid_principal(
+        principal in 1_u64..10_000_000_000_000,
+        occupied_fraction in 0_u8..=100,
+        deposit_rate in 1_u64..1_000_000_000,
+        rate_gain in 0_u64..1_000_000_000,
+    ) {
+        let occupied = ((principal as u128 * occupied_fraction as u128) / 100) as u64;
+        if let Some(withdrawing_rate) = deposit_rate.checked_add(rate_gain) {
+            let maximum = maximum_withdraw_capacity(
+                principal,
+                occupied,
+                deposit_rate,
+                withdrawing_rate,
+            ).expect("bounded fixture");
+            prop_assert!(maximum >= principal);
+        }
+    }
 }

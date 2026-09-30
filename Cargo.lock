@@ -58,6 +58,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "automata-dao-harvest-policy"
+version = "0.0.0"
+dependencies = [
+ "ckb-hash",
+ "ckb-std",
+ "molecule",
+]
+
+[[package]]
 name = "automata-deadline-policy"
 version = "0.0.0"
 dependencies = [
@@ -71,6 +80,14 @@ name = "automata-demo-campaign-type"
 version = "0.0.0"
 dependencies = [
  "ckb-hash",
+ "ckb-std",
+ "molecule",
+]
+
+[[package]]
+name = "automata-harvest-vault-lock"
+version = "0.0.0"
+dependencies = [
  "ckb-std",
  "molecule",
 ]

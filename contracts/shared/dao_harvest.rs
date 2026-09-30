@@ -10,6 +10,10 @@ pub const OWNER_RECOVER_OPERATION: u8 = 4;
 
 const POLICY_PAYLOAD_DOMAIN: &[u8] = b"ckb-automata/policy-payload/v1";
 const EXECUTOR_SET_DOMAIN: &[u8] = b"ckb-automata/dao-harvest-executors/v1";
+const RELATIVE_FLAG: u64 = 1 << 63;
+const EPOCH_METRIC: u64 = 0b01 << 61;
+const RESERVED_MASK: u64 = 0b1_1111 << 56;
+const VALUE_MASK: u64 = (1 << 56) - 1;
 
 fn domain_hash(domain: &[u8], body_parts: &[&[u8]]) -> Option<[u8; 32]> {
     let body_length = body_parts.iter().try_fold(0_usize, |total, part| {
@@ -73,6 +77,43 @@ pub fn prepare_executor_set_hash(
 
 pub fn is_withdrawing_dao_data(data: &[u8]) -> Option<bool> {
     (data.len() == 8).then(|| data.iter().any(|byte| *byte != 0))
+}
+
+pub fn maximum_withdraw_capacity(
+    principal_capacity: u64,
+    occupied_capacity: u64,
+    deposit_accumulated_rate: u64,
+    withdrawing_accumulated_rate: u64,
+) -> Option<u64> {
+    if occupied_capacity > principal_capacity
+        || deposit_accumulated_rate == 0
+        || withdrawing_accumulated_rate < deposit_accumulated_rate
+    {
+        return None;
+    }
+    let counted = principal_capacity.checked_sub(occupied_capacity)?;
+    let adjusted = (counted as u128)
+        .checked_mul(withdrawing_accumulated_rate as u128)?
+        .checked_div(deposit_accumulated_rate as u128)?;
+    let adjusted = u64::try_from(adjusted).ok()?;
+    occupied_capacity.checked_add(adjusted)
+}
+
+pub fn decode_relative_epoch_duration(raw: u64) -> Option<(u64, u64, u64)> {
+    if raw & RELATIVE_FLAG == 0
+        || raw & RESERVED_MASK != 0
+        || raw & (0b11 << 61) != EPOCH_METRIC
+    {
+        return None;
+    }
+    let value = raw & VALUE_MASK;
+    let number = value & 0x00ff_ffff;
+    let index = (value >> 24) & 0xffff;
+    let length = (value >> 40) & 0xffff;
+    if number == 0 || (length == 0 && index != 0) || (length != 0 && index >= length) {
+        return None;
+    }
+    Some((number, index, length))
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

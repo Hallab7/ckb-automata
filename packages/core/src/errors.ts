@@ -206,6 +206,12 @@ export const ERROR_CATALOG = {
     copy: "The preparation executor proof does not match the approved set.",
     rustVariant: "InvalidExecutorSet",
   },
+  SCRIPT_MISSING_BOUND_JOB: {
+    code: 43,
+    domain: "script",
+    copy: "The protected DAO cell is not being spent with its matching automation.",
+    rustVariant: "MissingBoundJob",
+  },
   SDK_MALFORMED_DATA: {
     code: 1000,
     domain: "sdk",
@@ -502,6 +508,7 @@ export const INVALID_TRANSITION_DIAGNOSTICS = {
   compensation_below_minimum: "SCRIPT_COMPENSATION_BELOW_MINIMUM",
   cycle_limit_reached: "SCRIPT_CYCLE_LIMIT_REACHED",
   invalid_prepare_executor_set: "SCRIPT_INVALID_EXECUTOR_SET",
+  missing_bound_dao_harvest_job: "SCRIPT_MISSING_BOUND_JOB",
 } as const satisfies Record<string, ScriptErrorKey>;
 
 export function getErrorDefinition(key: ErrorKey): ErrorDefinition {

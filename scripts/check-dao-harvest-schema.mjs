@@ -15,6 +15,7 @@ assert.deepEqual(actualFields, [
   "owner_lock_hash:Byte32",
   "payout_lock_hash:Byte32",
   "vault_lock_hash:Byte32",
+  "dao_type_hash:Byte32",
   "principal_capacity:Uint64",
   "prepare_executor_set_hash:Byte32",
   "executor_reward:Uint64",
@@ -28,6 +29,7 @@ assert.deepEqual(actualFields, [
 for (const requiredRule of [
   "unsigned little-endian",
   "exact full capacity",
+  "full deployed Nervos DAO type script hash",
   "sorted unique executor lock hashes",
   "exact separately funded reward",
   "MUST be less than prepare_buffer_epochs",

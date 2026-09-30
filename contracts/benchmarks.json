@@ -5,25 +5,25 @@
     {
       "id": "job-lock.execute.one-shot.valid",
       "outcome": "valid",
-      "measuredCycles": 1771134,
-      "budgetCycles": 2300000
+      "measuredCycles": 1752146,
+      "budgetCycles": 2200000
     },
     {
       "id": "job-lock.execute.one-shot.invalid-capacity",
       "outcome": "rejected",
-      "measuredCycles": 1762864,
-      "budgetCycles": 2300000
+      "measuredCycles": 1746101,
+      "budgetCycles": 2200000
     },
     {
       "id": "job-lock.cancel.valid",
       "outcome": "valid",
-      "measuredCycles": 1749061,
+      "measuredCycles": 1741387,
       "budgetCycles": 2200000
     },
     {
       "id": "job-lock.recover.valid",
       "outcome": "valid",
-      "measuredCycles": 1715983,
+      "measuredCycles": 1721843,
       "budgetCycles": 2200000
     },
     {
@@ -35,68 +35,92 @@
     {
       "id": "job-lock.top-up.valid",
       "outcome": "valid",
-      "measuredCycles": 1779041,
+      "measuredCycles": 1768579,
       "budgetCycles": 2300000
     },
     {
       "id": "job-lock.top-up.invalid-budget",
       "outcome": "rejected",
-      "measuredCycles": 1787056,
+      "measuredCycles": 1783995,
       "budgetCycles": 2300000
     },
     {
       "id": "campaign.create.valid",
       "outcome": "valid",
-      "measuredCycles": 64891,
-      "budgetCycles": 100000
+      "measuredCycles": 81477,
+      "budgetCycles": 200000
     },
     {
       "id": "campaign.create.invalid-refund-records",
       "outcome": "rejected",
-      "measuredCycles": 50035,
+      "measuredCycles": 65923,
       "budgetCycles": 100000
     },
     {
       "id": "deadline.finalize-success.valid",
       "outcome": "valid",
-      "measuredCycles": 1955273,
+      "measuredCycles": 1933931,
       "budgetCycles": 2500000
     },
     {
       "id": "deadline.finalize-refund.valid",
       "outcome": "valid",
-      "measuredCycles": 1978298,
+      "measuredCycles": 1992051,
       "budgetCycles": 2500000
     },
     {
       "id": "deadline.finalize.invalid-mixed-output",
       "outcome": "rejected",
-      "measuredCycles": 1990973,
+      "measuredCycles": 1983985,
       "budgetCycles": 2500000
     },
     {
       "id": "recurring.payout-successor.valid",
       "outcome": "valid",
-      "measuredCycles": 1950862,
+      "measuredCycles": 1947754,
       "budgetCycles": 2500000
     },
     {
       "id": "recurring.payout-successor.invalid-duplicate",
       "outcome": "rejected",
-      "measuredCycles": 1934758,
+      "measuredCycles": 1924281,
       "budgetCycles": 2500000
     },
     {
       "id": "recurring.final-run.valid",
       "outcome": "valid",
-      "measuredCycles": 1873574,
+      "measuredCycles": 1910824,
       "budgetCycles": 2400000
     },
     {
       "id": "recurring.final-run.invalid-residual",
       "outcome": "rejected",
-      "measuredCycles": 1754357,
+      "measuredCycles": 1748152,
       "budgetCycles": 2200000
+    },
+    {
+      "id": "dao-harvest.prepare.valid",
+      "outcome": "valid",
+      "measuredCycles": 315909,
+      "budgetCycles": 400000
+    },
+    {
+      "id": "dao-harvest.prepare.invalid-principal",
+      "outcome": "rejected",
+      "measuredCycles": 306236,
+      "budgetCycles": 400000
+    },
+    {
+      "id": "dao-harvest.roll.valid",
+      "outcome": "valid",
+      "measuredCycles": 281699,
+      "budgetCycles": 400000
+    },
+    {
+      "id": "dao-harvest.roll.invalid-payout",
+      "outcome": "rejected",
+      "measuredCycles": 278429,
+      "budgetCycles": 400000
     }
   ],
   "capacities": [
@@ -132,6 +156,10 @@
     {
       "id": "deadline-campaign-payload-v1",
       "encodedBytes": 33
+    },
+    {
+      "id": "dao-harvest-payload-v1",
+      "encodedBytes": 270
     }
   ]
 }

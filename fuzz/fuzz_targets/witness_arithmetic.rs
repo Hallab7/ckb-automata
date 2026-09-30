@@ -15,8 +15,18 @@ mod recurring {
     include!("../../contracts/shared/recurring.rs");
 }
 
+#[allow(dead_code)]
+mod dao_harvest {
+    include!("../../contracts/shared/dao_harvest.rs");
+}
+
+mod dao_harvest_witness {
+    include!("../../contracts/shared/dao_harvest_witness.rs");
+}
+
 fuzz_target!(|data: &[u8]| {
     let _ = execution_witness::parse_witness_operation(data);
+    let _ = dao_harvest_witness::parse_vault_operation(data);
     if data.len() < 97 {
         return;
     }
@@ -51,4 +61,11 @@ fuzz_target!(|data: &[u8]| {
         data[0] & 1 != 0,
         data[0] & 2 != 0,
     );
+    let _ = dao_harvest::maximum_withdraw_capacity(
+        read_u64(0),
+        read_u64(8),
+        read_u64(16),
+        read_u64(24),
+    );
+    let _ = dao_harvest::decode_relative_epoch_duration(read_u64(32));
 });

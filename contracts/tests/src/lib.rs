@@ -84,6 +84,10 @@ pub mod dao_harvest {
     include!("../../shared/dao_harvest.rs");
 }
 
+pub mod dao_harvest_witness {
+    include!("../../shared/dao_harvest_witness.rs");
+}
+
 pub mod execution_witness {
     include!("../../shared/execution_witness.rs");
 }
@@ -133,6 +137,9 @@ mod recurring_final;
 
 #[cfg(test)]
 mod dao_harvest_payload;
+
+#[cfg(test)]
+mod dao_harvest_contract;
 
 #[cfg(test)]
 mod conformance;

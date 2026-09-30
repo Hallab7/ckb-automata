@@ -31,3 +31,4 @@ DAO Harvest V1 reserves script codes `36` through `42` for its DAO cell,
 principal, payout, prepare-executor, minimum-compensation, cycle-limit, and
 executor-set invariants. The canonical names and plain-language copy remain in
 the TypeScript registry; the Rust enum mirrors the numeric allocations.
+Code `43` identifies a vault spend that omits its exact bound Job Cell.

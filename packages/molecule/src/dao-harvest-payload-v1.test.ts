@@ -11,6 +11,7 @@ interface DaoHarvestFixture {
   owner_lock_hash: string;
   payout_lock_hash: string;
   vault_lock_hash: string;
+  dao_type_hash: string;
   principal_capacity: string;
   prepare_executor_set_hash: string;
   executor_reward: string;
@@ -38,6 +39,7 @@ test("DaoHarvestPayloadV1 matches the cross-language fixture", async () => {
     owner_lock_hash: byteArray(fixture.owner_lock_hash),
     payout_lock_hash: byteArray(fixture.payout_lock_hash),
     vault_lock_hash: byteArray(fixture.vault_lock_hash),
+    dao_type_hash: byteArray(fixture.dao_type_hash),
     principal_capacity: fixture.principal_capacity,
     prepare_executor_set_hash: byteArray(fixture.prepare_executor_set_hash),
     executor_reward: fixture.executor_reward,
