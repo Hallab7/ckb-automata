@@ -142,7 +142,7 @@ export class TransactionBuildService {
         await this.#store.fail(claim, "conflicted", "EXECUTOR_STALE_OUTPOINT");
         return Object.freeze({ status: "stale" });
       }
-      const execution = runExecutorAdapter(this.#registry, snapshot, this.#identity);
+      const execution = await runExecutorAdapter(this.#registry, snapshot, this.#identity);
       if (execution.adapterId !== canonicalPayload.adapterId) {
         throw Object.assign(new Error("eligibility and build adapters disagree"), {
           code: "EXECUTOR_ADAPTER_MISMATCH",

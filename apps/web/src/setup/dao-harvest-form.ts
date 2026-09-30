@@ -1,10 +1,14 @@
-import { parseHash32 } from "@ckb-automata/core";
+import {
+  DAO_HARVEST_JOB_OCCUPIED_CAPACITY,
+  parseHash32,
+  type ScriptIdentity,
+} from "@ckb-automata/core";
 
 import { ckbToShannons, shannonsToCkb } from "./ckb-amount.ts";
 import { validateAutomationTitle } from "./automation-title.ts";
 import type { SetupDraft, SetupErrors, SetupStepId } from "./setup-flow.ts";
 
-export const DAO_HARVEST_MINIMUM_CKB = "102";
+export const DAO_HARVEST_MINIMUM_CKB = "210";
 export const DAO_HARVEST_REWARD_PER_ACTION_CKB = "61";
 export const DAO_HARVEST_ESTIMATED_NETWORK_FEE_CKB = "1";
 export const DAO_HARVEST_MAX_CYCLES = 12;
@@ -32,6 +36,8 @@ export interface DaoHarvestFundingPreview {
   readonly cycleCount: number;
   readonly principal: bigint;
   readonly principalCkb: string;
+  readonly recoverableReserve: bigint;
+  readonly recoverableReserveCkb: string;
   readonly total: bigint;
   readonly totalCkb: string;
 }
@@ -61,7 +67,8 @@ export function daoHarvestFundingPreview(draft: SetupDraft): DaoHarvestFundingPr
   const actionCount = BigInt(cycleCount * 2);
   const rewards = BigInt(ckbToShannons(DAO_HARVEST_REWARD_PER_ACTION_CKB)) * actionCount;
   const networkFee = BigInt(ckbToShannons(DAO_HARVEST_ESTIMATED_NETWORK_FEE_CKB));
-  const charges = rewards + networkFee;
+  const recoverableReserve = DAO_HARVEST_JOB_OCCUPIED_CAPACITY;
+  const charges = recoverableReserve + rewards + networkFee;
   const total = principal + charges;
   return Object.freeze({
     actionCount,
@@ -70,6 +77,8 @@ export function daoHarvestFundingPreview(draft: SetupDraft): DaoHarvestFundingPr
     cycleCount,
     principal,
     principalCkb: shannonsToCkb(principal),
+    recoverableReserve,
+    recoverableReserveCkb: shannonsToCkb(recoverableReserve),
     total,
     totalCkb: shannonsToCkb(total),
   });
@@ -141,7 +150,11 @@ export async function validateDaoHarvestStep(
 
 export function daoHarvestSetupRequest(
   draft: SetupDraft,
-  context: Pick<DaoHarvestValidationContext, "ownerLockHash"> & { readonly payoutLockHash: string },
+  context: Pick<DaoHarvestValidationContext, "ownerLockHash"> & {
+    readonly ownerLock: ScriptIdentity;
+    readonly payoutLock: ScriptIdentity;
+    readonly payoutLockHash: string;
+  },
 ) {
   if (context.ownerLockHash === undefined) throw new Error("Connect the owner wallet first.");
   const preview = daoHarvestFundingPreview(draft);
@@ -150,5 +163,6 @@ export function daoHarvestSetupRequest(
     payoutLockHash: parseHash32(context.payoutLockHash),
     principal: preview.principal.toString(),
     totalCycles: preview.cycleCount,
+    lockResolutions: Object.freeze([context.ownerLock, context.payoutLock]),
   });
 }

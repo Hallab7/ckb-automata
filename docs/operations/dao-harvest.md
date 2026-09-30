@@ -27,7 +27,7 @@ Example mature claim export:
 ```text
 pnpm recovery harvest-export \
   --harvest-deployment deploy/manifests/dao-harvest-testnet.json \
-  --rpc-url https://testnet.ckb.dev \
+  --rpc-url https://testnet.ckbapp.dev/ \
   --owner-lock owner-lock.json \
   --owner-out-point OWNER_TX_HASH:0x0 \
   --vault-out-point VAULT_TX_HASH:0x0 \

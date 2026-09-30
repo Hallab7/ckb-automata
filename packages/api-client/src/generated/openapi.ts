@@ -1341,7 +1341,18 @@ export interface operations {
         };
         readonly requestBody: {
             readonly content: {
-                readonly "application/json": Record<string, unknown>;
+                readonly "application/json": {
+                    readonly lockResolutions: readonly {
+                        readonly args: string;
+                        readonly codeHash: string;
+                        /** @enum {string} */
+                        readonly hashType: "data" | "data1" | "type";
+                    }[];
+                    readonly ownerLockHash: string;
+                    readonly payoutLockHash: string;
+                    readonly principal: string;
+                    readonly totalCycles: number;
+                };
             };
         };
         readonly responses: {

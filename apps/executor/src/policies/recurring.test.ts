@@ -146,8 +146,8 @@ function execute(fixture: Awaited<ReturnType<typeof recurringFixture>>) {
 
 test("recurring adapter rejects a payout below the resolved recipient minimum", async () => {
   const fixture = await recurringFixture(0n, 100n, 6_100_000_000n, 22);
-  assert.throws(
-    () => execute(fixture),
+  await assert.rejects(
+    async () => execute(fixture),
     (error: unknown) =>
       error instanceof RecurringAdapterError && error.code === "INVALID_RECURRING_JOB",
   );
@@ -160,8 +160,8 @@ for (const [label, sequence, tip, expectedNext] of [
 ] as const) {
   test(`recurring adapter derives the ${label} successor from the original schedule`, async () => {
     const fixture = await recurringFixture(sequence, tip);
-    const first = execute(fixture);
-    const second = execute(fixture);
+    const first = await execute(fixture);
+    const second = await execute(fixture);
     assert.deepEqual(first, second);
     assert.equal(first.status, "built");
     if (first.status !== "built") return;
@@ -179,7 +179,7 @@ for (const [label, sequence, tip, expectedNext] of [
 
 test("recurring adapter returns the exact residual to the owner on the final run", async () => {
   const fixture = await recurringFixture(3n, 130n);
-  const result = execute(fixture);
+  const result = await execute(fixture);
   assert.equal(result.status, "built");
   if (result.status !== "built") return;
   assert.equal(result.build.summary["final"], true);
@@ -191,7 +191,7 @@ test("recurring adapter returns the exact residual to the owner on the final run
 
 test("recurring adapter stops before building until the committed schedule bound", async () => {
   const fixture = await recurringFixture(0n, 99n);
-  const result = execute(fixture);
+  const result = await execute(fixture);
   assert.equal(result.status, "ineligible");
   if (result.status === "ineligible") {
     assert.equal(result.eligibility.reason, "EXECUTOR_NOT_YET_ELIGIBLE");
@@ -200,13 +200,14 @@ test("recurring adapter stops before building until the committed schedule bound
 
 test("recurring adapter rejects unresolved or mismatched payload commitments", async () => {
   const fixture = await recurringFixture(0n, 100n);
-  assert.throws(
-    () => execute({ ...fixture, snapshot: { ...fixture.snapshot, payloads: Object.freeze([]) } }),
+  await assert.rejects(
+    async () =>
+      execute({ ...fixture, snapshot: { ...fixture.snapshot, payloads: Object.freeze([]) } }),
     (error: unknown) =>
       error instanceof RecurringAdapterError && error.code === "INVALID_COMMITMENT",
   );
-  assert.throws(
-    () =>
+  await assert.rejects(
+    async () =>
       execute({
         ...fixture,
         snapshot: { ...fixture.snapshot, resolvedLocks: Object.freeze([fixture.ownerLock]) },
@@ -219,8 +220,8 @@ test("recurring adapter rejects unresolved or mismatched payload commitments", a
 test("recurring adapter rejects application fee cells and ambiguous executor payouts", async () => {
   const fixture = await recurringFixture(0n, 100n);
   const feeCell = fixture.snapshot.feeCells[0]!;
-  assert.throws(
-    () =>
+  await assert.rejects(
+    async () =>
       execute({
         ...fixture,
         snapshot: {
@@ -235,8 +236,8 @@ test("recurring adapter rejects application fee cells and ambiguous executor pay
     ...feeCell,
     output: Object.freeze({ ...feeCell.output, lock: fixture.recipientLock }),
   });
-  assert.throws(
-    () =>
+  await assert.rejects(
+    async () =>
       runExecutorAdapter(
         new ExecutorAdapterRegistry([RECURRING_EXECUTOR_ADAPTER]),
         { ...fixture.snapshot, feeCells: Object.freeze([recipientFeeCell]) },

@@ -11,6 +11,7 @@ import {
   DaoHarvestController,
   DaoHarvestMutationService,
   DaoHarvestReadService,
+  DaoHarvestTransactionAdapter,
 } from "./dao-harvest.ts";
 import {
   ActivityController,
@@ -24,6 +25,7 @@ import { CanonicalCheckpointStore } from "./indexer/checkpoints.ts";
 import { JobCellDiscovery } from "./indexer/job-discovery.ts";
 import { JobTransitionIndexer } from "./indexer/job-transitions.ts";
 import { CanonicalBlockProjector, JobProjectionRollback } from "./indexer/reorg.ts";
+import { DaoHarvestProjectionStore } from "./indexer/dao-harvest-projection.ts";
 import { LiveJobReconciler } from "./indexer/reconciliation.ts";
 import { LiveIndexerRuntime } from "./indexer/runtime.ts";
 import {
@@ -152,6 +154,12 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
           new JobProjectionRollback(databaseClient.database),
       },
       {
+        provide: DaoHarvestProjectionStore,
+        inject: [DatabaseClient],
+        useFactory: (databaseClient: DatabaseClient) =>
+          new DaoHarvestProjectionStore(databaseClient.database),
+      },
+      {
         provide: CanonicalBlockProjector,
         inject: [
           CkbClient,
@@ -159,6 +167,7 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
           JobProjectionRollback,
           JobCellDiscovery,
           JobTransitionIndexer,
+          DaoHarvestProjectionStore,
           BackendTelemetry,
         ],
         useFactory: (
@@ -167,11 +176,13 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
           rollback: JobProjectionRollback,
           discovery: JobCellDiscovery,
           transitions: JobTransitionIndexer,
+          daoHarvest: DaoHarvestProjectionStore,
           telemetry: BackendTelemetry,
         ) =>
           new CanonicalBlockProjector(ckbClient, checkpoints, rollback, discovery, transitions, {
             metrics: telemetry.metrics,
             telemetry: telemetry.runtime,
+            daoHarvest,
           }),
       },
       {
@@ -287,7 +298,11 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
       },
       {
         provide: DaoHarvestMutationService,
-        useFactory: () => new DaoHarvestMutationService(),
+        inject: [CkbClient, PostgresLockResolutionRecorder],
+        useFactory: (ckbClient: CkbClient, resolutions: PostgresLockResolutionRecorder) =>
+          new DaoHarvestMutationService(
+            new DaoHarvestTransactionAdapter(ckbClient, environment.CKB_GENESIS_HASH, resolutions),
+          ),
       },
       {
         provide: PendingCreationService,

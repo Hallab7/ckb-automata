@@ -940,7 +940,42 @@
         "operationId": "DaoHarvestController_setup",
         "parameters": [],
         "requestBody": {
-          "content": { "application/json": { "schema": { "type": "object" } } },
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "lockResolutions": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "args": { "pattern": "^0x(?:[0-9a-f]{2})*$", "type": "string" },
+                        "codeHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                        "hashType": { "enum": ["data", "data1", "type"], "type": "string" }
+                      },
+                      "required": ["args", "codeHash", "hashType"],
+                      "type": "object"
+                    },
+                    "maxItems": 2,
+                    "minItems": 2,
+                    "type": "array"
+                  },
+                  "ownerLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                  "payoutLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                  "principal": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                  "totalCycles": { "maximum": 12, "minimum": 1, "type": "integer" }
+                },
+                "required": [
+                  "lockResolutions",
+                  "ownerLockHash",
+                  "payoutLockHash",
+                  "principal",
+                  "totalCycles"
+                ],
+                "type": "object"
+              }
+            }
+          },
           "required": true
         },
         "responses": {

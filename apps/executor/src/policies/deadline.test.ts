@@ -138,8 +138,8 @@ function execute(fixture: Awaited<ReturnType<typeof deadlineFixture>>) {
 
 test("deadline adapter derives success and binds every terminal output", async () => {
   const fixture = await deadlineFixture("SUCCEEDED");
-  const first = execute(fixture);
-  const second = execute(fixture);
+  const first = await execute(fixture);
+  const second = await execute(fixture);
   assert.deepEqual(first, second);
   assert.equal(first.status, "built");
   if (first.status !== "built") return;
@@ -152,15 +152,15 @@ test("deadline adapter derives success and binds every terminal output", async (
 
 test("deadline adapter rejects a payout below the resolved recipient minimum", async () => {
   const fixture = await deadlineFixture("SUCCEEDED", 6_100_000_000n, 22);
-  assert.throws(
-    () => execute(fixture),
+  await assert.rejects(
+    async () => execute(fixture),
     (error: unknown) => error instanceof DeadlineAdapterError && error.code === "INVALID_CAMPAIGN",
   );
 });
 
 test("deadline adapter derives refund outputs from committed records", async () => {
   const fixture = await deadlineFixture("REFUNDING");
-  const result = execute(fixture);
+  const result = await execute(fixture);
   assert.equal(result.status, "built");
   if (result.status !== "built") return;
   assert.equal(result.build.summary["outcome"], "REFUNDING");
@@ -172,7 +172,7 @@ test("deadline adapter derives refund outputs from committed records", async () 
 
 test("deadline adapter stops before building until the committed block", async () => {
   const fixture = await deadlineFixture("SUCCEEDED");
-  const result = execute({
+  const result = await execute({
     ...fixture,
     snapshot: { ...fixture.snapshot, tip: header(99n) },
   });
@@ -184,8 +184,8 @@ test("deadline adapter stops before building until the committed block", async (
 
 test("deadline adapter rejects contradicted claims and uncommitted refund data", async () => {
   const fixture = await deadlineFixture("REFUNDING");
-  assert.throws(
-    () =>
+  await assert.rejects(
+    async () =>
       execute({
         ...fixture,
         snapshot: {
@@ -197,8 +197,8 @@ test("deadline adapter rejects contradicted claims and uncommitted refund data",
   );
   const records = fixture.snapshot.payloads[0]!;
   const last = records.endsWith("00") ? "01" : "00";
-  assert.throws(
-    () =>
+  await assert.rejects(
+    async () =>
       execute({
         ...fixture,
         snapshot: {

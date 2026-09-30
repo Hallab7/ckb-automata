@@ -31,6 +31,8 @@ export type ExecutorChainClient = Pick<
   | "dryRun"
   | "findCellsPaged"
   | "getCellLive"
+  | "getBlockByHash"
+  | "getBlockByNumber"
   | "getGenesisHash"
   | "getTipHeader"
   | "getTransactionStatus"
@@ -100,6 +102,16 @@ export class ExecutorRuntime implements OnApplicationBootstrap, OnModuleDestroy 
   getCellLive(...args: Parameters<ExecutorChainClient["getCellLive"]>) {
     this.#assertChainAvailable();
     return this.#chain.getCellLive(...args);
+  }
+
+  getBlockByHash(...args: Parameters<ExecutorChainClient["getBlockByHash"]>) {
+    this.#assertChainAvailable();
+    return this.#chain.getBlockByHash(...args);
+  }
+
+  getBlockByNumber(...args: Parameters<ExecutorChainClient["getBlockByNumber"]>) {
+    this.#assertChainAvailable();
+    return this.#chain.getBlockByNumber(...args);
   }
 
   findCellsPaged(...args: Parameters<ExecutorChainClient["findCellsPaged"]>) {

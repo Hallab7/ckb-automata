@@ -48,8 +48,8 @@ test("keeps DAO harvest setup simple and blocks incomplete wallet approval", asy
   await page.getByLabel("Number of harvests").fill("2");
 
   await expect(page.getByText(/original amount stays protected/i)).toBeVisible();
-  await expect(page.getByText("Estimated charges").locator("..")).toContainText("245 CKB");
-  await expect(page.getByText("Total to deposit").locator("..")).toContainText("1245 CKB");
+  await expect(page.getByText("Estimated charges").locator("..")).toContainText("626 CKB");
+  await expect(page.getByText("Total to deposit").locator("..")).toContainText("1626 CKB");
   await expect(page.getByRole("button", { name: "Connect wallet" })).toBeVisible();
   await expect(page.getByText(/block number|epoch/i)).toHaveCount(0);
   await expectNoHorizontalOverflow(page);

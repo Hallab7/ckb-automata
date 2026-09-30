@@ -52,6 +52,23 @@ export interface DeployedContract {
   readonly sizeBytes: number;
 }
 
+export interface DaoHarvestManifestDeployment {
+  readonly deployment: {
+    readonly transactionHash: Hash32;
+    readonly blockHash: Hash32;
+  };
+  readonly contracts: {
+    readonly "harvest-vault-lock": DeployedContract;
+    readonly "dao-harvest-policy": DeployedContract;
+  };
+  readonly nervosDao: {
+    readonly codeHash: Hash32;
+    readonly hashType: ScriptHashType;
+    readonly cellDep: CellDepIdentity;
+  };
+  readonly prepareExecutorLockHashes: readonly Hash32[];
+}
+
 export interface DeploymentManifest {
   readonly schemaVersion: 1;
   readonly network: string;
@@ -88,6 +105,7 @@ export interface DeploymentManifest {
     readonly blockHash: Hash32;
   };
   readonly contracts: Readonly<Record<DeployedContractName, DeployedContract>>;
+  readonly daoHarvest?: DaoHarvestManifestDeployment;
   readonly verification: {
     readonly kind: string;
     readonly transactionHash: Hash32;
@@ -140,6 +158,11 @@ export type PolicyMetadata =
       readonly scriptHash: Hash32;
       readonly contract: "deadline-policy";
       readonly campaignTypeHash: Hash32;
+    }
+  | {
+      readonly kind: "dao_harvest";
+      readonly scriptHash: Hash32;
+      readonly contract: "dao-harvest-policy";
     }
   | {
       readonly kind: "unknown";
@@ -296,6 +319,117 @@ function validateContract(value: unknown, path: string, issues: ManifestIssue[])
   };
 }
 
+function validateDaoHarvestManifest(
+  value: unknown,
+  issues: ManifestIssue[],
+): DaoHarvestManifestDeployment | undefined {
+  if (value === undefined) return undefined;
+  const path = "$.daoHarvest";
+  const harvest = requireRecord(value, path, issues);
+  const deployment = requireRecord(harvest["deployment"], `${path}.deployment`, issues);
+  const contractsValue = requireRecord(harvest["contracts"], `${path}.contracts`, issues);
+  const nervosDao = requireRecord(harvest["nervosDao"], `${path}.nervosDao`, issues);
+  const deploymentTransactionHash = requireHash(
+    deployment["transactionHash"],
+    `${path}.deployment.transactionHash`,
+    issues,
+  );
+  const contracts = {
+    "harvest-vault-lock": validateContract(
+      contractsValue["harvest-vault-lock"],
+      `${path}.contracts.harvest-vault-lock`,
+      issues,
+    ),
+    "dao-harvest-policy": validateContract(
+      contractsValue["dao-harvest-policy"],
+      `${path}.contracts.dao-harvest-policy`,
+      issues,
+    ),
+  };
+  const extraContracts = Object.keys(contractsValue).filter(
+    (name) => name !== "harvest-vault-lock" && name !== "dao-harvest-policy",
+  );
+  if (extraContracts.length > 0) {
+    issue(issues, "INVALID_FIELD", `${path}.contracts`, "contains unknown contract entries");
+  }
+  const identities = new Set<string>();
+  for (const [name, contract] of Object.entries(contracts)) {
+    if (contract.hashType !== "data1" || contract.cellDep.depType !== "code") {
+      issue(
+        issues,
+        "INCONSISTENT_DEPLOYMENT",
+        `${path}.contracts.${name}`,
+        "must use a data1 script and direct code cell dependency",
+      );
+    }
+    if (contract.cellDep.outPoint.txHash !== deploymentTransactionHash) {
+      issue(
+        issues,
+        "INCONSISTENT_DEPLOYMENT",
+        `${path}.contracts.${name}.cellDep.outPoint.txHash`,
+        "must reference the DAO harvest deployment transaction",
+      );
+    }
+    const identity = `${contract.cellDep.outPoint.txHash}:${contract.cellDep.outPoint.index}`;
+    if (identities.has(identity)) {
+      issue(
+        issues,
+        "INCONSISTENT_DEPLOYMENT",
+        `${path}.contracts.${name}.cellDep`,
+        "must identify a unique code cell",
+      );
+    }
+    identities.add(identity);
+  }
+  const executorValues = harvest["prepareExecutorLockHashes"];
+  const executorHashes: Hash32[] = [];
+  if (!Array.isArray(executorValues) || executorValues.length < 1 || executorValues.length > 8) {
+    issue(
+      issues,
+      "INVALID_FIELD",
+      `${path}.prepareExecutorLockHashes`,
+      "must contain one to eight executor lock hashes",
+    );
+  } else {
+    for (const [index, executor] of executorValues.entries()) {
+      executorHashes.push(
+        requireHash(executor, `${path}.prepareExecutorLockHashes[${index}]`, issues),
+      );
+    }
+    if (new Set(executorHashes).size !== executorHashes.length) {
+      issue(
+        issues,
+        "INVALID_FIELD",
+        `${path}.prepareExecutorLockHashes`,
+        "must not contain duplicate executor lock hashes",
+      );
+    }
+  }
+  const daoHashType = requireHashType(nervosDao["hashType"], `${path}.nervosDao.hashType`, issues);
+  const daoCellDep = validateCellDep(nervosDao["cellDep"], `${path}.nervosDao.cellDep`, issues);
+  if (daoHashType !== "type" || daoCellDep.depType !== "code") {
+    issue(
+      issues,
+      "INCONSISTENT_DEPLOYMENT",
+      `${path}.nervosDao`,
+      "must reference the canonical type-hash DAO code cell",
+    );
+  }
+  return {
+    deployment: {
+      transactionHash: deploymentTransactionHash,
+      blockHash: requireHash(deployment["blockHash"], `${path}.deployment.blockHash`, issues),
+    },
+    contracts,
+    nervosDao: {
+      codeHash: requireHash(nervosDao["codeHash"], `${path}.nervosDao.codeHash`, issues),
+      hashType: daoHashType,
+      cellDep: daoCellDep,
+    },
+    prepareExecutorLockHashes: Object.freeze(executorHashes),
+  };
+}
+
 export function validateDeploymentManifest(
   value: unknown,
   expectedGenesisHash?: string,
@@ -327,6 +461,7 @@ export function validateDeploymentManifest(
   const deployment = requireRecord(root["deployment"], "$.deployment", issues);
   const contractsValue = requireRecord(root["contracts"], "$.contracts", issues);
   const verification = requireRecord(root["verification"], "$.verification", issues);
+  const daoHarvest = validateDaoHarvestManifest(root["daoHarvest"], issues);
 
   const contracts = Object.fromEntries(
     DEPLOYED_CONTRACT_NAMES.map((name) => [
@@ -462,6 +597,7 @@ export function validateDeploymentManifest(
       blockHash: requireHash(deployment["blockHash"], "$.deployment.blockHash", issues),
     },
     contracts,
+    ...(daoHarvest === undefined ? {} : { daoHarvest }),
     verification: {
       kind: requireString(verification["kind"], "$.verification.kind", issues),
       transactionHash: requireHash(
@@ -563,6 +699,18 @@ function classifyPolicy(
       scriptHash,
       contract: "deadline-policy",
       campaignTypeHash: parseHash32(policyScript.args),
+    });
+  }
+  if (
+    manifest.daoHarvest !== undefined &&
+    policyScript.codeHash === manifest.daoHarvest.contracts["dao-harvest-policy"].codeHash &&
+    policyScript.hashType === manifest.daoHarvest.contracts["dao-harvest-policy"].hashType &&
+    policyScript.args === "0x"
+  ) {
+    return Object.freeze({
+      kind: "dao_harvest",
+      scriptHash,
+      contract: "dao-harvest-policy",
     });
   }
   return Object.freeze({ kind: "unknown", scriptHash, codeHash: policyScript.codeHash });

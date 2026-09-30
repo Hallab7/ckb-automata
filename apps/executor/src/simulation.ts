@@ -240,14 +240,15 @@ function accounting(
   const snapshotJob = record(snapshot["job"], "snapshot.job");
   const job = JobDataV1.unpack(hexToBytes(hex(snapshotJob["data"], "snapshot.job.data")));
   const reward = parseShannons(job.reward.toString());
-  const rewardOutput = built.outputs[0];
-  if (
-    !rewardOutput ||
-    parseShannons(rewardOutput.capacity) !== reward ||
-    JSON.stringify(rewardOutput.lock) !== JSON.stringify(rewardLock) ||
-    rewardOutput.type !== null ||
-    built.outputsData[0] !== "0x"
-  ) {
+  const rewardOutputs = built.outputs.flatMap((output, index) =>
+    parseShannons(output.capacity) === reward &&
+    JSON.stringify(output.lock) === JSON.stringify(rewardLock) &&
+    output.type === null &&
+    built.outputsData[index] === "0x"
+      ? [output]
+      : [],
+  );
+  if (rewardOutputs.length !== 1) {
     throw new SimulationGateError(
       "EXECUTOR_REWARD_INVALID",
       "transaction does not preserve the committed executor reward",

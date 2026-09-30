@@ -32,6 +32,7 @@ export interface ExecutorHeaderSnapshot {
   readonly number: BlockNumber;
   readonly epoch: `0x${string}`;
   readonly timestamp: `0x${string}`;
+  readonly dao?: `0x${string}`;
 }
 
 export interface ExecutorSnapshot {
@@ -86,7 +87,7 @@ export type BuiltVerification =
 
 export interface ExecutorAdapterRegistration {
   readonly id: string;
-  readonly policy: "deadline" | "recurring";
+  readonly policy: "deadline" | "recurring" | "dao-harvest";
   readonly supports: (policy: PolicyMetadata) => boolean;
   readonly evaluateEligibility: (context: ExecutorEligibilityContext) => EligibilityDecision;
 }
@@ -102,13 +103,13 @@ export interface ExecutorPolicyAdapter<Inspection = unknown, Evidence = unknown>
     context: ExecutorContext,
     inspection: Inspection,
     eligibility: Extract<EligibilityDecision<Evidence>, { readonly status: "eligible" }>,
-  ) => ExecutorBuild;
+  ) => ExecutorBuild | Promise<ExecutorBuild>;
   readonly verifyBuilt: (
     context: ExecutorContext,
     inspection: Inspection,
     eligibility: Extract<EligibilityDecision<Evidence>, { readonly status: "eligible" }>,
     build: ExecutorBuild,
-  ) => BuiltVerification;
+  ) => BuiltVerification | Promise<BuiltVerification>;
 }
 
 export interface RegisteredExecutorAdapter {
@@ -119,13 +120,13 @@ export interface RegisteredExecutorAdapter {
     context: ExecutorContext,
     inspection: unknown,
     eligibility: Extract<EligibilityDecision, { readonly status: "eligible" }>,
-  ) => ExecutorBuild;
+  ) => ExecutorBuild | Promise<ExecutorBuild>;
   readonly verifyBuilt: (
     context: ExecutorContext,
     inspection: unknown,
     eligibility: Extract<EligibilityDecision, { readonly status: "eligible" }>,
     build: ExecutorBuild,
-  ) => BuiltVerification;
+  ) => BuiltVerification | Promise<BuiltVerification>;
 }
 
 export type ExecutorRunResult =
@@ -262,30 +263,30 @@ export function evaluateExecutorEligibility(
   });
 }
 
-export function runExecutorAdapter(
+export async function runExecutorAdapter(
   registry: ExecutorAdapterRegistry,
   snapshot: ExecutorSnapshot,
   identity: ExecutorIdentity,
   instrumentation: { readonly telemetry?: Pick<TelemetryRuntime, "withSpanSync"> } = {},
-): ExecutorRunResult {
-  const run = (): ExecutorRunResult => {
+): Promise<ExecutorRunResult> {
+  const run = async (): Promise<ExecutorRunResult> => {
     const context = createContext(snapshot, identity);
     const adapter = registry.resolve(context.jobInspection.policy);
     const inspection = adapter.inspect(context);
     const eligibility = adapter.eligibility(context, inspection);
     if (eligibility.status === "ineligible") {
       return Object.freeze({
-        status: "ineligible",
+        status: "ineligible" as const,
         adapterId: adapter.registration.id,
         inspection,
         eligibility,
       });
     }
-    const build = adapter.build(context, inspection, eligibility);
-    const verification = adapter.verifyBuilt(context, inspection, eligibility, build);
+    const build = await adapter.build(context, inspection, eligibility);
+    const verification = await adapter.verifyBuilt(context, inspection, eligibility, build);
     return verification.status === "valid"
       ? Object.freeze({
-          status: "built",
+          status: "built" as const,
           adapterId: adapter.registration.id,
           inspection,
           eligibility,
@@ -293,7 +294,7 @@ export function runExecutorAdapter(
           verification,
         })
       : Object.freeze({
-          status: "invalid_build",
+          status: "invalid_build" as const,
           adapterId: adapter.registration.id,
           inspection,
           eligibility,

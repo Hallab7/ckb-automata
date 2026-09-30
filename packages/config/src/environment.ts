@@ -92,7 +92,14 @@ const commonFields = {
   ),
   EXECUTOR_SUPPORTED_POLICIES: z.preprocess(
     (value) => (value === "" ? undefined : value),
-    z.enum(["deadline", "recurring", "deadline,recurring", "recurring,deadline"]).optional(),
+    z
+      .string()
+      .max(64)
+      .regex(/^(?:deadline|recurring|dao-harvest)(?:,(?:deadline|recurring|dao-harvest)){0,2}$/)
+      .refine((value) => new Set(value.split(",")).size === value.split(",").length, {
+        message: "supported executor policies must be unique",
+      })
+      .optional(),
   ),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.preprocess(
     (value) => (value === "" || value === "local-placeholder-disabled" ? undefined : value),

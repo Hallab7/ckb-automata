@@ -5,6 +5,10 @@ import test from "node:test";
 const root = new URL("../", import.meta.url);
 const blueprint = await readFile(new URL("render.yaml", root), "utf8");
 const verifier = await readFile(new URL("scripts/verify-public-api.mjs", root), "utf8");
+const manifest = JSON.parse(await readFile(new URL("deploy/manifests/testnet.json", root), "utf8"));
+const harvestRecovery = JSON.parse(
+  await readFile(new URL("deploy/manifests/dao-harvest-testnet.json", root), "utf8"),
+);
 
 test("public data services use explicit testnet and secret references", () => {
   for (const value of [
@@ -34,4 +38,34 @@ test("public verification covers TLS, readiness, identity, and metrics", () => {
   ]) {
     assert.ok(verifier.includes(value), `public verifier is missing ${value}`);
   }
+});
+
+test("published DAO recovery artifact matches the pinned testnet deployment", () => {
+  assert.equal(harvestRecovery.network, manifest.network);
+  assert.equal(harvestRecovery.genesisHash, manifest.genesisHash);
+  assert.equal(
+    harvestRecovery.deployment.transactionHash,
+    manifest.daoHarvest.deployment.transactionHash,
+  );
+  assert.deepEqual(harvestRecovery.policy, {
+    script: {
+      codeHash: manifest.daoHarvest.contracts["dao-harvest-policy"].codeHash,
+      hashType: manifest.daoHarvest.contracts["dao-harvest-policy"].hashType,
+    },
+    cellDep: manifest.daoHarvest.contracts["dao-harvest-policy"].cellDep,
+  });
+  assert.deepEqual(harvestRecovery.vaultLock, {
+    script: {
+      codeHash: manifest.daoHarvest.contracts["harvest-vault-lock"].codeHash,
+      hashType: manifest.daoHarvest.contracts["harvest-vault-lock"].hashType,
+    },
+    cellDep: manifest.daoHarvest.contracts["harvest-vault-lock"].cellDep,
+  });
+  assert.deepEqual(harvestRecovery.daoType, {
+    script: {
+      codeHash: manifest.daoHarvest.nervosDao.codeHash,
+      hashType: manifest.daoHarvest.nervosDao.hashType,
+    },
+    cellDep: manifest.daoHarvest.nervosDao.cellDep,
+  });
 });

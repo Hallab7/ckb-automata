@@ -85,7 +85,7 @@ services:
       - key: EXECUTOR_INSTANCE_ID
         value: operator-a
       - key: EXECUTOR_SUPPORTED_POLICIES
-        value: deadline,recurring
+        value: deadline,recurring,dao-harvest
       - key: EXECUTOR_LOCK_ARGS
         sync: false
       - key: EXECUTOR_TRANSACTION_FEE
@@ -139,7 +139,7 @@ services:
       - key: EXECUTOR_INSTANCE_ID
         value: operator-b
       - key: EXECUTOR_SUPPORTED_POLICIES
-        value: deadline,recurring
+        value: deadline,recurring,dao-harvest
       - key: EXECUTOR_LOCK_ARGS
         sync: false
       - key: EXECUTOR_TRANSACTION_FEE

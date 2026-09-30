@@ -20,7 +20,7 @@ import type { AutomataDatabase } from "../database/client.ts";
 import { jobEvents, jobs, jobVersions } from "../database/schema.ts";
 import type { CkbReadClient } from "../ckb-client.ts";
 
-export type SupportedJobPolicyKind = "deadline" | "recurring";
+export type SupportedJobPolicyKind = "deadline" | "recurring" | "dao_harvest";
 
 export interface DiscoveredJobCell {
   readonly networkId: string;
@@ -116,7 +116,11 @@ export function extractSupportedJobCells(
         malformedOrInvalid += 1;
         continue;
       }
-      if (inspection.policy.kind !== "deadline" && inspection.policy.kind !== "recurring") {
+      if (
+        inspection.policy.kind !== "deadline" &&
+        inspection.policy.kind !== "recurring" &&
+        inspection.policy.kind !== "dao_harvest"
+      ) {
         unsupportedPolicies += 1;
         continue;
       }

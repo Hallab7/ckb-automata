@@ -183,6 +183,7 @@ export {
   DaoHarvestController,
   DaoHarvestMutationService,
   DaoHarvestReadService,
+  DaoHarvestTransactionAdapter,
   type DaoHarvestListResponse,
   type DaoHarvestMutationAdapter,
   type DaoHarvestQuoteReadModel,
@@ -192,8 +193,10 @@ export {
 } from "./dao-harvest.ts";
 export {
   extractDaoHarvestProjections,
+  DaoHarvestProjectionStore,
   type DaoHarvestProjection,
   type DaoHarvestProjectionExtraction,
+  type DaoHarvestProjectionResult,
 } from "./indexer/dao-harvest-projection.ts";
 export {
   JOB_QUOTE_ASSUMPTIONS,

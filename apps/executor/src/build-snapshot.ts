@@ -7,6 +7,7 @@ import {
   parseHash32,
   parseOutPoint,
   parseShannons,
+  registeredDaoHarvestDeployment,
   type RegisteredDeployment,
   type ScriptIdentity,
 } from "@ckb-automata/core";
@@ -52,6 +53,7 @@ function headerSnapshot(
     number: parseBlockNumber(header.number.toString()),
     epoch: header.epoch.toString() as `0x${string}`,
     timestamp: header.timestamp.toString() as `0x${string}`,
+    ...(header.dao === undefined ? {} : { dao: header.dao.toString() as `0x${string}` }),
   });
 }
 
@@ -184,6 +186,7 @@ export class ChainBuildSnapshotSource implements BuildSnapshotSource {
     const locks = await this.#resolvedLocks(lineage);
     const payloads = Object.freeze([...new Set(lineage.flatMap(outputTypePayloads))]);
     const applicationCells = await this.#applicationCells(lineage, inspected.policy);
+    const headers = await this.#headers(applicationCells, inspected.policy);
     const feeCells = await this.#feeCells();
     const tip = headerSnapshot(await this.#runtime.getTipHeader());
     assertSnapshotTipContinuity(tipBefore, tip);
@@ -193,7 +196,7 @@ export class ChainBuildSnapshotSource implements BuildSnapshotSource {
       job,
       applicationCells,
       feeCells,
-      headers: Object.freeze([]),
+      headers,
       resolvedLocks: locks,
       payloads,
       claims: Object.freeze({}),
@@ -257,14 +260,24 @@ export class ChainBuildSnapshotSource implements BuildSnapshotSource {
     lineage: readonly ClientTransactionResponse[],
     policy: Extract<ReturnType<typeof inspectJobData>, { readonly status: "ok" }>["policy"],
   ): Promise<readonly ExecutorCellSnapshot[]> {
-    if (policy.kind !== "deadline") return Object.freeze([]);
+    if (policy.kind !== "deadline" && policy.kind !== "dao_harvest") return Object.freeze([]);
     const matches: ExecutorCellSnapshot[] = [];
+    const harvest =
+      policy.kind === "dao_harvest" ? registeredDaoHarvestDeployment(this.#deployment) : undefined;
     for (const response of lineage) {
       for (const [index, output] of response.transaction.outputs.entries()) {
-        if (
-          !output.type ||
-          parseHash32(scriptToHash(chainScriptIdentity(output.type))) !== policy.campaignTypeHash
-        ) {
+        const outputTypeHash = output.type
+          ? parseHash32(scriptToHash(chainScriptIdentity(output.type)))
+          : undefined;
+        const matchesPolicy =
+          policy.kind === "deadline"
+            ? outputTypeHash === policy.campaignTypeHash
+            : harvest !== undefined &&
+              outputTypeHash ===
+                parseHash32(scriptToHash({ ...harvest.daoType.script, args: "0x" })) &&
+              output.lock.codeHash === harvest.vaultLock.script.codeHash &&
+              output.lock.hashType === harvest.vaultLock.script.hashType;
+        if (!matchesPolicy) {
           continue;
         }
         const live = await this.#runtime.getCellLive({
@@ -278,6 +291,30 @@ export class ChainBuildSnapshotSource implements BuildSnapshotSource {
       }
     }
     return Object.freeze(matches);
+  }
+
+  async #headers(
+    cells: readonly ExecutorCellSnapshot[],
+    policy: Extract<ReturnType<typeof inspectJobData>, { readonly status: "ok" }>["policy"],
+  ): Promise<readonly ExecutorHeaderSnapshot[]> {
+    if (policy.kind !== "dao_harvest") return Object.freeze([]);
+    const headers = new Map<string, ExecutorHeaderSnapshot>();
+    for (const cell of cells) {
+      const containing = await this.#runtime.getBlockByHash(cell.blockHash);
+      if (!containing) throw new Error("DAO vault inclusion header is unavailable");
+      const snapshot = headerSnapshot(containing.header);
+      headers.set(snapshot.hash, snapshot);
+      if (cell.data !== "0x0000000000000000") {
+        const body = Buffer.from(cell.data.slice(2), "hex");
+        if (body.length !== 8) throw new Error("withdrawing DAO vault data is invalid");
+        const depositNumber = body.readBigUInt64LE();
+        const deposit = await this.#runtime.getBlockByNumber(depositNumber);
+        if (!deposit) throw new Error("DAO deposit header is unavailable");
+        const depositSnapshot = headerSnapshot(deposit.header);
+        headers.set(depositSnapshot.hash, depositSnapshot);
+      }
+    }
+    return Object.freeze([...headers.values()]);
   }
 
   async #feeCells(): Promise<readonly ExecutorCellSnapshot[]> {

@@ -1,6 +1,7 @@
 import { DaoHarvestPayloadV1, JobDataV1 } from "@ckb-automata/molecule";
 import type { ClientBlock } from "@ckb-ccc/shell";
 import { bytesToHex, hexToBytes, scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
+import { and, eq, sql } from "drizzle-orm";
 
 import {
   addEpochFractions,
@@ -14,12 +15,17 @@ import {
   parseHash32,
   parseOutputIndex,
   parseShannons,
+  registeredDaoHarvestDeployment,
   subtractEpochFractions,
   type DaoHarvestDeployment,
   type Hash32,
   type OutputIndex,
+  type RegisteredDeployment,
   type Shannons,
 } from "@ckb-automata/core";
+
+import type { AutomataDatabase } from "../database/client.ts";
+import { daoHarvestJobs, jobs } from "../database/schema.ts";
 
 export interface DaoHarvestProjection {
   readonly networkId: string;
@@ -36,6 +42,11 @@ export interface DaoHarvestProjection {
   readonly completedCycles: bigint;
   readonly totalCycles: bigint;
   readonly payload: `0x${string}`;
+  readonly economics: {
+    readonly executorReward: string;
+    readonly minCompensation: string;
+    readonly protectedPrincipal: string;
+  };
   readonly provenance: {
     readonly blockNumber: bigint;
     readonly blockHash: Hash32;
@@ -168,6 +179,11 @@ export function extractDaoHarvestProjections(
             completedCycles: sequence / 2n,
             totalCycles: BigInt(payload.decoded.total_cycles.toString()),
             payload: bytesToHex(payload.bytes) as `0x${string}`,
+            economics: Object.freeze({
+              executorReward: payload.decoded.executor_reward.toString(),
+              minCompensation: payload.decoded.min_compensation.toString(),
+              protectedPrincipal: payload.decoded.principal_capacity.toString(),
+            }),
             provenance: Object.freeze({ blockNumber, blockHash, transactionIndex }),
           }),
         );
@@ -177,4 +193,133 @@ export function extractDaoHarvestProjections(
     }
   }
   return Object.freeze({ projections: Object.freeze(projections), malformed });
+}
+
+export interface DaoHarvestProjectionResult extends DaoHarvestProjectionExtraction {
+  readonly persisted: number;
+}
+
+export class DaoHarvestProjectionStore {
+  readonly #database: AutomataDatabase;
+
+  constructor(database: AutomataDatabase) {
+    this.#database = database;
+  }
+
+  async projectBlock(
+    block: ClientBlock,
+    deployment: RegisteredDeployment,
+  ): Promise<DaoHarvestProjectionResult> {
+    if (deployment.manifest.daoHarvest === undefined) {
+      return Object.freeze({ projections: Object.freeze([]), malformed: 0, persisted: 0 });
+    }
+    const extraction = extractDaoHarvestProjections(
+      block,
+      registeredDaoHarvestDeployment(deployment),
+    );
+    const hasConsumedCells = block.transactions.some((chainTransaction) =>
+      chainTransaction.inputs.some(
+        (input) => !/^0x0{64}$/.test(input.previousOutput.txHash.toString()),
+      ),
+    );
+    if (extraction.projections.length === 0 && !hasConsumedCells) {
+      return Object.freeze({ ...extraction, persisted: 0 });
+    }
+    await this.#database.transaction(async (transaction) => {
+      await transaction.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtextextended(${deployment.network}, 0))`,
+      );
+      for (const projection of extraction.projections) {
+        const values = {
+          networkId: projection.networkId,
+          jobId: projection.jobId,
+          vaultOutpointTxHash: projection.vaultOutPoint.txHash,
+          vaultOutpointIndex: projection.vaultOutPoint.index.toString(),
+          vaultState: projection.vaultState,
+          depositEpochSince: projection.depositEpochSince.toString(),
+          prepareStartSince: projection.prepareStartSince.toString(),
+          prepareCutoffSince: projection.prepareCutoffSince.toString(),
+          claimMaturitySince: projection.claimMaturitySince?.toString() ?? null,
+          prepareBlockHash:
+            projection.vaultState === "withdrawing" ? projection.provenance.blockHash : null,
+          prepareBlockNumber:
+            projection.vaultState === "withdrawing"
+              ? projection.provenance.blockNumber.toString()
+              : null,
+          completedCycles: projection.completedCycles.toString(),
+          totalCycles: projection.totalCycles.toString(),
+          principalCapacity: projection.principalCapacity.toString(),
+          payoutLockHash: projection.payoutLockHash,
+          economicsSnapshot: projection.economics,
+          payload: Buffer.from(projection.payload.slice(2), "hex"),
+          observedBlockNumber: projection.provenance.blockNumber.toString(),
+          observedBlockHash: projection.provenance.blockHash,
+          canonical: true,
+          updatedAt: new Date(),
+        } as const;
+        await transaction
+          .insert(daoHarvestJobs)
+          .values(values)
+          .onConflictDoUpdate({
+            target: [daoHarvestJobs.networkId, daoHarvestJobs.jobId],
+            set: values,
+          });
+      }
+      const projectedJobIds = new Set<string>(extraction.projections.map(({ jobId }) => jobId));
+      for (const chainTransaction of block.transactions) {
+        const inputs = chainTransaction.inputs
+          .map((input) => ({
+            txHash: parseHash32(input.previousOutput.txHash.toString()),
+            index: BigInt(input.previousOutput.index).toString(),
+          }))
+          .filter(({ txHash }) => !/^0x0{64}$/.test(txHash));
+        for (const input of inputs) {
+          const [consumed] = await transaction
+            .select({
+              jobId: jobs.jobId,
+              vaultTxHash: daoHarvestJobs.vaultOutpointTxHash,
+              vaultIndex: daoHarvestJobs.vaultOutpointIndex,
+            })
+            .from(jobs)
+            .innerJoin(
+              daoHarvestJobs,
+              and(
+                eq(daoHarvestJobs.networkId, jobs.networkId),
+                eq(daoHarvestJobs.jobId, jobs.jobId),
+              ),
+            )
+            .where(
+              and(
+                eq(jobs.networkId, deployment.network),
+                eq(jobs.policyKind, "dao_harvest"),
+                eq(jobs.outpointTxHash, input.txHash),
+                eq(jobs.outpointIndex, input.index),
+              ),
+            )
+            .limit(1);
+          if (!consumed || projectedJobIds.has(consumed.jobId)) continue;
+          const consumedVault = inputs.some(
+            (candidate) =>
+              candidate.txHash === consumed.vaultTxHash && candidate.index === consumed.vaultIndex,
+          );
+          await transaction
+            .update(daoHarvestJobs)
+            .set({
+              vaultState: consumedVault ? "completed" : "recovery_required",
+              observedBlockNumber: BigInt(block.header.number).toString(),
+              observedBlockHash: parseHash32(block.header.hash),
+              canonical: true,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(daoHarvestJobs.networkId, deployment.network),
+                eq(daoHarvestJobs.jobId, consumed.jobId),
+              ),
+            );
+        }
+      }
+    });
+    return Object.freeze({ ...extraction, persisted: extraction.projections.length });
+  }
 }

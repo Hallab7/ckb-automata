@@ -100,7 +100,7 @@ function HarvestDetails(context: SetupStepRenderContext) {
         />
         <TextField
           {...error(context, "principalCkb")}
-          hint="This exact amount is re-deposited after every harvest. Minimum 102 CKB."
+          hint="This exact amount is re-deposited after every harvest. Minimum 210 CKB."
           inputMode="decimal"
           label="Original amount (CKB)"
           name="principalCkb"
@@ -240,9 +240,15 @@ function HarvestReviewStep({
     onState({ status: "loading" });
     void (async () => {
       const client = api();
-      const payoutLockHash = await session.resolveLockHash(context.draft["payoutAddress"] ?? "");
+      const [ownerLock, payoutLock] = await Promise.all([
+        session.getOwnerLock(session.ownerLockHash!),
+        session.resolveLock(context.draft["payoutAddress"] ?? ""),
+      ]);
+      const payoutLockHash = session.reviewLockHash(payoutLock);
       const request = daoHarvestSetupRequest(context.draft, {
         ownerLockHash: session.ownerLockHash,
+        ownerLock,
+        payoutLock,
         payoutLockHash,
       });
       const [build, network, signerGenesis] = await Promise.all([
@@ -367,8 +373,9 @@ function HarvestReviewStep({
           </div>
         </dl>
         <p>
-          Unused executor rewards remain owner-recoverable. Network fees and final compensation
-          depend on live chain conditions.
+          The {preview.recoverableReserveCkb} CKB automation reserve and unused executor rewards
+          remain owner-recoverable. Network fees and final compensation depend on live chain
+          conditions.
         </p>
       </details>
       <InlineNotice title="Testnet pilot" tone="warning">
@@ -411,9 +418,16 @@ function HarvestApproval({
     if (state.status === "submitting") return;
     setState({ status: "submitting" });
     try {
-      const payoutLockHash = await session.resolveLockHash(context.draft["payoutAddress"] ?? "");
+      if (session.ownerLockHash === undefined) throw new Error("Reconnect the owner wallet first.");
+      const [ownerLock, payoutLock] = await Promise.all([
+        session.getOwnerLock(session.ownerLockHash),
+        session.resolveLock(context.draft["payoutAddress"] ?? ""),
+      ]);
+      const payoutLockHash = session.reviewLockHash(payoutLock);
       const request = daoHarvestSetupRequest(context.draft, {
         ownerLockHash: session.ownerLockHash,
+        ownerLock,
+        payoutLock,
         payoutLockHash,
       });
       const refreshed = await api().createDaoHarvest(request);

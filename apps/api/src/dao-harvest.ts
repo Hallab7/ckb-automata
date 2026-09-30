@@ -25,11 +25,32 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { and, desc, eq, getTableColumns, lt, or } from "drizzle-orm";
+import { scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
 
-import type { UnsignedDeadlineTransaction } from "@ckb-automata/core";
+import {
+  DAO_HARVEST_JOB_OCCUPIED_CAPACITY,
+  DAO_HARVEST_VAULT_OCCUPIED_CAPACITY,
+  addEpochs,
+  buildDaoHarvestSetup,
+  calculateDaoHarvestQuote,
+  createEpoch,
+  deploymentRegistry,
+  encodeAbsoluteEpochSince,
+  encodeRelativeEpochSince,
+  parseEpoch,
+  parseHash32,
+  parseShannons,
+  registeredDaoHarvestDeployment,
+  selectDaoPrepareWindow,
+  type DeploymentRegistry,
+  type ScriptIdentity,
+  type UnsignedDeadlineTransaction,
+} from "@ckb-automata/core";
 
+import type { CkbReadClient } from "./ckb-client.ts";
 import type { AutomataDatabase } from "./database/client.ts";
 import { daoHarvestJobs, jobs } from "./database/schema.ts";
+import type { LockResolutionRecorder } from "./lock-resolutions.ts";
 
 const HASH = /^0x[0-9a-f]{64}$/;
 const DEFAULT_LIMIT = 20;
@@ -87,6 +108,7 @@ export interface DaoHarvestUnsignedBuild {
   readonly signingEntries: readonly unknown[];
   readonly intent: unknown;
   readonly policyCriticalHash: string;
+  readonly jobId?: string;
 }
 
 export interface DaoHarvestMutationAdapter {
@@ -94,6 +116,204 @@ export interface DaoHarvestMutationAdapter {
     operation: DaoHarvestUnsignedBuild["operation"],
     body: unknown,
   ): Promise<DaoHarvestUnsignedBuild>;
+}
+
+const SETUP_KEYS = [
+  "lockResolutions",
+  "ownerLockHash",
+  "payoutLockHash",
+  "principal",
+  "totalCycles",
+] as const;
+const EXECUTOR_REWARD = 61n * 100_000_000n;
+const ESTIMATED_NETWORK_FEE = 1n * 100_000_000n;
+const PREPARE_BUFFER_EPOCHS = 4n;
+const CONFIRMATION_MARGIN_EPOCHS = 1n;
+const QUOTE_VALID_BLOCKS = 10n;
+
+interface SetupRequest {
+  readonly ownerLockHash: string;
+  readonly payoutLockHash: string;
+  readonly principal: string;
+  readonly totalCycles: number;
+  readonly lockResolutions: readonly ScriptIdentity[];
+}
+
+function lockResolution(value: unknown, name: string): ScriptIdentity {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new TypeError(`${name} must be a lock script`);
+  }
+  const record = value as Record<string, unknown>;
+  if (
+    Object.keys(record).toSorted().join(",") !== "args,codeHash,hashType" ||
+    typeof record["codeHash"] !== "string" ||
+    typeof record["args"] !== "string" ||
+    (record["hashType"] !== "data" &&
+      record["hashType"] !== "data1" &&
+      record["hashType"] !== "type") ||
+    !/^0x(?:[0-9a-f]{2})*$/.test(record["args"])
+  ) {
+    throw new TypeError(`${name} is invalid`);
+  }
+  return Object.freeze({
+    codeHash: parseHash32(record["codeHash"]),
+    hashType: record["hashType"],
+    args: record["args"] as `0x${string}`,
+  });
+}
+
+function setupRequest(value: unknown): SetupRequest {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new BadRequestException("DAO harvest setup must be an object");
+  }
+  const record = value as Record<string, unknown>;
+  if (
+    Object.keys(record).length !== SETUP_KEYS.length ||
+    SETUP_KEYS.some((key) => !(key in record))
+  ) {
+    throw new BadRequestException("DAO harvest setup contains unsupported fields");
+  }
+  const ownerLockHash = record["ownerLockHash"];
+  const payoutLockHash = record["payoutLockHash"];
+  const principal = record["principal"];
+  const totalCycles = record["totalCycles"];
+  const lockResolutions = record["lockResolutions"];
+  if (
+    typeof ownerLockHash !== "string" ||
+    typeof payoutLockHash !== "string" ||
+    typeof principal !== "string" ||
+    typeof totalCycles !== "number" ||
+    !Array.isArray(lockResolutions) ||
+    lockResolutions.length !== 2
+  ) {
+    throw new BadRequestException("DAO harvest setup fields have invalid types");
+  }
+  try {
+    const ownerHash = parseHash32(ownerLockHash);
+    const payoutHash = parseHash32(payoutLockHash);
+    const locks = lockResolutions.map((lock, index) =>
+      lockResolution(lock, `lockResolutions[${index}]`),
+    );
+    const hashes = locks.map((lock) => parseHash32(scriptToHash(lock)));
+    if (new Set(hashes).size !== 2 || !hashes.includes(ownerHash) || !hashes.includes(payoutHash)) {
+      throw new TypeError("lock resolutions must match the owner and payout hashes");
+    }
+    if (parseShannons(principal) < DAO_HARVEST_VAULT_OCCUPIED_CAPACITY) {
+      throw new RangeError("original amount must be at least 210 CKB");
+    }
+    if (!Number.isSafeInteger(totalCycles) || totalCycles < 1 || totalCycles > 12) {
+      throw new RangeError("number of harvests must be between 1 and 12");
+    }
+  } catch (error) {
+    throw new BadRequestException(error instanceof Error ? error.message : "invalid setup");
+  }
+  return Object.freeze({
+    ownerLockHash,
+    payoutLockHash,
+    principal,
+    totalCycles,
+    lockResolutions: Object.freeze(
+      lockResolutions.map((lock, index) => lockResolution(lock, `lockResolutions[${index}]`)),
+    ),
+  });
+}
+
+function accumulatedRate(daoValue: unknown): bigint {
+  const value = String(daoValue);
+  if (!/^0x[0-9a-f]{64}$/.test(value)) throw new Error("tip DAO field is invalid");
+  return Buffer.from(value.slice(2, 18), "hex").readBigUInt64LE();
+}
+
+export class DaoHarvestTransactionAdapter implements DaoHarvestMutationAdapter {
+  readonly #chain: Pick<CkbReadClient, "getTipHeader">;
+  readonly #expectedGenesisHash: string;
+  readonly #registry: Pick<DeploymentRegistry, "load">;
+  readonly #resolutions: LockResolutionRecorder;
+
+  constructor(
+    chain: Pick<CkbReadClient, "getTipHeader">,
+    expectedGenesisHash: string,
+    resolutions: LockResolutionRecorder,
+    registry: Pick<DeploymentRegistry, "load"> = deploymentRegistry,
+  ) {
+    this.#chain = chain;
+    this.#expectedGenesisHash = expectedGenesisHash;
+    this.#resolutions = resolutions;
+    this.#registry = registry;
+  }
+
+  async build(
+    operation: DaoHarvestUnsignedBuild["operation"],
+    body: unknown,
+  ): Promise<DaoHarvestUnsignedBuild> {
+    if (operation !== "setup") {
+      throw new ServiceUnavailableException(
+        "This owner action is available after a harvest automation is indexed",
+      );
+    }
+    const request = setupRequest(body);
+    const registered = await this.#registry.load(this.#expectedGenesisHash);
+    if (registered.status !== "ok" || registered.deployment.manifest.daoHarvest === undefined) {
+      throw new ServiceUnavailableException("DAO harvest is not active on this deployment");
+    }
+    const deployment = registeredDaoHarvestDeployment(registered.deployment);
+    const tip = await this.#chain.getTipHeader();
+    const tipEpoch = parseEpoch(tip.epoch.toString());
+    const anticipatedDepositEpoch = addEpochs(tipEpoch, 1n);
+    const window = selectDaoPrepareWindow({
+      deposit: anticipatedDepositEpoch,
+      tip: anticipatedDepositEpoch,
+      bufferEpochs: PREPARE_BUFFER_EPOCHS,
+      confirmationMarginEpochs: CONFIRMATION_MARGIN_EPOCHS,
+    });
+    const actions = BigInt(request.totalCycles) * 2n;
+    const rate = accumulatedRate(tip.dao);
+    const quote = calculateDaoHarvestQuote({
+      principal: request.principal,
+      occupiedCapacity: DAO_HARVEST_VAULT_OCCUPIED_CAPACITY,
+      depositAccumulatedRate: rate,
+      projectedWithdrawAccumulatedRate: rate,
+      executorReward: EXECUTOR_REWARD,
+      actions,
+      estimatedNetworkFee: ESTIMATED_NETWORK_FEE,
+      snapshotBlock: tip.number.toString(),
+      validUntilBlock: BigInt(tip.number.toString()) + QUOTE_VALID_BLOCKS,
+    });
+    const build = buildDaoHarvestSetup({
+      deployment,
+      expectedGenesisHash: parseHash32(this.#expectedGenesisHash),
+      ownerLockHash: parseHash32(request.ownerLockHash),
+      payoutLockHash: parseHash32(request.payoutLockHash),
+      principal: request.principal,
+      vaultOccupiedCapacity: DAO_HARVEST_VAULT_OCCUPIED_CAPACITY,
+      jobOccupiedCapacity: DAO_HARVEST_JOB_OCCUPIED_CAPACITY,
+      prepareExecutorLockHashes:
+        registered.deployment.manifest.daoHarvest.prepareExecutorLockHashes,
+      executorReward: EXECUTOR_REWARD,
+      minCompensation: 1n,
+      prepareBufferEpochs: encodeRelativeEpochSince(
+        createEpoch({ number: PREPARE_BUFFER_EPOCHS, index: 0n, length: 0n }),
+      ),
+      confirmationMarginEpochs: encodeRelativeEpochSince(
+        createEpoch({ number: CONFIRMATION_MARGIN_EPOCHS, index: 0n, length: 0n }),
+      ),
+      totalCycles: BigInt(request.totalCycles),
+      endEpochSince: 0n,
+      firstPrepareSince: encodeAbsoluteEpochSince(window.startsAt),
+      creatorNonce: tip.number.toString(),
+      quote,
+      currentBlock: tip.number.toString(),
+    });
+    await this.#resolutions.remember(request.lockResolutions);
+    return Object.freeze({
+      operation: "setup" as const,
+      transaction: build.transaction,
+      signingEntries: build.signingEntries,
+      intent: build.intent,
+      policyCriticalHash: build.payloadHash,
+      jobId: build.jobId,
+    });
+  }
 }
 
 type Row = typeof daoHarvestJobs.$inferSelect & { readonly ownerLockHash: string };
@@ -314,6 +534,33 @@ export class DaoHarvestController {
 
 const hashSchema = { type: "string", pattern: "^0x[0-9a-f]{64}$" };
 const decimalSchema = { type: "string", pattern: "^(0|[1-9][0-9]*)$" };
+const lockScriptSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["args", "codeHash", "hashType"],
+  properties: {
+    args: { type: "string", pattern: "^0x(?:[0-9a-f]{2})*$" },
+    codeHash: hashSchema,
+    hashType: { type: "string", enum: ["data", "data1", "type"] },
+  },
+};
+const harvestSetupSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["lockResolutions", "ownerLockHash", "payoutLockHash", "principal", "totalCycles"],
+  properties: {
+    lockResolutions: {
+      type: "array",
+      minItems: 2,
+      maxItems: 2,
+      items: lockScriptSchema,
+    },
+    ownerLockHash: hashSchema,
+    payoutLockHash: hashSchema,
+    principal: decimalSchema,
+    totalCycles: { type: "integer", minimum: 1, maximum: 12 },
+  },
+};
 const harvestSchema = {
   type: "object",
   required: [
@@ -386,7 +633,7 @@ for (const [method, path, summary] of [
     method,
     Object.getOwnPropertyDescriptor(DaoHarvestController.prototype, method)!,
   );
-  ApiBody({ schema: { type: "object" } })(
+  ApiBody({ schema: method === "setup" ? harvestSetupSchema : { type: "object" } })(
     DaoHarvestController.prototype,
     method,
     Object.getOwnPropertyDescriptor(DaoHarvestController.prototype, method)!,

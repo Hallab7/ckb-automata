@@ -44,6 +44,12 @@ function chainFixture(genesisHash = GENESIS_HASH) {
       async getTipHeader() {
         throw new Error("tip header is not used by bootstrap tests");
       },
+      async getBlockByHash() {
+        throw new Error("blocks are not used by bootstrap tests");
+      },
+      async getBlockByNumber() {
+        throw new Error("blocks are not used by bootstrap tests");
+      },
       async getCellLive() {
         throw new Error("live cells are not used by bootstrap tests");
       },
@@ -90,7 +96,7 @@ test("standalone context reports readiness without creating an HTTP listener", a
       instanceId: "executor-local",
       network: "ckb_dev",
       activeWork: 0,
-      adapters: ["deadline-v1", "recurring-v1"],
+      adapters: ["deadline-v1", "recurring-v1", "dao-harvest-v1"],
       chain: { status: "up", genesisHash: GENESIS_HASH },
       redis: { status: "up" },
     });

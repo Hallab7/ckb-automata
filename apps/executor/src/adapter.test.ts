@@ -22,6 +22,7 @@ import {
   type ExecutorSnapshot,
 } from "./adapter.ts";
 import { DEADLINE_EXECUTOR_REGISTRATION } from "./policies/deadline.ts";
+import { DAO_HARVEST_EXECUTOR_REGISTRATION } from "./policies/dao-harvest.ts";
 import { RECURRING_EXECUTOR_REGISTRATION } from "./policies/recurring.ts";
 
 async function deployment(): Promise<RegisteredDeployment> {
@@ -138,11 +139,11 @@ test("identical snapshot and executor identity produce identical policy outputs"
   >);
   const registry = new ExecutorAdapterRegistry([adapter]);
   const spans: string[] = [];
-  const first = runExecutorAdapter(registry, fixture.snapshot, {
+  const first = await runExecutorAdapter(registry, fixture.snapshot, {
     rewardLock: fixture.rewardLock,
     transactionFee: parseShannons("1000000"),
   });
-  const second = runExecutorAdapter(
+  const second = await runExecutorAdapter(
     registry,
     fixture.snapshot,
     {
@@ -191,6 +192,22 @@ test("deadline and recurring registrations own their policy matching", () => {
     }),
     true,
   );
+  assert.equal(
+    DAO_HARVEST_EXECUTOR_REGISTRATION.supports({
+      kind: "dao_harvest",
+      scriptHash: hash,
+      contract: "dao-harvest-policy",
+    }),
+    true,
+  );
+  assert.equal(
+    DAO_HARVEST_EXECUTOR_REGISTRATION.supports({
+      kind: "recurring",
+      scriptHash: hash,
+      contract: "recurring-policy",
+    }),
+    false,
+  );
 });
 
 test("ineligible decisions stop before build", async () => {
@@ -211,10 +228,14 @@ test("ineligible decisions stop before build", async () => {
     },
     verifyBuilt: () => ({ status: "valid" as const }),
   });
-  const result = runExecutorAdapter(new ExecutorAdapterRegistry([adapter]), fixture.snapshot, {
-    rewardLock: fixture.rewardLock,
-    transactionFee: parseShannons("1000000"),
-  });
+  const result = await runExecutorAdapter(
+    new ExecutorAdapterRegistry([adapter]),
+    fixture.snapshot,
+    {
+      rewardLock: fixture.rewardLock,
+      transactionFee: parseShannons("1000000"),
+    },
+  );
   assert.equal(result.status, "ineligible");
   assert.equal(builds, 0);
 });
@@ -232,10 +253,14 @@ test("the registry rejects ambiguous support and exposes failed self-verificatio
       message: "fixture rejected",
     }),
   });
-  const result = runExecutorAdapter(new ExecutorAdapterRegistry([invalid]), fixture.snapshot, {
-    rewardLock: fixture.rewardLock,
-    transactionFee: parseShannons("1000000"),
-  });
+  const result = await runExecutorAdapter(
+    new ExecutorAdapterRegistry([invalid]),
+    fixture.snapshot,
+    {
+      rewardLock: fixture.rewardLock,
+      transactionFee: parseShannons("1000000"),
+    },
+  );
   assert.equal(result.status, "invalid_build");
   assert.equal(result.verification.reason, "EXECUTOR_SIMULATION_REJECTED");
 
@@ -246,8 +271,8 @@ test("the registry rejects ambiguous support and exposes failed self-verificatio
     build: () => ({ transaction: fixture.transaction, summary: Object.freeze({}) }),
     verifyBuilt: () => ({ status: "valid" as const }),
   });
-  assert.throws(
-    () =>
+  await assert.rejects(
+    async () =>
       runExecutorAdapter(
         new ExecutorAdapterRegistry([invalid, duplicateSupport]),
         fixture.snapshot,

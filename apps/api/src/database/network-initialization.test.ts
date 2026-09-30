@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { TESTNET_DEPLOYMENT_MANIFEST_SHA256 } from "@ckb-automata/core";
+
 import {
   assertStoredNetwork,
   resolveNetworkInitialization,
@@ -9,7 +11,7 @@ import {
 
 const expected: NetworkInitializationRecord = Object.freeze({
   confirmationDepth: 5,
-  deploymentManifestHash: "8902af74e77e28fc10c4d73eae37a6343e788ede98cd90c7a2add2170525bf38",
+  deploymentManifestHash: TESTNET_DEPLOYMENT_MANIFEST_SHA256,
   genesisHash: "0x10639e0895502b5688a6be8cf69460d76541bfa4821629d86d62ba0aae3f9606",
   networkId: "ckb_testnet",
   rpcProfile: "testnet-public",

@@ -55,7 +55,11 @@ export interface EligibilityJobSource {
 }
 
 export function eligibilityRecordFromRow(row: EligibilityRow): EligibilityJobRecord {
-  if (row.policy_kind !== "deadline" && row.policy_kind !== "recurring") {
+  if (
+    row.policy_kind !== "deadline" &&
+    row.policy_kind !== "recurring" &&
+    row.policy_kind !== "dao_harvest"
+  ) {
     throw new Error("live job has an unsupported policy kind");
   }
   return Object.freeze({

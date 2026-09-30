@@ -17,6 +17,7 @@ import { PostgresDeadLetterStore } from "./dead-letter-store.ts";
 import { DeadLetterCoordinator } from "./dead-letter-worker.ts";
 import { EligibilityCoordinator, PostgresEligibilityJobSource } from "./eligibility-worker.ts";
 import { DEADLINE_EXECUTOR_ADAPTER } from "./policies/deadline.ts";
+import { DAO_HARVEST_EXECUTOR_ADAPTER } from "./policies/dao-harvest.ts";
 import { RECURRING_EXECUTOR_ADAPTER } from "./policies/recurring.ts";
 import { DurableQueueRegistry, queueRegistrationOptions, queueRootOptions } from "./queues.ts";
 import { ExecutorReceiptSigner } from "./receipt.ts";
@@ -41,13 +42,14 @@ export const EXECUTOR_QUEUES = Symbol("EXECUTOR_QUEUES");
 const DEFAULT_ADAPTERS = Object.freeze([
   DEADLINE_EXECUTOR_ADAPTER,
   RECURRING_EXECUTOR_ADAPTER,
+  DAO_HARVEST_EXECUTOR_ADAPTER,
 ] satisfies readonly RegisteredExecutorAdapter[]);
 
 function configuredAdapters(
   environment: AutomataEnvironment,
 ): readonly RegisteredExecutorAdapter[] {
   const supported = new Set(
-    (environment.EXECUTOR_SUPPORTED_POLICIES ?? "deadline,recurring").split(","),
+    (environment.EXECUTOR_SUPPORTED_POLICIES ?? "deadline,recurring,dao-harvest").split(","),
   );
   return Object.freeze(
     DEFAULT_ADAPTERS.filter((adapter) => supported.has(adapter.registration.policy)),

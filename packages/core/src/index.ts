@@ -131,7 +131,9 @@ export {
 } from "./dao-harvest-math.ts";
 
 export {
+  DAO_HARVEST_JOB_OCCUPIED_CAPACITY,
   DAO_HARVEST_SETUP_INTENT_DOMAIN,
+  DAO_HARVEST_VAULT_OCCUPIED_CAPACITY,
   DaoHarvestBuilderError,
   buildDaoHarvestOwnerExit,
   buildDaoHarvestPrepare,
@@ -139,6 +141,7 @@ export {
   buildDaoHarvestRoll,
   buildDaoHarvestSetup,
   buildDaoHarvestStopRecurrence,
+  registeredDaoHarvestDeployment,
   type DaoHarvestActionInput,
   type DaoHarvestBuilderErrorCode,
   type DaoHarvestContractDeployment,

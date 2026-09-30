@@ -34,7 +34,7 @@ export function operatorLockArgs(privateKey: string): `0x${string}` {
 export function signOperatorFeeInput(
   transaction: UnsignedDeadlineTransaction,
   privateKey: string,
-  inputIndex = 1,
+  inputIndex = transaction.inputs.length - 1,
 ): UnsignedDeadlineTransaction {
   if (
     !Number.isSafeInteger(inputIndex) ||

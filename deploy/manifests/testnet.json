@@ -106,6 +106,55 @@
       "sizeBytes": 8128
     }
   },
+  "daoHarvest": {
+    "deployment": {
+      "transactionHash": "0xc5cb0fdd0967ca38f67c40b64a46a4925e7d954cf432368b70538757a09b9822",
+      "blockHash": "0x4cbac5afb8746d2c1c580ca3b9a722380374d316c04215f313cfc5a28b72238a"
+    },
+    "contracts": {
+      "harvest-vault-lock": {
+        "codeHash": "0xa4693f462087a7e980817a7769224a11d1f4e3025f8aa97f1b49d724c4d7ae32",
+        "hashType": "data1",
+        "cellDep": {
+          "outPoint": {
+            "txHash": "0xc5cb0fdd0967ca38f67c40b64a46a4925e7d954cf432368b70538757a09b9822",
+            "index": "0x0"
+          },
+          "depType": "code"
+        },
+        "binarySha256": "b543f869868c94bb56552f074c7d40ea32faf5b8ad1abd4b3e72d7c20f141b08",
+        "sizeBytes": 15336
+      },
+      "dao-harvest-policy": {
+        "codeHash": "0xa3ffba9aa6a33bc9cdbba5a6d9e9a103074fe2ae23635bc094c0bc214b01301c",
+        "hashType": "data1",
+        "cellDep": {
+          "outPoint": {
+            "txHash": "0xc5cb0fdd0967ca38f67c40b64a46a4925e7d954cf432368b70538757a09b9822",
+            "index": "0x1"
+          },
+          "depType": "code"
+        },
+        "binarySha256": "9d8b781493c4cf8f8479468766a300d7cfef69495b830963a190203d7e5b6c69",
+        "sizeBytes": 41304
+      }
+    },
+    "nervosDao": {
+      "codeHash": "0x82d76d1b75fe2fd9a27dfbaa65a039221a380d76c926f378d3f81cf3e7e13f2e",
+      "hashType": "type",
+      "cellDep": {
+        "outPoint": {
+          "txHash": "0x8f8c79eb6671709633fe6a46de93c0fedc9c1b8a6527a18d3983879542635c9f",
+          "index": "0x2"
+        },
+        "depType": "code"
+      }
+    },
+    "prepareExecutorLockHashes": [
+      "0x56f7b4edac9e6c7ffecdce54817b1f6903eec6e4ac589bae8dd2bb9d7a3bd7fb",
+      "0x167c6fd7818c8758c976822da225323dfe96d2fb68397ed79dcc11e6e00eddcc"
+    ]
+  },
   "verification": {
     "kind": "resolved-code-deps-and-ckb-vm-fixtures",
     "transactionHash": "0xef471574d2f58c38d3e9d9380d98f853c9bcf5388730a767ac6f1ff35ab8cc64",

@@ -1,10 +1,13 @@
 import {
+  compareEpochFractions,
+  decodeAbsoluteEpochSince,
   inspectJobData,
   parseBlockNumber,
   parseHash32,
   parseOutPoint,
   parseSequence,
   parseShannons,
+  parseEpoch,
   type RegisteredDeployment,
   type ScriptIdentity,
 } from "@ckb-automata/core";
@@ -25,7 +28,7 @@ export interface EligibilityJobRecord {
   readonly networkId: string;
   readonly jobId: string;
   readonly sequence: string;
-  readonly policyKind: "deadline" | "recurring";
+  readonly policyKind: "deadline" | "recurring" | "dao_harvest";
   readonly data: `0x${string}`;
   readonly capacity: string;
   readonly outPoint: { readonly txHash: string; readonly index: string };
@@ -92,8 +95,16 @@ function policyScript(
   if (record.policyKind === "deadline") {
     throw new Error("deadline eligibility requires the live policy script");
   }
-  const contract = deployment.contracts["recurring-policy"];
-  return Object.freeze({ ...contract.script, args: "0x" as const });
+  if (record.policyKind === "dao_harvest") {
+    const contract = deployment.manifest.daoHarvest?.contracts["dao-harvest-policy"];
+    if (!contract) throw new Error("DAO harvest deployment is unavailable");
+    return Object.freeze({
+      codeHash: contract.codeHash,
+      hashType: contract.hashType,
+      args: "0x" as const,
+    });
+  }
+  return Object.freeze({ ...deployment.contracts["recurring-policy"].script, args: "0x" as const });
 }
 
 function snapshot(
@@ -220,7 +231,10 @@ export class EligibilityEvaluator {
         reason: result.eligibility.reason,
       });
     }
-    const delayMs = nextEvaluationDelay(inspected.job.notBefore, tip.number);
+    const delayMs =
+      record.policyKind === "dao_harvest"
+        ? nextEpochEvaluationDelay(inspected.job.notBefore, tip.epoch)
+        : nextEvaluationDelay(inspected.job.notBefore, tip.number);
     if (wakeSequence === Number.MAX_SAFE_INTEGER) {
       throw new RangeError("eligibility wake sequence is exhausted");
     }
@@ -245,4 +259,19 @@ export class EligibilityEvaluator {
       delayMs,
     });
   }
+}
+
+export function nextEpochEvaluationDelay(notBeforeValue: bigint, tipValue: string): number {
+  const notBefore = decodeAbsoluteEpochSince(notBeforeValue);
+  const tip = parseEpoch(tipValue);
+  if (compareEpochFractions(tip, notBefore) >= 0) return MIN_EVALUATION_DELAY_MS;
+  const wholeEpochs = notBefore.number - tip.number;
+  const estimate = (wholeEpochs <= 0n ? 1n : wholeEpochs) * 4n * 60n * 60n * 1_000n;
+  return Number(
+    estimate > BigInt(MAX_EVALUATION_DELAY_MS)
+      ? MAX_EVALUATION_DELAY_MS
+      : estimate < BigInt(MIN_EVALUATION_DELAY_MS)
+        ? MIN_EVALUATION_DELAY_MS
+        : estimate,
+  );
 }

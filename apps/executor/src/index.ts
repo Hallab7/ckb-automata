@@ -3,6 +3,12 @@ import { WORKSPACE_NAME } from "@ckb-automata/core";
 export const EXECUTOR_APP_ID = `${WORKSPACE_NAME}:executor` as const;
 
 export {
+  DAO_HARVEST_EXECUTOR_ADAPTER,
+  DAO_HARVEST_EXECUTOR_REGISTRATION,
+  DaoHarvestAdapterError,
+} from "./policies/dao-harvest.ts";
+
+export {
   daoHarvestOperationalSignal,
   inspectDaoHarvestDeadLetter,
   type DaoHarvestDeadLetterInspection,

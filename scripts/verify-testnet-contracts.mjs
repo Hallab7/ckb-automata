@@ -56,7 +56,30 @@ assert.ok(
   `deployment has ${confirmationDepth} confirmations; ${requiredConfirmationDepth} required`,
 );
 
-for (const [name, contract] of Object.entries(manifest.contracts)) {
+let harvestConfirmationDepth = null;
+if (manifest.daoHarvest) {
+  const harvestDeployment = await rpc("get_transaction", [
+    manifest.daoHarvest.deployment.transactionHash,
+  ]);
+  assert.equal(harvestDeployment.tx_status.status, "committed", "DAO deployment is not committed");
+  assert.equal(
+    harvestDeployment.tx_status.block_hash,
+    manifest.daoHarvest.deployment.blockHash,
+    "DAO deployment block mismatch",
+  );
+  const header = await rpc("get_header", [manifest.daoHarvest.deployment.blockHash]);
+  harvestConfirmationDepth = BigInt(tipHeader.number) - BigInt(header.number) + 1n;
+  assert.ok(
+    harvestConfirmationDepth >= requiredConfirmationDepth,
+    `DAO deployment has ${harvestConfirmationDepth} confirmations; ${requiredConfirmationDepth} required`,
+  );
+}
+
+const contracts = {
+  ...manifest.contracts,
+  ...manifest.daoHarvest?.contracts,
+};
+for (const [name, contract] of Object.entries(contracts)) {
   assert.equal(contract.cellDep.depType, "code", `${name} must use a code cell dep`);
   const cell = await liveCell(contract.cellDep);
   const data = Buffer.from(cell.data.content.slice(2), "hex");
@@ -73,6 +96,20 @@ for (const [name, contract] of Object.entries(manifest.contracts)) {
     hash_type: "data1",
   });
   assert.equal(cell.output.type, null, `${name} code cell must not have a type script`);
+}
+
+if (manifest.daoHarvest) {
+  const daoCell = await liveCell(manifest.daoHarvest.nervosDao.cellDep, false);
+  assert.ok(daoCell.output.type, "Nervos DAO code cell must carry a type script");
+  assert.equal(
+    scriptHash({
+      codeHash: daoCell.output.type.code_hash,
+      hashType: daoCell.output.type.hash_type,
+      args: daoCell.output.type.args,
+    }),
+    manifest.daoHarvest.nervosDao.codeHash,
+    "Nervos DAO system script mismatch",
+  );
 }
 
 const secpDepGroup = await liveCell(manifest.secp256k1Blake160.cellDep);
@@ -101,6 +138,14 @@ const fixtureCases = [
   ["recurring-policy", "recurring_payout::recurring_policy_pays_the_exact_committed_native_amount"],
   ["demo-campaign-type", "campaign_creation::deterministic_campaign_fixture_can_be_created"],
   ["campaign-lock", "campaign_lock::empty_args_allow_permissionless_campaign_consumption"],
+  [
+    "harvest-vault-lock",
+    "dao_harvest_contract::owner_can_exit_the_vault_without_service_authority",
+  ],
+  [
+    "dao-harvest-policy",
+    "dao_harvest_contract::claim_pays_exact_compensation_and_redeposits_principal",
+  ],
 ];
 const cargo = process.platform === "win32" ? "cargo.exe" : "cargo";
 for (const [name, fixture] of fixtureCases) {
@@ -112,5 +157,5 @@ for (const [name, fixture] of fixtureCases) {
 }
 
 console.log(
-  `Resolved ${Object.keys(manifest.contracts).length} immutable testnet code cells at ${confirmationDepth} confirmations`,
+  `Resolved ${Object.keys(contracts).length} immutable testnet code cells at ${confirmationDepth} primary confirmations${harvestConfirmationDepth === null ? "" : ` and ${harvestConfirmationDepth} DAO confirmations`}`,
 );

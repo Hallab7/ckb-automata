@@ -42,6 +42,8 @@ import type {
 } from "./deadline-creation.ts";
 import type { CellDepIdentity, ScriptIdentity } from "./job-inspection.ts";
 import { deriveJobId } from "./job-identity.ts";
+import { CONTRACT_CAPACITY } from "./contract-costs.ts";
+import type { RegisteredDeployment } from "./deployment-registry.ts";
 import {
   ABSOLUTE_EPOCH_TRIGGER_KIND,
   decodeAbsoluteEpochSince,
@@ -52,6 +54,8 @@ import {
 type Hex = `0x${string}`;
 
 export const DAO_HARVEST_SETUP_INTENT_DOMAIN = "ckb-automata/dao-harvest-setup-intent/v1" as const;
+export const DAO_HARVEST_VAULT_OCCUPIED_CAPACITY = 210n * 100_000_000n;
+export const DAO_HARVEST_JOB_OCCUPIED_CAPACITY = CONTRACT_CAPACITY.jobCellV1;
 
 export type DaoHarvestBuilderErrorCode =
   | "WRONG_NETWORK"
@@ -87,6 +91,50 @@ export interface DaoHarvestDeployment {
   readonly policy: DaoHarvestContractDeployment;
   readonly vaultLock: DaoHarvestContractDeployment;
   readonly daoType: DaoHarvestContractDeployment;
+}
+
+function daoHarvestContract(value: {
+  readonly codeHash: Hash32;
+  readonly hashType: ScriptIdentity["hashType"];
+  readonly cellDep: CellDepIdentity;
+}): DaoHarvestContractDeployment {
+  return Object.freeze({
+    script: Object.freeze({ codeHash: value.codeHash, hashType: value.hashType }),
+    cellDep: value.cellDep,
+  });
+}
+
+export function registeredDaoHarvestDeployment(
+  deployment: RegisteredDeployment,
+): DaoHarvestDeployment {
+  const harvest = deployment.manifest.daoHarvest;
+  if (deployment.network !== "ckb_testnet" || harvest === undefined) {
+    throw new DaoHarvestBuilderError(
+      "WRONG_NETWORK",
+      "DAO harvest is not registered for the selected deployment",
+    );
+  }
+  return Object.freeze({
+    network: "ckb_testnet" as const,
+    genesisHash: deployment.genesisHash,
+    manifestSha256: deployment.manifestSha256,
+    secp256k1Blake160: Object.freeze({
+      cellDep: deployment.manifest.secp256k1Blake160.cellDep,
+    }),
+    jobLock: daoHarvestContract({
+      ...deployment.contracts["job-lock"].script,
+      cellDep: deployment.contracts["job-lock"].cellDep,
+    }),
+    policy: daoHarvestContract(harvest.contracts["dao-harvest-policy"]),
+    vaultLock: daoHarvestContract(harvest.contracts["harvest-vault-lock"]),
+    daoType: Object.freeze({
+      script: Object.freeze({
+        codeHash: harvest.nervosDao.codeHash,
+        hashType: harvest.nervosDao.hashType,
+      }),
+      cellDep: harvest.nervosDao.cellDep,
+    }),
+  });
 }
 
 export interface DaoHarvestSetupInput {

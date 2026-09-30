@@ -23,6 +23,10 @@ import {
   jobVersions,
 } from "../database/schema.ts";
 import { CanonicalCheckpointStore, CheckpointError, type CheckpointUpdate } from "./checkpoints.ts";
+import type {
+  DaoHarvestProjectionResult,
+  DaoHarvestProjectionStore,
+} from "./dao-harvest-projection.ts";
 import { JobCellDiscovery, type JobDiscoveryResult } from "./job-discovery.ts";
 import { JobTransitionIndexer, type JobTransitionResult } from "./job-transitions.ts";
 
@@ -42,6 +46,7 @@ export interface CanonicalBlockProjectionResult {
   readonly rollback?: ReorgRollbackResult;
   readonly discovery: JobDiscoveryResult;
   readonly transitions: JobTransitionResult;
+  readonly daoHarvest?: DaoHarvestProjectionResult;
   readonly checkpoint: CheckpointUpdate;
 }
 
@@ -311,6 +316,7 @@ export class CanonicalBlockProjector {
   readonly #instrumentation: {
     readonly metrics?: Pick<AutomataMetrics, "reorgsTotal">;
     readonly telemetry?: Pick<TelemetryRuntime, "withSpan">;
+    readonly daoHarvest?: Pick<DaoHarvestProjectionStore, "projectBlock">;
   };
 
   constructor(
@@ -322,6 +328,7 @@ export class CanonicalBlockProjector {
     instrumentation: {
       readonly metrics?: Pick<AutomataMetrics, "reorgsTotal">;
       readonly telemetry?: Pick<TelemetryRuntime, "withSpan">;
+      readonly daoHarvest?: Pick<DaoHarvestProjectionStore, "projectBlock">;
     } = {},
   ) {
     this.#ckbClient = ckbClient;
@@ -425,6 +432,12 @@ export class CanonicalBlockProjector {
     const transitions = await span("indexer.job.transition", () =>
       this.#transitions.indexBlock(block, deployment),
     );
+    const daoHarvest = await span(
+      "indexer.dao_harvest.project",
+      () =>
+        this.#instrumentation.daoHarvest?.projectBlock(block, deployment) ??
+        Promise.resolve(undefined),
+    );
     const checkpoint = await span("indexer.checkpoint.record", () =>
       this.#checkpoints.record({
         networkId: deployment.network,
@@ -438,6 +451,7 @@ export class CanonicalBlockProjector {
       ...(rollback ? { rollback } : {}),
       discovery,
       transitions,
+      ...(daoHarvest === undefined ? {} : { daoHarvest }),
       checkpoint,
     });
   }
