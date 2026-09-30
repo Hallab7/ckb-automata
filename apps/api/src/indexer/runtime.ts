@@ -1,4 +1,6 @@
-import type { RegisteredDeployment } from "@ckb-automata/core";
+import type { ClientBlock } from "@ckb-ccc/shell";
+
+import { parseBlockNumber, type RegisteredDeployment } from "@ckb-automata/core";
 
 import type { CkbReadClient } from "../ckb-client.ts";
 import { CheckpointError, type CanonicalCheckpointStore } from "./checkpoints.ts";
@@ -6,6 +8,7 @@ import type { CanonicalBlockProjector } from "./reorg.ts";
 
 export const INDEXER_INITIAL_BACKFILL_BLOCKS = 256n;
 export const INDEXER_BATCH_BLOCKS = 32n;
+export const INDEXER_FETCH_CONCURRENCY = 8;
 export const INDEXER_POLL_INTERVAL_MS = 3_000;
 
 export interface IndexerScanRange {
@@ -45,9 +48,9 @@ export interface LiveIndexerRuntimeOptions {
 }
 
 export class LiveIndexerRuntime {
-  readonly #chain: Pick<CkbReadClient, "getTipHeader">;
+  readonly #chain: Pick<CkbReadClient, "getBlockByNumber" | "getTipHeader">;
   readonly #checkpoints: CanonicalCheckpointStore;
-  readonly #projector: CanonicalBlockProjector;
+  readonly #projector: Pick<CanonicalBlockProjector, "projectBlock">;
   readonly #logger: IndexerLogger;
   readonly #options: Required<Pick<LiveIndexerRuntimeOptions, "enabled" | "pollIntervalMs">> &
     Pick<LiveIndexerRuntimeOptions, "loadDeployment">;
@@ -56,9 +59,9 @@ export class LiveIndexerRuntime {
   #timer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(
-    chain: Pick<CkbReadClient, "getTipHeader">,
+    chain: Pick<CkbReadClient, "getBlockByNumber" | "getTipHeader">,
     checkpoints: CanonicalCheckpointStore,
-    projector: CanonicalBlockProjector,
+    projector: Pick<CanonicalBlockProjector, "projectBlock">,
     logger: IndexerLogger,
     options: LiveIndexerRuntimeOptions,
   ) {
@@ -107,9 +110,30 @@ export class LiveIndexerRuntime {
     const range = nextIndexerScanRange(checkpoint?.blockNumber, tip.number);
     if (range === undefined) return Object.freeze({ caughtUp: true, scanned: 0 });
     let scanned = 0;
-    for (let block = range.first; block <= range.last; block += 1n) {
-      await this.#projector.scanBlock(block, deployment);
-      scanned += 1;
+    for (let first = range.first; first <= range.last; first += BigInt(INDEXER_FETCH_CONCURRENCY)) {
+      const last =
+        first + BigInt(INDEXER_FETCH_CONCURRENCY) - 1n < range.last
+          ? first + BigInt(INDEXER_FETCH_CONCURRENCY) - 1n
+          : range.last;
+      const blockNumbers = Array.from(
+        { length: Number(last - first + 1n) },
+        (_, index) => first + BigInt(index),
+      );
+      const blocks = await Promise.all(
+        blockNumbers.map(async (blockNumber) => {
+          const block = await this.#chain.getBlockByNumber(blockNumber);
+          if (!block) throw new Error("canonical block is unavailable");
+          if (parseBlockNumber(block.header.number.toString()) !== blockNumber) {
+            throw new Error("CKB client returned a block at the wrong height");
+          }
+          return block;
+        }),
+      );
+      assertContiguousBlocks(blocks);
+      for (const block of blocks) {
+        await this.#projector.projectBlock(block, deployment);
+        scanned += 1;
+      }
     }
     const caughtUp = range.last === tip.number;
     this.#logger.info("indexer.batch.completed", "Canonical indexer batch completed", {
@@ -145,6 +169,14 @@ export class LiveIndexerRuntime {
     } finally {
       this.#running = false;
       this.#schedule(delay);
+    }
+  }
+}
+
+function assertContiguousBlocks(blocks: readonly ClientBlock[]): void {
+  for (let index = 1; index < blocks.length; index += 1) {
+    if (blocks[index]!.header.parentHash !== blocks[index - 1]!.header.hash) {
+      throw new Error("CKB client returned a non-canonical block range");
     }
   }
 }
