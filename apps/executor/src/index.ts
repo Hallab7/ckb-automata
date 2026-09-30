@@ -2,6 +2,18 @@ import { WORKSPACE_NAME } from "@ckb-automata/core";
 
 export const EXECUTOR_APP_ID = `${WORKSPACE_NAME}:executor` as const;
 
+export {
+  DAO_HARVEST_MAX_WAKE_DELAY_MS,
+  DAO_HARVEST_MIN_WAKE_DELAY_MS,
+  DaoHarvestScheduler,
+  assertDaoHarvestSubmissionWindow,
+  evaluateDaoHarvestSchedule,
+  reconcileDaoHarvestAttempt,
+  type DaoHarvestAttemptObservation,
+  type DaoHarvestScheduleDecision,
+  type DaoHarvestScheduleRecord,
+} from "./dao-harvest-scheduler.ts";
+
 export { ChainBuildSnapshotSource, chainScriptIdentity } from "./build-snapshot.ts";
 export { PostgresBuildAttemptStore } from "./build-store.ts";
 export { BuildCoordinator } from "./build-worker.ts";
