@@ -53,18 +53,25 @@ test("loads paired migrations in numeric order with stable checksums", async () 
   );
 });
 
-test("repository migrations retain confirmation policy and add the harvest projection", async () => {
+test("repository migrations retain confirmation policy and register the harvest deployment", async () => {
   const migrations = await loadMigrations();
   const confirmations = migrations.find(({ version }) => version === 13);
+  const harvestProjection = migrations.find(({ version }) => version === 14);
   const latest = migrations.at(-1);
 
   assert.equal(confirmations?.name, "testnet_confirmation_depth");
   assert.match(confirmations?.upSql ?? "", /confirmation_depth = 5/);
   assert.match(confirmations?.downSql ?? "", /confirmation_depth = 24/);
-  assert.equal(latest?.version, 14);
-  assert.equal(latest?.name, "dao_harvest_projection");
-  assert.match(latest?.upSql ?? "", /CREATE TABLE dao_harvest_jobs/);
-  assert.match(latest?.downSql ?? "", /DROP TABLE IF EXISTS dao_harvest_jobs/);
+  assert.equal(harvestProjection?.name, "dao_harvest_projection");
+  assert.match(harvestProjection?.upSql ?? "", /CREATE TABLE dao_harvest_jobs/);
+  assert.match(harvestProjection?.downSql ?? "", /DROP TABLE IF EXISTS dao_harvest_jobs/);
+  assert.equal(latest?.version, 15);
+  assert.equal(latest?.name, "dao_harvest_manifest");
+  for (const sql of [latest?.upSql ?? "", latest?.downSql ?? ""]) {
+    assert.match(sql, /8902af74/);
+    assert.match(sql, /cddc2e92/);
+    assert.match(sql, /10639e08/);
+  }
 });
 
 test("rejects gaps and unpaired migration files", async () => {
