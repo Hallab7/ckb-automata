@@ -1,7 +1,7 @@
 import { DaoHarvestPayloadV1, JobDataV1 } from "@ckb-automata/molecule";
 import type { ClientBlock } from "@ckb-ccc/shell";
 import { bytesToHex, hexToBytes, scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import {
   addEpochFractions,
@@ -217,12 +217,19 @@ export class DaoHarvestProjectionStore {
       block,
       registeredDaoHarvestDeployment(deployment),
     );
-    const hasConsumedCells = block.transactions.some((chainTransaction) =>
-      chainTransaction.inputs.some(
-        (input) => !/^0x0{64}$/.test(input.previousOutput.txHash.toString()),
-      ),
-    );
-    if (extraction.projections.length === 0 && !hasConsumedCells) {
+    const inputs = [
+      ...new Map(
+        block.transactions
+          .flatMap((chainTransaction) => chainTransaction.inputs)
+          .map((input) => ({
+            txHash: parseHash32(input.previousOutput.txHash.toString()),
+            index: BigInt(input.previousOutput.index).toString(),
+          }))
+          .filter(({ txHash }) => !/^0x0{64}$/.test(txHash))
+          .map((input) => [`${input.txHash}:${input.index}`, input] as const),
+      ).values(),
+    ];
+    if (extraction.projections.length === 0 && inputs.length === 0) {
       return Object.freeze({ ...extraction, persisted: 0 });
     }
     await this.#database.transaction(async (transaction) => {
@@ -266,58 +273,57 @@ export class DaoHarvestProjectionStore {
           });
       }
       const projectedJobIds = new Set<string>(extraction.projections.map(({ jobId }) => jobId));
-      for (const chainTransaction of block.transactions) {
-        const inputs = chainTransaction.inputs
-          .map((input) => ({
-            txHash: parseHash32(input.previousOutput.txHash.toString()),
-            index: BigInt(input.previousOutput.index).toString(),
-          }))
-          .filter(({ txHash }) => !/^0x0{64}$/.test(txHash));
-        for (const input of inputs) {
-          const [consumed] = await transaction
-            .select({
-              jobId: jobs.jobId,
-              vaultTxHash: daoHarvestJobs.vaultOutpointTxHash,
-              vaultIndex: daoHarvestJobs.vaultOutpointIndex,
-            })
-            .from(jobs)
-            .innerJoin(
-              daoHarvestJobs,
-              and(
-                eq(daoHarvestJobs.networkId, jobs.networkId),
-                eq(daoHarvestJobs.jobId, jobs.jobId),
-              ),
-            )
-            .where(
-              and(
-                eq(jobs.networkId, deployment.network),
-                eq(jobs.policyKind, "dao_harvest"),
-                eq(jobs.outpointTxHash, input.txHash),
-                eq(jobs.outpointIndex, input.index),
-              ),
-            )
-            .limit(1);
-          if (!consumed || projectedJobIds.has(consumed.jobId)) continue;
-          const consumedVault = inputs.some(
-            (candidate) =>
-              candidate.txHash === consumed.vaultTxHash && candidate.index === consumed.vaultIndex,
-          );
-          await transaction
-            .update(daoHarvestJobs)
-            .set({
-              vaultState: consumedVault ? "completed" : "recovery_required",
-              observedBlockNumber: BigInt(block.header.number).toString(),
-              observedBlockHash: parseHash32(block.header.hash),
-              canonical: true,
-              updatedAt: new Date(),
-            })
-            .where(
-              and(
-                eq(daoHarvestJobs.networkId, deployment.network),
-                eq(daoHarvestJobs.jobId, consumed.jobId),
-              ),
-            );
+      const inputTransactionHashes = [...new Set(inputs.map(({ txHash }) => txHash))];
+      const possibleConsumptions =
+        inputTransactionHashes.length === 0
+          ? []
+          : await transaction
+              .select({
+                jobId: jobs.jobId,
+                jobTxHash: jobs.outpointTxHash,
+                jobIndex: jobs.outpointIndex,
+                vaultTxHash: daoHarvestJobs.vaultOutpointTxHash,
+                vaultIndex: daoHarvestJobs.vaultOutpointIndex,
+              })
+              .from(jobs)
+              .innerJoin(
+                daoHarvestJobs,
+                and(
+                  eq(daoHarvestJobs.networkId, jobs.networkId),
+                  eq(daoHarvestJobs.jobId, jobs.jobId),
+                ),
+              )
+              .where(
+                and(
+                  eq(jobs.networkId, deployment.network),
+                  eq(jobs.policyKind, "dao_harvest"),
+                  inArray(jobs.outpointTxHash, inputTransactionHashes),
+                ),
+              );
+      const inputOutpoints = new Set(inputs.map(({ txHash, index }) => `${txHash}:${index}`));
+      for (const consumed of possibleConsumptions) {
+        if (
+          !inputOutpoints.has(`${consumed.jobTxHash}:${consumed.jobIndex}`) ||
+          projectedJobIds.has(consumed.jobId)
+        ) {
+          continue;
         }
+        const consumedVault = inputOutpoints.has(`${consumed.vaultTxHash}:${consumed.vaultIndex}`);
+        await transaction
+          .update(daoHarvestJobs)
+          .set({
+            vaultState: consumedVault ? "completed" : "recovery_required",
+            observedBlockNumber: BigInt(block.header.number).toString(),
+            observedBlockHash: parseHash32(block.header.hash),
+            canonical: true,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(daoHarvestJobs.networkId, deployment.network),
+              eq(daoHarvestJobs.jobId, consumed.jobId),
+            ),
+          );
       }
     });
     return Object.freeze({ ...extraction, persisted: extraction.projections.length });

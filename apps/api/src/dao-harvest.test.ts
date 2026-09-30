@@ -8,6 +8,7 @@ import { scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
 import testnetManifest from "../../../deploy/manifests/testnet.json" with { type: "json" };
 import {
   createDeploymentRegistry,
+  deploymentRegistry,
   hashDeploymentManifest,
   registeredDaoHarvestDeployment,
   type UnsignedDeadlineTransaction,
@@ -19,7 +20,10 @@ import {
   DaoHarvestMutationService,
   DaoHarvestTransactionAdapter,
 } from "./dao-harvest.ts";
-import { extractDaoHarvestProjections } from "./indexer/dao-harvest-projection.ts";
+import {
+  DaoHarvestProjectionStore,
+  extractDaoHarvestProjections,
+} from "./indexer/dao-harvest-projection.ts";
 
 const quietLogger: LoggerService = {
   log: () => undefined,
@@ -219,4 +223,60 @@ test("active deployment builds an exact unsigned setup and rejects understated f
     }),
     /unsupported fields/,
   );
+});
+
+test("DAO harvest consumption discovery uses one candidate query per block", async () => {
+  const registered = await deploymentRegistry.load(testnetManifest.genesisHash);
+  assert.equal(registered.status, "ok");
+  if (registered.status !== "ok") throw new Error("testnet deployment is unavailable");
+
+  let candidateQueries = 0;
+  let transactions = 0;
+  const database = {
+    transaction: async (callback: (transaction: unknown) => Promise<unknown>) => {
+      transactions += 1;
+      return callback({
+        execute: async () => undefined,
+        select: () => ({
+          from: () => ({
+            innerJoin: () => ({
+              where: async () => {
+                candidateQueries += 1;
+                return [];
+              },
+            }),
+          }),
+        }),
+      });
+    },
+  };
+  const inputs = Array.from({ length: 50 }, (_, index) => ({
+    previousOutput: {
+      txHash: `0x${(index + 1).toString(16).padStart(64, "0")}`,
+      index: BigInt(index % 2),
+    },
+  }));
+  const result = await new DaoHarvestProjectionStore(database as never).projectBlock(
+    {
+      header: {
+        epoch: 0n,
+        hash: `0x${"ab".repeat(32)}`,
+        number: 22_584_000n,
+      },
+      transactions: [
+        {
+          hash: () => `0x${"cd".repeat(32)}`,
+          inputs,
+          outputs: [],
+          outputsData: [],
+          witnesses: [],
+        },
+      ],
+    } as never,
+    registered.deployment,
+  );
+
+  assert.equal(result.persisted, 0);
+  assert.equal(transactions, 1);
+  assert.equal(candidateQueries, 1);
 });
