@@ -48,8 +48,12 @@ assert.equal(network.genesisHash, manifest.genesisHash);
 assert.equal(network.confirmationDepth, 5);
 assert.equal(
   network.deploymentManifestHash,
-  "8902af74e77e28fc10c4d73eae37a6343e788ede98cd90c7a2add2170525bf38",
+  "cddc2e92468849d33e3b42d3e925515f5d61836cf0b4625ac94d43235fe3aa66",
 );
+assert.deepEqual(network.supportedPolicyVersions?.["dao-harvest"], [1]);
+
+const harvests = await (await request("v1/dao-harvest?limit=1")).json();
+assert.ok(Array.isArray(harvests.items), "DAO harvest list is unavailable");
 
 const metrics = await (await request("v1/metrics", "text/plain")).text();
 for (const metric of [

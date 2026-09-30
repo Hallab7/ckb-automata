@@ -30,7 +30,7 @@ function readyExecutor(instanceId) {
     status: "ready",
     instanceId,
     network: "ckb_testnet",
-    adapters: ["recurring-v1", "deadline-v1"],
+    adapters: ["recurring-v1", "dao-harvest-v1", "deadline-v1"],
     chain: {
       genesisHash: "0x10639e0895502b5688a6be8cf69460d76541bfa4821629d86d62ba0aae3f9606",
     },

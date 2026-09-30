@@ -33,8 +33,10 @@ test("public verification covers TLS, readiness, identity, and metrics", () => {
     'assert.equal(apiUrl.protocol, "https:"',
     'request("v1/health/ready")',
     'request("v1/network")',
+    'request("v1/dao-harvest?limit=1")',
     'request("v1/metrics", "text/plain")',
     "manifest.genesisHash",
+    'network.supportedPolicyVersions?.["dao-harvest"]',
   ]) {
     assert.ok(verifier.includes(value), `public verifier is missing ${value}`);
   }

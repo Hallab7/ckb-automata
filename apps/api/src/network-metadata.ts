@@ -6,6 +6,7 @@ import { deploymentRegistry, type DeploymentRegistry } from "@ckb-automata/core"
 import type { CkbReadClient } from "./ckb-client.ts";
 
 export const SUPPORTED_POLICY_VERSIONS = Object.freeze({
+  "dao-harvest": Object.freeze([1] as const),
   deadline: Object.freeze([1] as const),
   recurring: Object.freeze([1] as const),
 });

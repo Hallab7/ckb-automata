@@ -6,7 +6,7 @@ import { setTimeout as wait } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 
 const EXPECTED_GENESIS = "0x10639e0895502b5688a6be8cf69460d76541bfa4821629d86d62ba0aae3f9606";
-const EXPECTED_ADAPTERS = Object.freeze(["deadline-v1", "recurring-v1"]);
+const EXPECTED_ADAPTERS = Object.freeze(["dao-harvest-v1", "deadline-v1", "recurring-v1"]);
 const TRANSIENT_STATUSES = new Set([502, 503, 504]);
 const DEFAULT_ATTEMPTS = 18;
 const DEFAULT_RETRY_DELAY_MS = 10_000;

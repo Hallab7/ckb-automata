@@ -156,7 +156,7 @@ test("versioned HTTP endpoint returns network metadata", async () => {
       tip: { blockNumber: "42", blockHash: TIP_HASH },
       confirmationDepth: 1,
       deploymentManifestHash: "2904b44ffa3c1f292404540f2bc6c14dc96789f888e28aa7fc2527566110e1d1",
-      supportedPolicyVersions: { deadline: [1], recurring: [1] },
+      supportedPolicyVersions: { "dao-harvest": [1], deadline: [1], recurring: [1] },
     });
     assert.equal((await fastify.inject({ method: "GET", url: "/network" })).statusCode, 404);
   } finally {
