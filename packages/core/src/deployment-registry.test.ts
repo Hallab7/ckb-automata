@@ -38,6 +38,14 @@ test("the pinned public manifest is canonical and selected by testnet genesis", 
   assert.equal(result.deployment.network, "ckb_testnet");
   assert.equal(result.deployment.manifestSha256, TESTNET_DEPLOYMENT_MANIFEST_SHA256);
   assert.equal(result.deployment.confirmation.requiredDepth, 5);
+  assert.equal(
+    result.deployment.manifest.daoHarvest?.contracts["dao-harvest-policy"].cellDep.outPoint.txHash,
+    result.deployment.manifest.daoHarvest?.deployment.transactionHash,
+  );
+  assert.notEqual(
+    result.deployment.manifest.daoHarvest?.contracts["harvest-vault-lock"].cellDep.outPoint.txHash,
+    result.deployment.manifest.daoHarvest?.deployment.transactionHash,
+  );
 });
 
 test("genesis lookup exposes only validated script, dep, and confirmation metadata", async () => {

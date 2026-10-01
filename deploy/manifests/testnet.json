@@ -13,7 +13,7 @@
     "warning": "Public deployment account identifier only; no credential is published"
   },
   "artifacts": {
-    "sourceRevision": "ad26b82431fc4eaf3a03c85f5bb3608863d5723f",
+    "sourceRevision": "815b328db7bd050554f2507f1b9b83d568ce1be3",
     "schemaSha256": "466ee9a672969544715ec6c12e14a2a0b2dfdb3907b53d7ce5ac9fbd8c8b6f3d",
     "builder": {
       "baseImage": "rust:1.93.1-bookworm@sha256:7c4ae649a84014c467d79319bbf17ce2632ae8b8be123ac2fb2ea5be46823f31",
@@ -108,8 +108,8 @@
   },
   "daoHarvest": {
     "deployment": {
-      "transactionHash": "0xc5cb0fdd0967ca38f67c40b64a46a4925e7d954cf432368b70538757a09b9822",
-      "blockHash": "0x4cbac5afb8746d2c1c580ca3b9a722380374d316c04215f313cfc5a28b72238a"
+      "transactionHash": "0x0c8d224317047b99fa8f95d321d4d64e16eeb4f8ab8ebdd3a481df42691ad717",
+      "blockHash": "0x9deb3255d1396950609e37eee127be1c69655f2dc538828adb2acf0f2f18d247"
     },
     "contracts": {
       "harvest-vault-lock": {
@@ -126,16 +126,16 @@
         "sizeBytes": 15336
       },
       "dao-harvest-policy": {
-        "codeHash": "0xa3ffba9aa6a33bc9cdbba5a6d9e9a103074fe2ae23635bc094c0bc214b01301c",
+        "codeHash": "0xc4a05ebc73dc16582f4d4c351eddbcbe46a6488c6a213408ac439727d070cbdd",
         "hashType": "data1",
         "cellDep": {
           "outPoint": {
-            "txHash": "0xc5cb0fdd0967ca38f67c40b64a46a4925e7d954cf432368b70538757a09b9822",
-            "index": "0x1"
+            "txHash": "0x0c8d224317047b99fa8f95d321d4d64e16eeb4f8ab8ebdd3a481df42691ad717",
+            "index": "0x0"
           },
           "depType": "code"
         },
-        "binarySha256": "9d8b781493c4cf8f8479468766a300d7cfef69495b830963a190203d7e5b6c69",
+        "binarySha256": "151a0a6ea87ffc83b14cce9b7421603dff928351cf48080d622a341e71e81f92",
         "sizeBytes": 41304
       }
     },

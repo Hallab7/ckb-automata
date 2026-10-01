@@ -353,6 +353,7 @@ function validateDaoHarvestManifest(
     issue(issues, "INVALID_FIELD", `${path}.contracts`, "contains unknown contract entries");
   }
   const identities = new Set<string>();
+  let contractsFromLatestDeployment = 0;
   for (const [name, contract] of Object.entries(contracts)) {
     if (contract.hashType !== "data1" || contract.cellDep.depType !== "code") {
       issue(
@@ -362,13 +363,8 @@ function validateDaoHarvestManifest(
         "must use a data1 script and direct code cell dependency",
       );
     }
-    if (contract.cellDep.outPoint.txHash !== deploymentTransactionHash) {
-      issue(
-        issues,
-        "INCONSISTENT_DEPLOYMENT",
-        `${path}.contracts.${name}.cellDep.outPoint.txHash`,
-        "must reference the DAO harvest deployment transaction",
-      );
+    if (contract.cellDep.outPoint.txHash === deploymentTransactionHash) {
+      contractsFromLatestDeployment += 1;
     }
     const identity = `${contract.cellDep.outPoint.txHash}:${contract.cellDep.outPoint.index}`;
     if (identities.has(identity)) {
@@ -380,6 +376,14 @@ function validateDaoHarvestManifest(
       );
     }
     identities.add(identity);
+  }
+  if (contractsFromLatestDeployment === 0) {
+    issue(
+      issues,
+      "INCONSISTENT_DEPLOYMENT",
+      `${path}.deployment.transactionHash`,
+      "must contain at least one active DAO harvest contract",
+    );
   }
   const executorValues = harvest["prepareExecutorLockHashes"];
   const executorHashes: Hash32[] = [];
