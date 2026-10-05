@@ -46,6 +46,7 @@ export type ApiPendingCreation = ApiSuccess<"PendingCreationController_register"
 export type ApiDaoHarvestList = ApiSuccess<"DaoHarvestController_list">;
 export type ApiDaoHarvest = ApiSuccess<"DaoHarvestController_detail">;
 export type ApiDaoHarvestQuote = ApiSuccess<"DaoHarvestController_quote">;
+export type ApiPendingDaoHarvest = ApiSuccess<"DaoHarvestController_registerSetup">;
 export interface ApiDaoHarvestBuild {
   readonly intent: Readonly<Record<string, unknown>>;
   readonly jobId?: string;
@@ -263,6 +264,12 @@ export class AutomataApiClient {
     body: ApiRequestBody<"DaoHarvestController_setup">,
   ): Promise<ApiDaoHarvestBuild> {
     return this.#post("v1/dao-harvest/setup", body);
+  }
+
+  registerDaoHarvestSetup(
+    body: ApiRequestBody<"DaoHarvestController_registerSetup">,
+  ): Promise<ApiPendingDaoHarvest> {
+    return this.#post("v1/dao-harvest/register-setup", body);
   }
 
   stopDaoHarvest(body: ApiRequestBody<"DaoHarvestController_stop">): Promise<ApiDaoHarvestBuild> {

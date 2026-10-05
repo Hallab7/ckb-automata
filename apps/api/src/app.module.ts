@@ -10,6 +10,7 @@ import { DatabaseClient, createDatabaseClient } from "./database/client.ts";
 import {
   DaoHarvestController,
   DaoHarvestMutationService,
+  DaoHarvestPendingService,
   DaoHarvestReadService,
   DaoHarvestTransactionAdapter,
 } from "./dao-harvest.ts";
@@ -291,10 +292,26 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
           new TransactionProgressService(environment, ckbClient),
       },
       {
+        provide: DaoHarvestPendingService,
+        inject: [DatabaseClient, CkbClient, TransactionProgressService],
+        useFactory: (
+          databaseClient: DatabaseClient,
+          ckbClient: CkbClient,
+          progress: TransactionProgressService,
+        ) =>
+          new DaoHarvestPendingService(
+            databaseClient.database,
+            environment.CKB_NETWORK,
+            environment.CKB_GENESIS_HASH,
+            ckbClient,
+            progress,
+          ),
+      },
+      {
         provide: DaoHarvestReadService,
-        inject: [DatabaseClient],
-        useFactory: (databaseClient: DatabaseClient) =>
-          new DaoHarvestReadService(databaseClient.database, environment.CKB_NETWORK),
+        inject: [DatabaseClient, DaoHarvestPendingService],
+        useFactory: (databaseClient: DatabaseClient, pending: DaoHarvestPendingService) =>
+          new DaoHarvestReadService(databaseClient.database, environment.CKB_NETWORK, pending),
       },
       {
         provide: DaoHarvestMutationService,

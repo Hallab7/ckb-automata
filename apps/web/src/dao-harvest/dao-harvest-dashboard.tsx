@@ -1,10 +1,14 @@
 "use client";
 
-import { ArrowUpRight, Landmark, RefreshCw } from "lucide-react";
+import { ArrowUpRight, Clock3, Landmark, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import { createApiClient, type ApiDaoHarvest } from "@ckb-automata/api-client";
+import {
+  createApiClient,
+  type ApiDaoHarvest,
+  type ApiPendingDaoHarvest,
+} from "@ckb-automata/api-client";
 import { Button, InlineNotice } from "@ckb-automata/ui";
 
 import { useWalletSession } from "../ccc/session.tsx";
@@ -22,6 +26,7 @@ export function DaoHarvestDashboard() {
     }
   }, []);
   const [items, setItems] = useState<readonly ApiDaoHarvest[]>([]);
+  const [pendingItems, setPendingItems] = useState<readonly ApiPendingDaoHarvest[]>([]);
   const [state, setState] = useState<"error" | "loading" | "ready">("loading");
   const [retry, setRetry] = useState(0);
   const [titles, setTitles] = useState<Readonly<Record<string, string>>>({});
@@ -39,6 +44,7 @@ export function DaoHarvestDashboard() {
       .then((response) => {
         if (!active) return;
         setItems(response.items ?? []);
+        setPendingItems(response.pendingItems ?? []);
         setState("ready");
       })
       .catch(() => {
@@ -49,10 +55,14 @@ export function DaoHarvestDashboard() {
     };
   }, [client, retry]);
 
-  const visible =
+  const visibleItems =
     session.status === "ready" && session.ownerLockHash !== undefined
       ? items.filter((item) => item.ownerLockHash === session.ownerLockHash)
       : items;
+  const visiblePending =
+    session.status === "ready" && session.ownerLockHash !== undefined
+      ? pendingItems.filter((item) => item.ownerLockHash === session.ownerLockHash)
+      : pendingItems;
 
   return (
     <section className="harvest-dashboard" aria-labelledby="harvest-dashboard-title">
@@ -91,14 +101,43 @@ export function DaoHarvestDashboard() {
           </Button>
         </InlineNotice>
       ) : null}
-      {state === "ready" && visible.length === 0 ? (
+      {state === "ready" && visibleItems.length === 0 && visiblePending.length === 0 ? (
         <div className="harvest-dashboard__empty">
           <p>No DAO compensation automations yet.</p>
         </div>
       ) : null}
-      {state === "ready" && visible.length > 0 ? (
+      {state === "ready" && (visibleItems.length > 0 || visiblePending.length > 0) ? (
         <div className="harvest-dashboard__rows">
-          {visible.map((item) => {
+          {visiblePending.map((item) => {
+            const confirmations = Math.min(Number(item.confirmations), item.requiredConfirmations);
+            const statusLabel =
+              item.status === "submitting"
+                ? "Submitting"
+                : item.status === "confirming"
+                  ? "Confirming"
+                  : "Waiting";
+            const action =
+              item.status === "submitting"
+                ? "Submitting to CKB testnet"
+                : item.status === "confirming"
+                  ? `${confirmations}/${item.requiredConfirmations} confirmations`
+                  : "Preparing automation details";
+            return (
+              <div className="harvest-row harvest-row--pending" key={item.jobId}>
+                <div>
+                  <strong>{titles[item.jobId] ?? "Harvest compensation"}</strong>
+                  <span>{action}</span>
+                </div>
+                <div>
+                  <span className="ui-status ui-status--info">{statusLabel}</span>
+                  <strong>{formatHarvestPrincipal(item.principal)}</strong>
+                  <small>0 of {item.progress.totalCycles} harvests</small>
+                </div>
+                <Clock3 aria-hidden="true" size={17} />
+              </div>
+            );
+          })}
+          {visibleItems.map((item) => {
             const presentation = daoHarvestPresentation(item);
             return (
               <Link

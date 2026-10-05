@@ -888,8 +888,49 @@
                       },
                       "type": "array"
                     },
-                    "page": { "type": "object" }
+                    "page": { "type": "object" },
+                    "pendingItems": {
+                      "items": {
+                        "properties": {
+                          "confirmations": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                          "jobId": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                          "ownerLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                          "payoutLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                          "principal": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                          "progress": {
+                            "properties": {
+                              "completedCycles": { "enum": ["0"], "type": "string" },
+                              "totalCycles": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" }
+                            },
+                            "required": ["completedCycles", "totalCycles"],
+                            "type": "object"
+                          },
+                          "requiredConfirmations": { "minimum": 1, "type": "integer" },
+                          "status": {
+                            "enum": ["submitting", "confirming", "waiting"],
+                            "type": "string"
+                          },
+                          "submittedAt": { "format": "date-time", "type": "string" },
+                          "transactionHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+                        },
+                        "required": [
+                          "jobId",
+                          "ownerLockHash",
+                          "payoutLockHash",
+                          "principal",
+                          "progress",
+                          "status",
+                          "confirmations",
+                          "requiredConfirmations",
+                          "submittedAt",
+                          "transactionHash"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
                   },
+                  "required": ["items", "pendingItems", "page"],
                   "type": "object"
                 }
               }
@@ -897,7 +938,7 @@
             "description": ""
           }
         },
-        "summary": "List indexed DAO harvest automations",
+        "summary": "List submitted and indexed DAO harvest automations",
         "tags": ["DAO harvest"]
       }
     },
@@ -932,6 +973,73 @@
           "503": { "description": "Harvest deployment or chain read unavailable" }
         },
         "summary": "Build an unsigned owner recovery transaction",
+        "tags": ["DAO harvest"]
+      }
+    },
+    "/v1/dao-harvest/register-setup": {
+      "post": {
+        "operationId": "DaoHarvestController_registerSetup",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "transactionHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+                },
+                "required": ["transactionHash"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "confirmations": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                    "jobId": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                    "ownerLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                    "payoutLockHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" },
+                    "principal": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" },
+                    "progress": {
+                      "properties": {
+                        "completedCycles": { "enum": ["0"], "type": "string" },
+                        "totalCycles": { "pattern": "^(0|[1-9][0-9]*)$", "type": "string" }
+                      },
+                      "required": ["completedCycles", "totalCycles"],
+                      "type": "object"
+                    },
+                    "requiredConfirmations": { "minimum": 1, "type": "integer" },
+                    "status": { "enum": ["submitting", "confirming", "waiting"], "type": "string" },
+                    "submittedAt": { "format": "date-time", "type": "string" },
+                    "transactionHash": { "pattern": "^0x[0-9a-f]{64}$", "type": "string" }
+                  },
+                  "required": [
+                    "jobId",
+                    "ownerLockHash",
+                    "payoutLockHash",
+                    "principal",
+                    "progress",
+                    "status",
+                    "confirmations",
+                    "requiredConfirmations",
+                    "submittedAt",
+                    "transactionHash"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": { "description": "Malformed or unknown DAO harvest submission" }
+        },
+        "summary": "Register a submitted DAO harvest setup while it confirms",
         "tags": ["DAO harvest"]
       }
     },

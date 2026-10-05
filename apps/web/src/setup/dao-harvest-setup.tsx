@@ -49,7 +49,12 @@ type ReviewState =
 type SubmissionState =
   | { readonly status: "idle" | "submitting" }
   | { readonly status: "error"; readonly message: string }
-  | { readonly status: "submitted"; readonly jobId?: string; readonly transactionHash: string };
+  | {
+      readonly status: "submitted";
+      readonly jobId?: string;
+      readonly registration: "registered" | "retry";
+      readonly transactionHash: string;
+    };
 
 const REVIEW_STORAGE_KEY = "ckb-automata.dao-harvest.review.v1";
 
@@ -74,6 +79,20 @@ function reviewFailure(reason: unknown): string {
   }
   if (reason instanceof TypeError) return "The testnet service could not be reached.";
   return reason instanceof Error ? reason.message : "The transaction review could not be built.";
+}
+
+async function registerHarvestSubmission(transactionHash: string): Promise<void> {
+  let failure: unknown;
+  for (const delay of [0, 750, 1_500]) {
+    if (delay > 0) await new Promise((resolve) => window.setTimeout(resolve, delay));
+    try {
+      await api().registerDaoHarvestSetup({ transactionHash });
+      return;
+    } catch (reason) {
+      failure = reason;
+    }
+  }
+  throw failure;
 }
 
 function HarvestDetails(context: SetupStepRenderContext) {
@@ -445,6 +464,12 @@ function HarvestApproval({
         review.snapshot,
       );
       const transactionHash = await session.submitSignedTransaction(signed, review.transactionHash);
+      let registration: "registered" | "retry" = "registered";
+      try {
+        await registerHarvestSubmission(transactionHash);
+      } catch {
+        registration = "retry";
+      }
       if (review.build.jobId !== undefined) {
         writeAutomationTitle(
           window.localStorage,
@@ -456,6 +481,7 @@ function HarvestApproval({
       setState({
         status: "submitted",
         ...(review.build.jobId === undefined ? {} : { jobId: review.build.jobId }),
+        registration,
         transactionHash,
       });
     } catch (reason) {
@@ -473,7 +499,22 @@ function HarvestApproval({
           <p className="setup-submission-success__eyebrow">Submitted</p>
           <h2>Your harvest automation is confirming</h2>
         </div>
-        <p>It will appear in Automations as soon as the testnet index sees it.</p>
+        <p>It now appears in Automations while the testnet confirms it.</p>
+        {state.registration === "retry" ? (
+          <InlineNotice title="Transaction submitted" tone="warning">
+            <p>The transaction succeeded, but its list entry still needs to be registered.</p>
+            <Button
+              onClick={() => {
+                void registerHarvestSubmission(state.transactionHash)
+                  .then(() => setState({ ...state, registration: "registered" }))
+                  .catch(() => undefined);
+              }}
+              tone="secondary"
+            >
+              Retry listing
+            </Button>
+          </InlineNotice>
+        ) : null}
         <code>{state.transactionHash}</code>
         <div className="setup-submission-success__actions">
           <a className="ui-button ui-button--primary" href="/automations">

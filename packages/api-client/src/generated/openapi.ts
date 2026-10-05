@@ -97,7 +97,7 @@ export type paths = {
             readonly path?: never;
             readonly cookie?: never;
         };
-        /** List indexed DAO harvest automations */
+        /** List submitted and indexed DAO harvest automations */
         readonly get: operations["DaoHarvestController_list"];
         readonly put?: never;
         readonly post?: never;
@@ -169,6 +169,23 @@ export type paths = {
         readonly put?: never;
         /** Build an unsigned owner recovery transaction */
         readonly post: operations["DaoHarvestController_recover"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/v1/dao-harvest/register-setup": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /** Register a submitted DAO harvest setup while it confirms */
+        readonly post: operations["DaoHarvestController_registerSetup"];
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -1139,7 +1156,7 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": {
-                        readonly items?: readonly {
+                        readonly items: readonly {
                             readonly economics: Record<string, unknown>;
                             readonly jobId: string;
                             readonly ownerLockHash: string;
@@ -1162,7 +1179,25 @@ export interface operations {
                             readonly updatedAt: string;
                             readonly vaultOutPoint: Record<string, unknown>;
                         }[];
-                        readonly page?: Record<string, unknown>;
+                        readonly page: Record<string, unknown>;
+                        readonly pendingItems: readonly {
+                            readonly confirmations: string;
+                            readonly jobId: string;
+                            readonly ownerLockHash: string;
+                            readonly payoutLockHash: string;
+                            readonly principal: string;
+                            readonly progress: {
+                                /** @enum {string} */
+                                readonly completedCycles: "0";
+                                readonly totalCycles: string;
+                            };
+                            readonly requiredConfirmations: number;
+                            /** @enum {string} */
+                            readonly status: "submitting" | "confirming" | "waiting";
+                            /** Format: date-time */
+                            readonly submittedAt: string;
+                            readonly transactionHash: string;
+                        }[];
                     };
                 };
             };
@@ -1325,6 +1360,55 @@ export interface operations {
             };
             /** @description Harvest deployment or chain read unavailable */
             readonly 503: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readonly DaoHarvestController_registerSetup: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": {
+                    readonly transactionHash: string;
+                };
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": {
+                        readonly confirmations: string;
+                        readonly jobId: string;
+                        readonly ownerLockHash: string;
+                        readonly payoutLockHash: string;
+                        readonly principal: string;
+                        readonly progress: {
+                            /** @enum {string} */
+                            readonly completedCycles: "0";
+                            readonly totalCycles: string;
+                        };
+                        readonly requiredConfirmations: number;
+                        /** @enum {string} */
+                        readonly status: "submitting" | "confirming" | "waiting";
+                        /** Format: date-time */
+                        readonly submittedAt: string;
+                        readonly transactionHash: string;
+                    };
+                };
+            };
+            /** @description Malformed or unknown DAO harvest submission */
+            readonly 400: {
                 headers: {
                     readonly [name: string]: unknown;
                 };

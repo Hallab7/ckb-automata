@@ -18,6 +18,8 @@ import { createApiApplication } from "./bootstrap.ts";
 import {
   DAO_HARVEST_READ_STATES,
   DaoHarvestMutationService,
+  DaoHarvestPendingService,
+  DaoHarvestReadService,
   DaoHarvestTransactionAdapter,
 } from "./dao-harvest.ts";
 import {
@@ -59,12 +61,15 @@ test("DAO harvest API publishes read, quote, and unsigned mutation routes", asyn
       "/v1/dao-harvest/stop",
       "/v1/dao-harvest/exit",
       "/v1/dao-harvest/recover",
+      "/v1/dao-harvest/register-setup",
     ]) {
       assert.ok(document.paths[path], `missing OpenAPI path ${path}`);
     }
     const schema = document.paths["/v1/dao-harvest/{jobId}"]?.get?.responses?.["200"];
     assert.match(JSON.stringify(schema), /principal/);
     assert.match(JSON.stringify(schema), /prepareStartSince/);
+    const listSchema = document.paths["/v1/dao-harvest"]?.get?.responses?.["200"];
+    assert.match(JSON.stringify(listSchema), /pendingItems/);
   } finally {
     await app.close();
   }
@@ -207,6 +212,65 @@ test("active deployment builds an exact unsigned setup and rejects understated f
   assert.equal(projected.projections[0]?.jobId, result.jobId);
   assert.equal(projected.projections[0]?.principalCapacity, 21_000_000_000n);
   assert.equal(projected.projections[0]?.vaultState, "deposited");
+  const transactionHash = `0x${"cd".repeat(32)}`;
+  let inserted: Record<string, unknown> | undefined;
+  const pending = new DaoHarvestPendingService(
+    {
+      insert: () => ({
+        values: (value: Record<string, unknown>) => ({
+          onConflictDoNothing: async () => {
+            inserted = value;
+          },
+        }),
+      }),
+    } as never,
+    "ckb_testnet",
+    testnetManifest.genesisHash,
+    {
+      getTipHeader: async () =>
+        ({
+          dao: {
+            c: 6_389_163_654_073_961_728n,
+            ar: 11_922_919_488_376_595n,
+            s: 749_970_336_604_435_714n,
+            u: 682_750_630_500_000_000n,
+          },
+          epoch: { integer: 13_920n, numerator: 1_152n, denominator: 1_800n },
+          hash: `0x${"ab".repeat(32)}`,
+          number: 22_583_953n,
+        }) as never,
+      getTransactionStatus: async () =>
+        ({
+          status: "committed" as const,
+          transaction: { ...transaction, hash: () => transactionHash },
+        }) as never,
+    },
+    {
+      read: async () => ({
+        block: { hash: `0x${"ab".repeat(32)}`, number: "22583953" },
+        confirmations: "3",
+        observedAt: "2026-10-06T00:00:00.000Z",
+        reason: null,
+        requiredConfirmations: 5,
+        state: "committed" as const,
+        transactionHash,
+      }),
+    } as never,
+    registry,
+  );
+  const registeredPending = await pending.register({ transactionHash });
+  assert.equal(registeredPending.jobId, result.jobId);
+  assert.equal(registeredPending.status, "confirming");
+  assert.equal(registeredPending.confirmations, "3");
+  assert.equal(inserted?.["txHash"], transactionHash);
+  assert.deepEqual(inserted?.["simulation"], {
+    kind: "pending_dao_harvest",
+    jobId: result.jobId,
+    ownerLockHash,
+    payoutLockHash,
+    principal: "21000000000",
+    totalCycles: "1",
+  });
   await assert.rejects(
     adapter.build("setup", {
       ownerLockHash,
@@ -228,6 +292,34 @@ test("active deployment builds an exact unsigned setup and rejects understated f
     }),
     /unsupported fields/,
   );
+});
+
+test("DAO harvest reads expose pending submissions before canonical indexing", async () => {
+  const pendingItem = {
+    jobId: `0x${"11".repeat(32)}`,
+    ownerLockHash: `0x${"22".repeat(32)}`,
+    payoutLockHash: `0x${"33".repeat(32)}`,
+    principal: "21000000000",
+    progress: { completedCycles: "0" as const, totalCycles: "1" },
+    status: "confirming" as const,
+    confirmations: "2",
+    requiredConfirmations: 5,
+    submittedAt: "2026-10-06T00:00:00.000Z",
+    transactionHash: `0x${"44".repeat(32)}`,
+  };
+  const builder = {
+    from: () => builder,
+    innerJoin: () => builder,
+    where: () => builder,
+    orderBy: () => builder,
+    limit: async () => [],
+  };
+  const reads = new DaoHarvestReadService({ select: () => builder } as never, "ckb_testnet", {
+    list: async () => [pendingItem],
+  });
+  const result = await reads.list({ limit: 20 });
+  assert.deepEqual(result.items, []);
+  assert.deepEqual(result.pendingItems, [pendingItem]);
 });
 
 test("DAO harvest consumption discovery uses one candidate query per block", async () => {

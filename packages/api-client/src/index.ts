@@ -11,6 +11,7 @@ export {
   type ApiDaoHarvestBuild,
   type ApiDaoHarvestList,
   type ApiDaoHarvestQuote,
+  type ApiPendingDaoHarvest,
   type ApiClientOptions,
   type ApiJob,
   type ApiJobEvents,

@@ -101,6 +101,24 @@ test("serializes generated transaction request bodies", async () => {
   assert.deepEqual(await request?.json(), body);
 });
 
+test("registers a submitted DAO harvest by transaction hash", async () => {
+  let request: Request | undefined;
+  const transactionHash = `0x${"ab".repeat(32)}`;
+  const client = createApiClient({
+    baseUrl: "https://api.example.test/",
+    fetch: async (input, init) => {
+      request = new Request(input, init);
+      return Response.json({ transactionHash });
+    },
+  });
+
+  await client.registerDaoHarvestSetup({ transactionHash });
+
+  assert.equal(request?.url, "https://api.example.test/v1/dao-harvest/register-setup");
+  assert.equal(request?.method, "POST");
+  assert.deepEqual(await request?.json(), { transactionHash });
+});
+
 test("revokes settings sessions with bearer authentication", async () => {
   const requests: Array<{ headers: Headers; method: string; url: string }> = [];
   const client = createApiClient({

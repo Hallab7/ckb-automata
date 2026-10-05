@@ -1,10 +1,11 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import {
   BadRequestException,
   Body,
   Controller,
   Get,
+  HttpCode,
   Inject,
   Injectable,
   NotFoundException,
@@ -24,7 +25,7 @@ import {
   ApiServiceUnavailableResponse,
   ApiTags,
 } from "@nestjs/swagger";
-import { and, desc, eq, getTableColumns, lt, or } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, inArray, lt, or } from "drizzle-orm";
 import { scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
 
 import { clientDaoAccumulatedRate, packClientEpoch } from "@ckb-automata/ccc";
@@ -51,8 +52,14 @@ import {
 
 import type { CkbReadClient } from "./ckb-client.ts";
 import type { AutomataDatabase } from "./database/client.ts";
-import { daoHarvestJobs, jobs } from "./database/schema.ts";
+import { daoHarvestJobs, jobs, transactionAttempts } from "./database/schema.ts";
+import { extractDaoHarvestProjections } from "./indexer/dao-harvest-projection.ts";
 import type { LockResolutionRecorder } from "./lock-resolutions.ts";
+import {
+  TransactionProgressService,
+  type TransactionProgress,
+  type TransactionProgressState,
+} from "./transaction-progress.ts";
 
 const HASH = /^0x[0-9a-f]{64}$/;
 const DEFAULT_LIMIT = 20;
@@ -92,7 +99,21 @@ export interface DaoHarvestReadModel {
 
 export interface DaoHarvestListResponse {
   readonly items: readonly DaoHarvestReadModel[];
+  readonly pendingItems: readonly PendingDaoHarvestReadModel[];
   readonly page: { readonly limit: number; readonly nextCursor: string | null };
+}
+
+export interface PendingDaoHarvestReadModel {
+  readonly jobId: string;
+  readonly ownerLockHash: string;
+  readonly payoutLockHash: string;
+  readonly principal: string;
+  readonly progress: { readonly completedCycles: "0"; readonly totalCycles: string };
+  readonly status: "confirming" | "submitting" | "waiting";
+  readonly confirmations: string;
+  readonly requiredConfirmations: number;
+  readonly submittedAt: string;
+  readonly transactionHash: string;
 }
 
 export interface DaoHarvestQuoteReadModel {
@@ -385,13 +406,266 @@ function readModel(row: Row): DaoHarvestReadModel {
   });
 }
 
+const ACTIVE_SUBMISSION_STATES = ["submitted", "proposed", "committed", "confirmed"] as const;
+
+interface PendingDaoHarvestMetadata {
+  readonly jobId: string;
+  readonly ownerLockHash: string;
+  readonly payoutLockHash: string;
+  readonly principal: string;
+  readonly totalCycles: string;
+}
+
+interface StoredPendingDaoHarvest extends PendingDaoHarvestMetadata {
+  readonly kind: "pending_dao_harvest";
+}
+
+function pendingMetadata(value: unknown): StoredPendingDaoHarvest | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
+  const item = value as Record<string, unknown>;
+  if (
+    item["kind"] !== "pending_dao_harvest" ||
+    typeof item["jobId"] !== "string" ||
+    !HASH.test(item["jobId"]) ||
+    typeof item["ownerLockHash"] !== "string" ||
+    !HASH.test(item["ownerLockHash"]) ||
+    typeof item["payoutLockHash"] !== "string" ||
+    !HASH.test(item["payoutLockHash"]) ||
+    typeof item["principal"] !== "string" ||
+    !/^(0|[1-9][0-9]*)$/.test(item["principal"]) ||
+    typeof item["totalCycles"] !== "string" ||
+    !/^[1-9][0-9]*$/.test(item["totalCycles"])
+  ) {
+    return undefined;
+  }
+  return item as unknown as StoredPendingDaoHarvest;
+}
+
+function submissionHash(value: unknown): string {
+  if (typeof value !== "string" || !HASH.test(value)) {
+    throw new BadRequestException("transactionHash must be a lowercase 32-byte hash");
+  }
+  return value;
+}
+
+function submissionStatus(state: TransactionProgressState): PendingDaoHarvestReadModel["status"] {
+  if (state === "submitted") return "submitting";
+  if (state === "confirmed") return "waiting";
+  return "confirming";
+}
+
+function pendingReadModel(
+  metadata: PendingDaoHarvestMetadata,
+  transactionHash: string,
+  submittedAt: Date,
+  progress: Pick<TransactionProgress, "confirmations" | "requiredConfirmations" | "state">,
+): PendingDaoHarvestReadModel {
+  return Object.freeze({
+    jobId: metadata.jobId,
+    ownerLockHash: metadata.ownerLockHash,
+    payoutLockHash: metadata.payoutLockHash,
+    principal: metadata.principal,
+    progress: Object.freeze({ completedCycles: "0" as const, totalCycles: metadata.totalCycles }),
+    status: submissionStatus(progress.state),
+    confirmations: progress.confirmations,
+    requiredConfirmations: progress.requiredConfirmations,
+    submittedAt: submittedAt.toISOString(),
+    transactionHash,
+  });
+}
+
+export class DaoHarvestPendingService {
+  readonly #chain: Pick<CkbReadClient, "getTipHeader" | "getTransactionStatus">;
+  readonly #database: AutomataDatabase;
+  readonly #genesisHash: string;
+  readonly #network: string;
+  readonly #progress: TransactionProgressService;
+  readonly #registry: DeploymentRegistry;
+
+  constructor(
+    database: AutomataDatabase,
+    network: string,
+    genesisHash: string,
+    chain: Pick<CkbReadClient, "getTipHeader" | "getTransactionStatus">,
+    progress: TransactionProgressService,
+    registry: DeploymentRegistry = deploymentRegistry,
+  ) {
+    this.#database = database;
+    this.#network = network;
+    this.#genesisHash = genesisHash;
+    this.#chain = chain;
+    this.#progress = progress;
+    this.#registry = registry;
+  }
+
+  async register(input: unknown): Promise<PendingDaoHarvestReadModel> {
+    if (typeof input !== "object" || input === null || Array.isArray(input)) {
+      throw new BadRequestException("DAO harvest submission must be an object");
+    }
+    const body = input as Record<string, unknown>;
+    if (Object.keys(body).length !== 1 || !("transactionHash" in body)) {
+      throw new BadRequestException("DAO harvest submission contains unsupported fields");
+    }
+    const transactionHash = submissionHash(body["transactionHash"]);
+    const [registered, observed, tip] = await Promise.all([
+      this.#registry.load(this.#genesisHash),
+      this.#chain.getTransactionStatus(transactionHash),
+      this.#chain.getTipHeader(),
+    ]);
+    if (registered.status !== "ok" || registered.deployment.manifest.daoHarvest === undefined) {
+      throw new ServiceUnavailableException("DAO harvest is not active on this deployment");
+    }
+    if (
+      observed === undefined ||
+      !["sent", "pending", "proposed", "committed"].includes(observed.status) ||
+      parseHash32(observed.transaction.hash()) !== transactionHash
+    ) {
+      throw new BadRequestException("The submitted DAO harvest transaction is not known on CKB");
+    }
+    const extraction = extractDaoHarvestProjections(
+      {
+        header: tip,
+        transactions: [observed.transaction],
+      } as never,
+      registeredDaoHarvestDeployment(registered.deployment),
+    );
+    const projection = extraction.projections[0];
+    if (
+      projection === undefined ||
+      extraction.projections.length !== 1 ||
+      extraction.malformed > 0
+    ) {
+      throw new BadRequestException("The submitted transaction is not a valid DAO harvest setup");
+    }
+    const metadata = Object.freeze({
+      jobId: projection.jobId,
+      ownerLockHash: projection.ownerLockHash,
+      payoutLockHash: projection.payoutLockHash,
+      principal: projection.principalCapacity.toString(),
+      totalCycles: projection.totalCycles.toString(),
+    });
+    const submittedAt = new Date();
+    await this.#database
+      .insert(transactionAttempts)
+      .values({
+        id: randomUUID(),
+        networkId: this.#network,
+        operation: "create",
+        simulation: { kind: "pending_dao_harvest", ...metadata } satisfies StoredPendingDaoHarvest,
+        state: "submitted",
+        submittedAt,
+        txHash: transactionHash,
+      })
+      .onConflictDoNothing();
+    const progress = await this.#readProgress(transactionHash, submittedAt, "submitted");
+    return pendingReadModel(metadata, transactionHash, submittedAt, progress);
+  }
+
+  async list(): Promise<readonly PendingDaoHarvestReadModel[]> {
+    const rows = await this.#database
+      .select()
+      .from(transactionAttempts)
+      .where(
+        and(
+          eq(transactionAttempts.networkId, this.#network),
+          eq(transactionAttempts.operation, "create"),
+          inArray(transactionAttempts.state, [...ACTIVE_SUBMISSION_STATES]),
+        ),
+      )
+      .orderBy(desc(transactionAttempts.submittedAt));
+    const candidates = rows.flatMap((row) => {
+      const metadata = pendingMetadata(row.simulation);
+      return metadata === undefined || row.txHash === null || row.submittedAt === null
+        ? []
+        : [{ metadata, row }];
+    });
+    const jobIds = [...new Set(candidates.map(({ metadata }) => metadata.jobId))];
+    const indexed =
+      jobIds.length === 0
+        ? []
+        : await this.#database
+            .select({ jobId: daoHarvestJobs.jobId })
+            .from(daoHarvestJobs)
+            .where(
+              and(
+                eq(daoHarvestJobs.networkId, this.#network),
+                inArray(daoHarvestJobs.jobId, jobIds),
+              ),
+            );
+    const indexedJobIds = new Set(indexed.map(({ jobId }) => jobId));
+    const items: PendingDaoHarvestReadModel[] = [];
+    for (const { metadata, row } of candidates) {
+      if (indexedJobIds.has(metadata.jobId)) continue;
+      const progress = await this.#readProgress(row.txHash!, row.submittedAt!, row.state);
+      if (
+        !ACTIVE_SUBMISSION_STATES.includes(
+          progress.state as (typeof ACTIVE_SUBMISSION_STATES)[number],
+        )
+      ) {
+        await this.#database
+          .update(transactionAttempts)
+          .set({ state: progress.state, updatedAt: new Date() })
+          .where(eq(transactionAttempts.id, row.id));
+        continue;
+      }
+      if (row.state !== progress.state) {
+        await this.#database
+          .update(transactionAttempts)
+          .set({
+            state: progress.state,
+            ...(progress.block === null ? {} : { committedBlockNumber: progress.block.number }),
+            ...(progress.state === "confirmed"
+              ? { confirmedAt: new Date(progress.observedAt) }
+              : {}),
+            updatedAt: new Date(),
+          })
+          .where(eq(transactionAttempts.id, row.id));
+      }
+      items.push(pendingReadModel(metadata, row.txHash!, row.submittedAt!, progress));
+    }
+    return Object.freeze(items);
+  }
+
+  async #readProgress(
+    transactionHash: string,
+    submittedAt: Date,
+    fallbackState: string,
+  ): Promise<TransactionProgress> {
+    try {
+      return await this.#progress.read(transactionHash, {
+        submittedAt: submittedAt.toISOString(),
+      });
+    } catch {
+      return {
+        block: null,
+        confirmations: "0",
+        observedAt: new Date().toISOString(),
+        reason: null,
+        requiredConfirmations: 1,
+        state: ACTIVE_SUBMISSION_STATES.includes(
+          fallbackState as (typeof ACTIVE_SUBMISSION_STATES)[number],
+        )
+          ? (fallbackState as TransactionProgressState)
+          : "submitted",
+        transactionHash: parseHash32(transactionHash),
+      };
+    }
+  }
+}
+
 export class DaoHarvestReadService {
   readonly #database: AutomataDatabase;
   readonly #network: string;
+  readonly #pending: Pick<DaoHarvestPendingService, "list"> | undefined;
 
-  constructor(database: AutomataDatabase, network: string) {
+  constructor(
+    database: AutomataDatabase,
+    network: string,
+    pending?: Pick<DaoHarvestPendingService, "list">,
+  ) {
     this.#database = database;
     this.#network = network;
+    this.#pending = pending;
   }
 
   async list(query: {
@@ -424,8 +698,10 @@ export class DaoHarvestReadService {
       .limit(pageLimit + 1);
     const hasMore = rows.length > pageLimit;
     const selected = rows.slice(0, pageLimit) as Row[];
+    const pendingItems = pageCursor === null ? ((await this.#pending?.list()) ?? []) : [];
     return Object.freeze({
       items: Object.freeze(selected.map(readModel)),
+      pendingItems,
       page: Object.freeze({
         limit: pageLimit,
         nextCursor: hasMore && selected.at(-1) ? encodeCursor(selected.at(-1)!) : null,
@@ -494,10 +770,16 @@ export class DaoHarvestMutationService {
 export class DaoHarvestController {
   readonly #reads: DaoHarvestReadService;
   readonly #mutations: DaoHarvestMutationService;
+  readonly #pending: DaoHarvestPendingService;
 
-  constructor(reads: DaoHarvestReadService, mutations: DaoHarvestMutationService) {
+  constructor(
+    reads: DaoHarvestReadService,
+    mutations: DaoHarvestMutationService,
+    pending: DaoHarvestPendingService,
+  ) {
     this.#reads = reads;
     this.#mutations = mutations;
+    this.#pending = pending;
   }
 
   list(query: {
@@ -514,6 +796,9 @@ export class DaoHarvestController {
   }
   setup(body: unknown): Promise<DaoHarvestUnsignedBuild> {
     return this.#mutations.build("setup", body);
+  }
+  registerSetup(body: unknown): Promise<PendingDaoHarvestReadModel> {
+    return this.#pending.register(body);
   }
   stop(body: unknown): Promise<DaoHarvestUnsignedBuild> {
     return this.#mutations.build("stop", body);
@@ -602,13 +887,80 @@ const harvestSchema = {
     updatedAt: { type: "string", format: "date-time" },
   },
 };
+const pendingHarvestSchema = {
+  type: "object",
+  required: [
+    "jobId",
+    "ownerLockHash",
+    "payoutLockHash",
+    "principal",
+    "progress",
+    "status",
+    "confirmations",
+    "requiredConfirmations",
+    "submittedAt",
+    "transactionHash",
+  ],
+  properties: {
+    jobId: hashSchema,
+    ownerLockHash: hashSchema,
+    payoutLockHash: hashSchema,
+    principal: decimalSchema,
+    progress: {
+      type: "object",
+      required: ["completedCycles", "totalCycles"],
+      properties: {
+        completedCycles: { type: "string", enum: ["0"] },
+        totalCycles: decimalSchema,
+      },
+    },
+    status: { type: "string", enum: ["submitting", "confirming", "waiting"] },
+    confirmations: decimalSchema,
+    requiredConfirmations: { type: "integer", minimum: 1 },
+    submittedAt: { type: "string", format: "date-time" },
+    transactionHash: hashSchema,
+  },
+};
 
 Injectable()(DaoHarvestReadService);
+Injectable()(DaoHarvestPendingService);
 Injectable()(DaoHarvestMutationService);
 Inject(DaoHarvestReadService)(DaoHarvestController, undefined, 0);
 Inject(DaoHarvestMutationService)(DaoHarvestController, undefined, 1);
+Inject(DaoHarvestPendingService)(DaoHarvestController, undefined, 2);
 Controller("dao-harvest")(DaoHarvestController);
 ApiTags("DAO harvest")(DaoHarvestController);
+
+const registerSetupDescriptor = Object.getOwnPropertyDescriptor(
+  DaoHarvestController.prototype,
+  "registerSetup",
+)!;
+Post("register-setup")(DaoHarvestController.prototype, "registerSetup", registerSetupDescriptor);
+HttpCode(200)(DaoHarvestController.prototype, "registerSetup", registerSetupDescriptor);
+Body()(DaoHarvestController.prototype, "registerSetup", 0);
+ApiOperation({ summary: "Register a submitted DAO harvest setup while it confirms" })(
+  DaoHarvestController.prototype,
+  "registerSetup",
+  registerSetupDescriptor,
+);
+ApiBody({
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["transactionHash"],
+    properties: { transactionHash: hashSchema },
+  },
+})(DaoHarvestController.prototype, "registerSetup", registerSetupDescriptor);
+ApiOkResponse({ schema: pendingHarvestSchema })(
+  DaoHarvestController.prototype,
+  "registerSetup",
+  registerSetupDescriptor,
+);
+ApiBadRequestResponse({ description: "Malformed or unknown DAO harvest submission" })(
+  DaoHarvestController.prototype,
+  "registerSetup",
+  registerSetupDescriptor,
+);
 
 for (const [method, path, summary] of [
   ["setup", "setup", "Build an unsigned DAO harvest setup transaction"],
@@ -655,7 +1007,7 @@ Get()(
   Object.getOwnPropertyDescriptor(DaoHarvestController.prototype, "list")!,
 );
 Query()(DaoHarvestController.prototype, "list", 0);
-ApiOperation({ summary: "List indexed DAO harvest automations" })(
+ApiOperation({ summary: "List submitted and indexed DAO harvest automations" })(
   DaoHarvestController.prototype,
   "list",
   Object.getOwnPropertyDescriptor(DaoHarvestController.prototype, "list")!,
@@ -673,7 +1025,12 @@ ApiQuery({ name: "limit", required: false, type: Number })(
 ApiOkResponse({
   schema: {
     type: "object",
-    properties: { items: { type: "array", items: harvestSchema }, page: { type: "object" } },
+    required: ["items", "pendingItems", "page"],
+    properties: {
+      items: { type: "array", items: harvestSchema },
+      pendingItems: { type: "array", items: pendingHarvestSchema },
+      page: { type: "object" },
+    },
   },
 })(
   DaoHarvestController.prototype,
