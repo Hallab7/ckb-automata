@@ -30,6 +30,7 @@ import { scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
 import { clientDaoAccumulatedRate, packClientEpoch } from "@ckb-automata/ccc";
 import {
   DAO_HARVEST_JOB_OCCUPIED_CAPACITY,
+  DAO_HARVEST_QUOTE_VALID_BLOCKS,
   DAO_HARVEST_VAULT_OCCUPIED_CAPACITY,
   addEpochs,
   buildDaoHarvestSetup,
@@ -130,8 +131,6 @@ const EXECUTOR_REWARD = 61n * 100_000_000n;
 const ESTIMATED_NETWORK_FEE = 1n * 100_000_000n;
 const PREPARE_BUFFER_EPOCHS = 4n;
 const CONFIRMATION_MARGIN_EPOCHS = 1n;
-const QUOTE_VALID_BLOCKS = 10n;
-
 interface SetupRequest {
   readonly ownerLockHash: string;
   readonly payoutLockHash: string;
@@ -272,7 +271,7 @@ export class DaoHarvestTransactionAdapter implements DaoHarvestMutationAdapter {
       actions,
       estimatedNetworkFee: ESTIMATED_NETWORK_FEE,
       snapshotBlock: tip.number.toString(),
-      validUntilBlock: BigInt(tip.number.toString()) + QUOTE_VALID_BLOCKS,
+      validUntilBlock: BigInt(tip.number.toString()) + DAO_HARVEST_QUOTE_VALID_BLOCKS,
     });
     const build = buildDaoHarvestSetup({
       deployment,

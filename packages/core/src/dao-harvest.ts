@@ -3,6 +3,7 @@ import { PERSONAL, blake2b } from "@nervosnetwork/ckb-sdk-utils";
 export const DAO_HARVEST_PAYLOAD_VERSION = 1 as const;
 export const DAO_HARVEST_PAYLOAD_DOMAIN = "ckb-automata/policy-payload/v1" as const;
 export const DAO_HARVEST_EXECUTOR_SET_DOMAIN = "ckb-automata/dao-harvest-executors/v1" as const;
+export const DAO_HARVEST_QUOTE_VALID_BLOCKS = 10n;
 export const MAX_DAO_HARVEST_PREPARE_EXECUTORS = 8 as const;
 
 export const DAO_HARVEST_OPERATIONS = Object.freeze({

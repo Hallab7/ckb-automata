@@ -1,5 +1,8 @@
 import type { ApiDaoHarvestBuild } from "@ckb-automata/api-client";
-import type { UnsignedDeadlineTransaction } from "@ckb-automata/core";
+import {
+  DAO_HARVEST_QUOTE_VALID_BLOCKS,
+  type UnsignedDeadlineTransaction,
+} from "@ckb-automata/core";
 
 const HASH = /^0x[0-9a-f]{64}$/;
 
@@ -10,6 +13,12 @@ export interface ExpectedDaoHarvestIntent {
   readonly totalCycles: number;
 }
 
+export interface DaoHarvestReviewSnapshot {
+  readonly blockHash: string;
+  readonly blockNumber: string;
+  readonly expiresAfterBlock: string;
+}
+
 function decimal(value: unknown, name: string): bigint {
   if (typeof value !== "string" || !/^(0|[1-9][0-9]*)$/.test(value)) {
     throw new Error(`The transaction has an invalid ${name}.`);
@@ -17,11 +26,59 @@ function decimal(value: unknown, name: string): bigint {
   return BigInt(value);
 }
 
+export function daoHarvestReviewSnapshot(
+  tip: Readonly<{ blockHash: string; blockNumber: string }>,
+): DaoHarvestReviewSnapshot {
+  if (!HASH.test(tip.blockHash)) throw new Error("The reviewed snapshot hash is invalid.");
+  const block = decimal(tip.blockNumber, "snapshot block");
+  return Object.freeze({
+    ...tip,
+    expiresAfterBlock: (block + DAO_HARVEST_QUOTE_VALID_BLOCKS).toString(),
+  });
+}
+
+function stableIntent(build: ApiDaoHarvestBuild): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(build.intent)
+      .filter(([key]) => key !== "creatorNonce" && key !== "firstPrepareSince")
+      .toSorted(([left], [right]) => left.localeCompare(right)),
+  );
+}
+
+export function verifyRefreshedDaoHarvestPolicy(
+  reviewed: ApiDaoHarvestBuild,
+  refreshed: ApiDaoHarvestBuild,
+): void {
+  if (JSON.stringify(stableIntent(refreshed)) !== JSON.stringify(stableIntent(reviewed))) {
+    throw new Error("The harvest policy changed. Return to Review before signing.");
+  }
+}
+
 function sameRequiredOutput(
   expected: UnsignedDeadlineTransaction["outputs"][number],
   actual: UnsignedDeadlineTransaction["outputs"][number] | undefined,
 ): boolean {
   return actual !== undefined && JSON.stringify(expected) === JSON.stringify(actual);
+}
+
+function sameCellDep(
+  expected: UnsignedDeadlineTransaction["cellDeps"][number],
+  actual: UnsignedDeadlineTransaction["cellDeps"][number],
+): boolean {
+  return (
+    expected.depType === actual.depType &&
+    expected.outPoint.txHash === actual.outPoint.txHash &&
+    BigInt(expected.outPoint.index) === BigInt(actual.outPoint.index)
+  );
+}
+
+function preservesRequiredCellDeps(
+  reviewed: UnsignedDeadlineTransaction,
+  completed: UnsignedDeadlineTransaction,
+): boolean {
+  return reviewed.cellDeps.every((required) =>
+    completed.cellDeps.some((candidate) => sameCellDep(required, candidate)),
+  );
 }
 
 export function verifyDaoHarvestSetupBuild(
@@ -72,7 +129,7 @@ export function verifyCompletedDaoHarvestTransaction(
     !sameRequiredOutput(reviewed.outputs[1]!, completed.outputs[1]) ||
     reviewed.outputsData[0] !== completed.outputsData[0] ||
     reviewed.outputsData[1] !== completed.outputsData[1] ||
-    JSON.stringify(reviewed.cellDeps) !== JSON.stringify(completed.cellDeps) ||
+    !preservesRequiredCellDeps(reviewed, completed) ||
     JSON.stringify(reviewed.headerDeps) !== JSON.stringify(completed.headerDeps)
   ) {
     throw new Error("Wallet funding changed the reviewed harvest policy.");
@@ -88,7 +145,7 @@ export function verifyCompletedDaoHarvestOwnerAction(
       (output, index) => !sameRequiredOutput(output, completed.outputs[index]),
     ) ||
     reviewed.outputsData.some((data, index) => data !== completed.outputsData[index]) ||
-    JSON.stringify(reviewed.cellDeps) !== JSON.stringify(completed.cellDeps) ||
+    !preservesRequiredCellDeps(reviewed, completed) ||
     JSON.stringify(reviewed.headerDeps) !== JSON.stringify(completed.headerDeps) ||
     reviewed.witnesses.some((witness, index) => witness !== completed.witnesses[index])
   ) {

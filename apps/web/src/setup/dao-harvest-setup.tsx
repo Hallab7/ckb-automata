@@ -20,8 +20,10 @@ import {
   type DaoHarvestValidationContext,
 } from "./dao-harvest-form.ts";
 import {
+  daoHarvestReviewSnapshot,
   verifyCompletedDaoHarvestTransaction,
   verifyDaoHarvestSetupBuild,
+  verifyRefreshedDaoHarvestPolicy,
 } from "./dao-harvest-review.ts";
 import { DAO_HARVEST_SETUP_STEPS, type SetupDraft } from "./setup-flow.ts";
 import { SetupStepper, type SetupStepRenderContext } from "./setup-stepper.tsx";
@@ -30,7 +32,11 @@ interface HarvestReview {
   readonly build: ApiDaoHarvestBuild;
   readonly completed: ApiDaoHarvestBuild["transaction"];
   readonly key: string;
-  readonly snapshot: { readonly blockHash: string; readonly blockNumber: string };
+  readonly snapshot: {
+    readonly blockHash: string;
+    readonly blockNumber: string;
+    readonly expiresAfterBlock: string;
+  };
   readonly transactionHash: string;
 }
 
@@ -268,7 +274,7 @@ function HarvestReviewStep({
         build,
         completed: completed.transaction,
         key,
-        snapshot: network.tip,
+        snapshot: daoHarvestReviewSnapshot(network.tip),
         transactionHash: completed.hash,
       };
       window.sessionStorage.setItem(REVIEW_STORAGE_KEY, JSON.stringify(value));
@@ -432,12 +438,7 @@ function HarvestApproval({
         principal: BigInt(request.principal),
         totalCycles: request.totalCycles,
       });
-      if (
-        refreshed.policyCriticalHash !== review.build.policyCriticalHash ||
-        JSON.stringify(refreshed.transaction) !== JSON.stringify(review.build.transaction)
-      ) {
-        throw new Error("The chain quote changed. Return to Review before signing.");
-      }
+      verifyRefreshedDaoHarvestPolicy(review.build, refreshed);
       const signed = await session.signReviewedTransaction(
         review.completed,
         review.transactionHash,
