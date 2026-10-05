@@ -87,12 +87,30 @@ test("confirmed reconciliation rows remain readable ahead of the canonical check
 
   await service.list({ limit: 20 });
   assert.equal(stale.queryCount(), 3);
-  assert.equal(dialect.sqlToQuery(stale.conditions[1]!).sql, '"jobs"."network_id" = $1');
-  assert.equal(dialect.sqlToQuery(stale.conditions[2]!).sql, '"jobs"."network_id" = $1');
+  assert.equal(
+    dialect.sqlToQuery(stale.conditions[1]!).sql,
+    '("jobs"."network_id" = $1 and "jobs"."policy_kind" in ($2, $3))',
+  );
+  assert.equal(
+    dialect.sqlToQuery(stale.conditions[2]!).sql,
+    '("jobs"."network_id" = $1 and "jobs"."policy_kind" in ($2, $3))',
+  );
 
   const empty = readDatabase(undefined);
   await new JobReadService(empty.database as never, "ckb_testnet").list({ limit: 20 });
   assert.equal(empty.queryCount(), 3);
+});
+
+test("payment reads exclude DAO harvest rows handled by the dedicated API", async () => {
+  const dialect = new PgDialect();
+  const source = readDatabase({ blockNumber: "100", blockHash: `0x${"11".repeat(32)}` });
+  const service = new JobReadService(source.database as never, "ckb_testnet");
+
+  await assert.rejects(() => service.detail(`0x${"22".repeat(32)}`), /Not Found/);
+  assert.equal(
+    dialect.sqlToQuery(source.conditions[1]!).sql,
+    '("jobs"."network_id" = $1 and "jobs"."job_id" = $2 and "jobs"."policy_kind" in ($3, $4))',
+  );
 });
 
 test("job routes publish an OpenAPI contract with decimal-string integer fields", async () => {

@@ -20,7 +20,7 @@ import {
   ApiQuery,
   ApiTags,
 } from "@nestjs/swagger";
-import { and, count, desc, eq, lt, or, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, inArray, lt, or, type SQL } from "drizzle-orm";
 
 import { inspectJobData } from "@ckb-automata/core";
 
@@ -398,7 +398,13 @@ export class JobReadService {
         const [row] = await tx
           .select()
           .from(jobs)
-          .where(and(eq(jobs.networkId, this.#network), eq(jobs.jobId, jobId)))
+          .where(
+            and(
+              eq(jobs.networkId, this.#network),
+              eq(jobs.jobId, jobId),
+              inArray(jobs.policyKind, [...JOB_TEMPLATES]),
+            ),
+          )
           .limit(1);
         return { checkpoint: checkpointRow ?? null, row };
       },
@@ -430,7 +436,10 @@ export class JobReadService {
           .where(eq(indexerCheckpoints.networkId, this.#network))
           .limit(1);
         const checkpoint = checkpointRow ?? null;
-        const filters: SQL[] = [eq(jobs.networkId, this.#network)];
+        const filters: SQL[] = [
+          eq(jobs.networkId, this.#network),
+          inArray(jobs.policyKind, [...JOB_TEMPLATES]),
+        ];
         if (ownerLockHash !== undefined) filters.push(eq(jobs.ownerLockHash, ownerLockHash));
         if (query.state !== undefined) filters.push(eq(jobs.state, query.state));
         if (query.template !== undefined) filters.push(eq(jobs.policyKind, query.template));
@@ -467,7 +476,12 @@ export class JobReadService {
             : await tx
                 .select({ jobId: jobs.jobId })
                 .from(jobs)
-                .where(eq(jobs.networkId, this.#network));
+                .where(
+                  and(
+                    eq(jobs.networkId, this.#network),
+                    inArray(jobs.policyKind, [...JOB_TEMPLATES]),
+                  ),
+                );
         return { allIndexedJobIds, checkpoint, rows, summaryRows, totalItems: total.totalItems };
       },
       { accessMode: "read only", isolationLevel: "repeatable read" },
