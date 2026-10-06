@@ -216,7 +216,12 @@ function setupRequest(value: unknown): SetupRequest {
       lockResolution(lock, `lockResolutions[${index}]`),
     );
     const hashes = locks.map((lock) => parseHash32(scriptToHash(lock)));
-    if (new Set(hashes).size !== 2 || !hashes.includes(ownerHash) || !hashes.includes(payoutHash)) {
+    const expectedHashes = new Set([ownerHash, payoutHash]);
+    const resolutionHashes = new Set(hashes);
+    if (
+      resolutionHashes.size !== expectedHashes.size ||
+      [...expectedHashes].some((expectedHash) => !resolutionHashes.has(expectedHash))
+    ) {
       throw new TypeError("lock resolutions must match the owner and payout hashes");
     }
     if (parseShannons(principal) < DAO_HARVEST_VAULT_OCCUPIED_CAPACITY) {

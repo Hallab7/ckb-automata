@@ -182,6 +182,28 @@ test("active deployment builds an exact unsigned setup and rejects understated f
   assert.equal(BigInt(transaction.outputs[1]!.capacity), 50_300_000_000n);
   assert.equal(transaction.cellDeps.length, 5);
   assert.deepEqual(remembered, [ownerLock, payoutLock]);
+
+  const sameAddressResult = await adapter.build("setup", {
+    ownerLockHash,
+    payoutLockHash: ownerLockHash,
+    principal: "21000000000",
+    totalCycles: 1,
+    lockResolutions: [ownerLock, ownerLock],
+  });
+  assert.equal(sameAddressResult.operation, "setup");
+  assert.deepEqual(remembered.slice(-2), [ownerLock, ownerLock]);
+
+  await assert.rejects(
+    adapter.build("setup", {
+      ownerLockHash,
+      payoutLockHash,
+      principal: "21000000000",
+      totalCycles: 1,
+      lockResolutions: [ownerLock, ownerLock],
+    }),
+    /match the owner and payout hashes/,
+  );
+
   const registered = await registry.load(testnetManifest.genesisHash);
   assert.equal(registered.status, "ok");
   if (registered.status !== "ok") throw new Error("test deployment is unavailable");
