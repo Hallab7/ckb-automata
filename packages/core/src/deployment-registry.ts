@@ -206,7 +206,7 @@ export const LOCAL_DEPLOYMENT_MANIFEST_SHA256 =
   "2904b44ffa3c1f292404540f2bc6c14dc96789f888e28aa7fc2527566110e1d1" as const;
 export const TESTNET_GENESIS_HASH = testnetManifest.genesisHash;
 export const TESTNET_DEPLOYMENT_MANIFEST_SHA256 =
-  "857e3125f86ead74bd48370d314a503e2df61b84565df08e5202672cadc6a5f5" as const;
+  "0fe4b1f45b6fc4bc719d7e197ff4f58fb222e300f4c077a19b81b0e8bf64a1c3" as const;
 
 export const deploymentRegistry = createDeploymentRegistry([
   {

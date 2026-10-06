@@ -1,10 +1,10 @@
 {
   "network": "ckb_testnet",
   "genesisHash": "0x10639e0895502b5688a6be8cf69460d76541bfa4821629d86d62ba0aae3f9606",
-  "manifestSha256": "857e3125f86ead74bd48370d314a503e2df61b84565df08e5202672cadc6a5f5",
+  "manifestSha256": "0fe4b1f45b6fc4bc719d7e197ff4f58fb222e300f4c077a19b81b0e8bf64a1c3",
   "deployment": {
-    "transactionHash": "0x0c8d224317047b99fa8f95d321d4d64e16eeb4f8ab8ebdd3a481df42691ad717",
-    "blockHash": "0x9deb3255d1396950609e37eee127be1c69655f2dc538828adb2acf0f2f18d247"
+    "transactionHash": "0xc64456e82fc7b8b5fe75cd11921f33c79c4a9f83dd843cc08d8277efbe8721fe",
+    "blockHash": "0x6a624bbaf05cb02f8b284ce444cc37cf5696ff576a4ff8c83ae4b0daf9ae747d"
   },
   "secp256k1Blake160": {
     "cellDep": {
@@ -30,12 +30,12 @@
   },
   "policy": {
     "script": {
-      "codeHash": "0xc4a05ebc73dc16582f4d4c351eddbcbe46a6488c6a213408ac439727d070cbdd",
+      "codeHash": "0xe52976ae5a666d335679268f7d8946e22e22cad6e0795606290afc60df917bfc",
       "hashType": "data1"
     },
     "cellDep": {
       "outPoint": {
-        "txHash": "0x0c8d224317047b99fa8f95d321d4d64e16eeb4f8ab8ebdd3a481df42691ad717",
+        "txHash": "0xc64456e82fc7b8b5fe75cd11921f33c79c4a9f83dd843cc08d8277efbe8721fe",
         "index": "0x0"
       },
       "depType": "code"

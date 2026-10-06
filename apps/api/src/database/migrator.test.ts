@@ -58,6 +58,7 @@ test("repository migrations retain confirmation policy and register the harvest 
   const confirmations = migrations.find(({ version }) => version === 13);
   const harvestProjection = migrations.find(({ version }) => version === 14);
   const harvestManifest = migrations.find(({ version }) => version === 15);
+  const harvestPolicyFix = migrations.find(({ version }) => version === 16);
   const latest = migrations.at(-1);
 
   assert.equal(confirmations?.name, "testnet_confirmation_depth");
@@ -72,11 +73,17 @@ test("repository migrations retain confirmation policy and register the harvest 
     assert.match(sql, /cddc2e92/);
     assert.match(sql, /10639e08/);
   }
-  assert.equal(latest?.version, 16);
-  assert.equal(latest?.name, "dao_harvest_policy_fix");
-  for (const sql of [latest?.upSql ?? "", latest?.downSql ?? ""]) {
+  assert.equal(harvestPolicyFix?.name, "dao_harvest_policy_fix");
+  for (const sql of [harvestPolicyFix?.upSql ?? "", harvestPolicyFix?.downSql ?? ""]) {
     assert.match(sql, /cddc2e92/);
     assert.match(sql, /857e3125/);
+    assert.match(sql, /10639e08/);
+  }
+  assert.equal(latest?.version, 17);
+  assert.equal(latest?.name, "owner_compensation_policy");
+  for (const sql of [latest?.upSql ?? "", latest?.downSql ?? ""]) {
+    assert.match(sql, /857e3125/);
+    assert.match(sql, /0fe4b1f4/);
     assert.match(sql, /10639e08/);
   }
 });
