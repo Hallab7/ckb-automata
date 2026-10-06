@@ -6,25 +6,29 @@ const pageSource = await readFile(
   new URL("../../app/(product)/how-it-works/page.tsx", import.meta.url),
   "utf8",
 );
+const tabsSource = await readFile(new URL("./how-it-works-tabs.tsx", import.meta.url), "utf8");
+const guideSource = `${pageSource}\n${tabsSource}`;
 
 test("how it works explains the complete automation flow in plain language", () => {
   for (const copy of [
-    "Choose an automation",
-    "Enter the payment details",
-    "Set the schedule",
-    "Review and approve",
-    "Track the automation",
-    "Schedule payment",
+    "Scheduled payment",
     "Recurring distribution",
+    "DAO harvest",
+    "Enter the payment details",
+    "Choose the repeat schedule",
+    "Wait for the DAO cycle",
+    "Receive the compensation",
+    "Review and approve",
     "Payment status",
-    "Manage an automation",
   ]) {
-    assert.match(pageSource, new RegExp(copy, "i"));
+    assert.match(guideSource, new RegExp(copy, "i"));
   }
 });
 
 test("how it works remains a standalone product guide", () => {
-  assert.doesNotMatch(pageSource, /executor/i);
-  assert.match(pageSource, /Submitting and Confirming/i);
-  assert.match(pageSource, /cancel it, add funds, or recover/i);
+  assert.doesNotMatch(guideSource, /executor/i);
+  assert.match(pageSource, /Confirming means the automation is being created/i);
+  assert.match(pageSource, /stop, cancel, exit, or recover/i);
+  assert.match(tabsSource, /role="tablist"/i);
+  assert.match(tabsSource, /role="tabpanel"/i);
 });
