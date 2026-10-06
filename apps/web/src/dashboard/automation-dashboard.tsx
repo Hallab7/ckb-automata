@@ -12,6 +12,7 @@ import {
 import { useWalletSession } from "../ccc/session.tsx";
 import { createLiveDataProvider, LIVE_DATA_LABEL } from "../data-provider.ts";
 import { browserWebEnvironment } from "../environment.ts";
+import { usePublicDeploymentMetadata } from "../public-deployment-gate.tsx";
 import { requestErrorMessage } from "../request-errors.ts";
 import { readAutomationTitles } from "../setup/automation-title.ts";
 import { latestObservedBlock, readNetworkTipBlock } from "../time/chain-time.ts";
@@ -32,6 +33,8 @@ interface LoadedDashboardPage {
   readonly referenceBlock?: string;
   readonly response: ApiJobList;
 }
+
+type SummaryLoadState = "error" | "loading" | "ready";
 
 function browserApiClient(): AutomataApiClient {
   const environment = browserWebEnvironment();
@@ -58,10 +61,13 @@ async function loadRecipientAmounts(
 async function loadDashboardPage(
   api: AutomataApiClient,
   responsePromise: Promise<ApiJobList>,
+  verifiedNetwork?: Awaited<ReturnType<AutomataApiClient["network"]>>,
 ): Promise<LoadedDashboardPage> {
   const [response, network] = await Promise.all([
     responsePromise,
-    api.network().catch(() => undefined),
+    verifiedNetwork === undefined
+      ? api.network().catch(() => undefined)
+      : Promise.resolve(verifiedNetwork),
   ]);
   const referenceBlock = latestObservedBlock(
     readNetworkTipBlock(network),
@@ -75,8 +81,13 @@ async function loadDashboardPage(
   };
 }
 
+function fullSummaryQuery(query: ApiQuery<"JobsController_list">): ApiQuery<"JobsController_list"> {
+  return { ...query, limit: 1, summary: "full" };
+}
+
 export function AutomationDashboard() {
   const session = useWalletSession();
+  const verifiedNetwork = usePublicDeploymentMetadata();
   const apiResult = useMemo(() => {
     try {
       const provider = createLiveDataProvider(browserApiClient);
@@ -91,6 +102,8 @@ export function AutomationDashboard() {
   const [pages, setPages] = useState<readonly LoadedDashboardPage[]>([]);
   const [pageIndex, setPageIndex] = useState(0);
   const [recipientAmounts, setRecipientAmounts] = useState<RecipientAmountsByJob>({});
+  const [exactSummary, setExactSummary] = useState<ApiJobList["summary"]>();
+  const [summaryLoadState, setSummaryLoadState] = useState<SummaryLoadState>("loading");
   const [loadState, setLoadState] = useState<DashboardLoadState>("loading");
   const [paginationError, setPaginationError] = useState<string>();
   const [loadingPage, setLoadingPage] = useState(false);
@@ -100,7 +113,7 @@ export function AutomationDashboard() {
   const currentPage = pages[pageIndex];
   const items = currentPage?.response.items ?? EMPTY_ITEMS;
   const pendingItems = currentPage?.response.pendingItems ?? [];
-  const summary = currentPage?.response.summary;
+  const summary = exactSummary ?? currentPage?.response.summary;
   const checkpointAt = currentPage?.loadedAt;
   const checkpointBlock = currentPage?.referenceBlock;
   const totalItems = currentPage?.response.page.totalItems ?? 0;
@@ -116,6 +129,7 @@ export function AutomationDashboard() {
       ...(templateFilter
         ? { template: templateFilter as NonNullable<ApiQuery<"JobsController_list">["template"]> }
         : {}),
+      summary: "compact",
     }),
     [stateFilter, templateFilter],
   );
@@ -152,20 +166,38 @@ export function AutomationDashboard() {
     setPages([]);
     setPageIndex(0);
     setRecipientAmounts({});
+    setExactSummary(undefined);
+    setSummaryLoadState("loading");
     setPaginationError(undefined);
     setLoadState("loading");
     const request =
       mode === "owner"
         ? apiResult.api.listAccountJobs(session.ownerLockHash!, query)
         : apiResult.api.listJobs(query);
-    void loadDashboardPage(apiResult.api, request)
+    void loadDashboardPage(apiResult.api, request, verifiedNetwork)
       .then((page) => {
         if (!active) return;
         setPages([page]);
         setLoadState("ready");
-        void loadRecipientAmounts(apiResult.api!, page.response.items).then((amounts) => {
-          if (active) setRecipientAmounts(amounts);
-        });
+        void loadRecipientAmounts(apiResult.api!, page.response.items)
+          .then((amounts) => {
+            if (active) setRecipientAmounts(amounts);
+          })
+          .then(() => {
+            if (!active) return undefined;
+            const summaryRequest =
+              mode === "owner"
+                ? apiResult.api!.listAccountJobs(session.ownerLockHash!, fullSummaryQuery(query))
+                : apiResult.api!.listJobs(fullSummaryQuery(query));
+            return summaryRequest.then((response) => {
+              if (!active) return;
+              setExactSummary(response.summary);
+              setSummaryLoadState("ready");
+            });
+          })
+          .catch(() => {
+            if (active) setSummaryLoadState("error");
+          });
       })
       .catch(() => {
         if (!active) return;
@@ -182,6 +214,7 @@ export function AutomationDashboard() {
     session.detailsStatus,
     session.ownerLockHash,
     session.status,
+    verifiedNetwork,
   ]);
 
   useEffect(() => {
@@ -200,6 +233,20 @@ export function AutomationDashboard() {
           void loadRecipientAmounts(apiResult.api!, page.response.items).then((amounts) => {
             if (active) setRecipientAmounts((current) => ({ ...current, ...amounts }));
           });
+          const summaryRequest =
+            mode === "owner"
+              ? apiResult.api!.listAccountJobs(session.ownerLockHash!, fullSummaryQuery(query))
+              : apiResult.api!.listJobs(fullSummaryQuery(query));
+          void summaryRequest
+            .then((response) => {
+              if (active) {
+                setExactSummary(response.summary);
+                setSummaryLoadState("ready");
+              }
+            })
+            .catch(() => {
+              // Keep the previous exact summary during a temporary refresh failure.
+            });
         })
         .catch(() => {
           // Keep the last complete page when a background refresh is temporarily unavailable.
@@ -270,6 +317,7 @@ export function AutomationDashboard() {
         paginationError={paginationError}
         recipientAmounts={recipientAmounts}
         summary={summary}
+        summaryAmountsLoading={summaryLoadState === "loading"}
         totalItems={totalItems}
         onConnect={session.open}
         onNextPage={loadNextPage}

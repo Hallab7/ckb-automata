@@ -47,6 +47,7 @@ export type JobTemplateId = (typeof JOB_TEMPLATES)[number];
 export interface JobListQuery {
   readonly cursor?: string;
   readonly limit?: string | number;
+  readonly summary?: string;
   readonly state?: string;
   readonly template?: string;
 }
@@ -154,6 +155,7 @@ export const JOB_TEMPLATE_CATALOG: readonly JobTemplate[] = Object.freeze([
 interface ParsedListQuery {
   readonly cursor?: string;
   readonly limit: number;
+  readonly summary: "compact" | "full";
   readonly state?: JobState;
   readonly template?: JobTemplateId;
 }
@@ -183,7 +185,7 @@ function invalidQuery(message: string): BadRequestException {
 }
 
 function parseListQuery(input: Readonly<Record<string, unknown>>): ParsedListQuery {
-  const allowed = new Set(["cursor", "limit", "state", "template"]);
+  const allowed = new Set(["cursor", "limit", "state", "summary", "template"]);
   const unknown = Object.keys(input).filter((key) => !allowed.has(key));
   if (unknown.length > 0) throw invalidQuery(`unsupported query parameter: ${unknown[0]}`);
 
@@ -203,9 +205,15 @@ function parseListQuery(input: Readonly<Record<string, unknown>>): ParsedListQue
     throw invalidQuery(`template must be one of: ${JOB_TEMPLATES.join(", ")}`);
   }
 
+  const summary = one(input["summary"], "summary") ?? "full";
+  if (summary !== "compact" && summary !== "full") {
+    throw invalidQuery("summary must be one of: compact, full");
+  }
+
   return {
     ...(cursor === undefined ? {} : { cursor }),
     limit,
+    summary,
     ...(state === undefined ? {} : { state: state as JobState }),
     ...(template === undefined ? {} : { template: template as JobTemplateId }),
   };
@@ -470,8 +478,10 @@ export class JobReadService {
                 .select()
                 .from(jobs)
                 .where(and(...filters));
+        const summaryCoversAllIndexedJobs =
+          ownerLockHash === undefined && query.state === undefined && query.template === undefined;
         const allIndexedJobIds =
-          this.#pending === undefined
+          this.#pending === undefined || summaryCoversAllIndexedJobs
             ? summaryRows.map((row) => ({ jobId: row.jobId }))
             : await tx
                 .select({ jobId: jobs.jobId })
@@ -511,7 +521,12 @@ export class JobReadService {
             ...(query.state === undefined ? {} : { state: query.state }),
             ...(query.template === undefined ? {} : { template: query.template }),
           });
-    const summary = await this.#summary(result.summaryRows, pendingItems, result.checkpoint);
+    const summary = await this.#summary(
+      result.summaryRows,
+      pendingItems,
+      result.checkpoint,
+      query.summary === "full",
+    );
 
     return Object.freeze({
       items: Object.freeze(pageRows.map((row) => readModel(row, result.checkpoint))),
@@ -543,6 +558,7 @@ export class JobReadService {
     rows: readonly JobRow[],
     pending: readonly PendingCreationReadModel[],
     checkpoint: Checkpoint,
+    includeRecipientAmounts: boolean,
   ): Promise<JobListSummary> {
     const states = { confirming: 0, live: 0, orphaned: 0, spent: 0, submitting: 0 };
     for (const row of rows) states[row.state as JobState] += 1;
@@ -572,37 +588,40 @@ export class JobReadService {
       return rowJob.job.notBefore < nextJob.job.notBefore ? row : next;
     }, undefined);
     let unavailable = false;
-    let recipientTotal = pending.reduce(
-      (total, item) => total + BigInt(item.recipientAmount.total),
-      0n,
-    );
+    let recipientTotal = 0n;
     let nextRecipientAmount: JobTerms["payout"] | null = null;
-    const canonicalRows = rows.filter((row) => row.state !== "orphaned");
-    const terms: Array<{ readonly row: JobRow; readonly value: JobTerms | undefined }> = [];
-    for (let index = 0; index < canonicalRows.length; index += SUMMARY_TERMS_CONCURRENCY) {
-      const batch = canonicalRows.slice(index, index + SUMMARY_TERMS_CONCURRENCY);
-      terms.push(
-        ...(await Promise.all(
-          batch.map(async (row) => {
-            try {
-              return { row, value: await this.#terms(row) } as const;
-            } catch {
-              unavailable = true;
-              return { row, value: undefined } as const;
-            }
-          }),
-        )),
+    if (includeRecipientAmounts) {
+      recipientTotal = pending.reduce(
+        (total, item) => total + BigInt(item.recipientAmount.total),
+        0n,
       );
-    }
-    for (const item of terms) {
-      if (item.value === undefined) continue;
-      recipientTotal += BigInt(item.value.payout.total);
-      if (item.row.jobId === nextRow?.jobId) nextRecipientAmount = item.value.payout;
+      const canonicalRows = rows.filter((row) => row.state !== "orphaned");
+      const terms: Array<{ readonly row: JobRow; readonly value: JobTerms | undefined }> = [];
+      for (let index = 0; index < canonicalRows.length; index += SUMMARY_TERMS_CONCURRENCY) {
+        const batch = canonicalRows.slice(index, index + SUMMARY_TERMS_CONCURRENCY);
+        terms.push(
+          ...(await Promise.all(
+            batch.map(async (row) => {
+              try {
+                return { row, value: await this.#terms(row) } as const;
+              } catch {
+                unavailable = true;
+                return { row, value: undefined } as const;
+              }
+            }),
+          )),
+        );
+      }
+      for (const item of terms) {
+        if (item.value === undefined) continue;
+        recipientTotal += BigInt(item.value.payout.total);
+        if (item.row.jobId === nextRow?.jobId) nextRecipientAmount = item.value.payout;
+      }
     }
     return Object.freeze({
       nextJob: nextRow === undefined ? null : readModel(nextRow, checkpoint),
       nextRecipientAmount,
-      recipientTotal: unavailable ? null : recipientTotal.toString(),
+      recipientTotal: !includeRecipientAmounts || unavailable ? null : recipientTotal.toString(),
       states: Object.freeze(states),
       totalItems: rows.length + pending.length,
     });
@@ -844,6 +863,12 @@ function decorateList(target: object, property: string): void {
     schema: { minimum: 1, maximum: MAX_PAGE_SIZE, default: DEFAULT_PAGE_SIZE },
   })(target, property, descriptor);
   ApiQuery({ name: "state", required: false, enum: JOB_STATES })(target, property, descriptor);
+  ApiQuery({
+    name: "summary",
+    required: false,
+    enum: ["compact", "full"],
+    schema: { default: "full" },
+  })(target, property, descriptor);
   ApiQuery({ name: "template", required: false, enum: JOB_TEMPLATES })(
     target,
     property,

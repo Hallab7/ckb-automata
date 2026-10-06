@@ -686,6 +686,7 @@ export interface operations {
                 readonly cursor?: string;
                 readonly limit?: unknown;
                 readonly state?: "live" | "spent" | "orphaned";
+                readonly summary?: "compact" | "full";
                 readonly template?: "deadline" | "recurring";
             };
             readonly header?: never;
@@ -1577,6 +1578,7 @@ export interface operations {
                 readonly cursor?: string;
                 readonly limit?: unknown;
                 readonly state?: "live" | "spent" | "orphaned";
+                readonly summary?: "compact" | "full";
                 readonly template?: "deadline" | "recurring";
             };
             readonly header?: never;

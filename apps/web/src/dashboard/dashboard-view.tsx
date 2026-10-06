@@ -70,14 +70,19 @@ function DashboardStatusBadge({ status }: Readonly<{ status: DashboardStatus }>)
   );
 }
 
-function Summary({ value }: Readonly<{ value: ApiJobList["summary"] }>) {
+function Summary({
+  amountsLoading,
+  value,
+}: Readonly<{ amountsLoading: boolean; value: ApiJobList["summary"] }>) {
   const summary = dashboardSummary(value);
   return (
     <section className="automation-funds" aria-label="Loaded automation summary">
       <div className="automation-funds__heading">
         <div>
           <span>Total recipient amount</span>
-          <strong>{summary.recipientTotal}</strong>
+          <strong aria-live="polite">
+            {amountsLoading ? "Calculating..." : summary.recipientTotal}
+          </strong>
           <small>Across all matching automations</small>
         </div>
         <div className="automation-funds__count">
@@ -382,6 +387,7 @@ export interface AutomationDashboardViewProperties {
   readonly pageSize?: number | undefined;
   readonly paginationError?: string | undefined;
   readonly recipientAmounts?: RecipientAmountsByJob | undefined;
+  readonly summaryAmountsLoading?: boolean | undefined;
   readonly summary?: ApiJobList["summary"] | undefined;
   readonly onConnect?: (() => void) | undefined;
   readonly onNextPage?: (() => void) | undefined;
@@ -411,6 +417,7 @@ export function AutomationDashboardView({
   pageSize = 12,
   paginationError,
   recipientAmounts = {},
+  summaryAmountsLoading = false,
   summary,
   onConnect,
   onNextPage,
@@ -447,7 +454,7 @@ export function AutomationDashboardView({
 
       {summary !== undefined && summary.totalItems > 0 ? (
         <div className="automation-overview">
-          <Summary value={summary} />
+          <Summary amountsLoading={summaryAmountsLoading} value={summary} />
           <NextAutomation
             checkpointAt={checkpointAt}
             checkpointBlock={checkpointBlock}

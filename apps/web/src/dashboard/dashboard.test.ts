@@ -9,6 +9,15 @@ test("dashboard consumes generated public and owner job reads", async () => {
   assert.match(source, /cursor: nextCursor/);
   assert.match(source, /stateFilter/);
   assert.match(source, /templateFilter/);
+  assert.match(source, /summary: "compact"/);
+  assert.match(source, /fullSummaryQuery/);
+  assert.match(source, /usePublicDeploymentMetadata/);
+  assert.match(source, /loadDashboardPage\(apiResult\.api, request, verifiedNetwork\)/);
+  assert.match(source, /setLoadState\("ready"\)/);
+  assert.ok(
+    source.indexOf('setLoadState("ready")') < source.indexOf("fullSummaryQuery(query)"),
+    "the list must render before the exact summary request",
+  );
 });
 
 test("dashboard keeps a page-shaped skeleton while records load", async () => {

@@ -2,9 +2,9 @@
 
 import { RefreshCw } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
-import { createApiClient } from "@ckb-automata/api-client";
+import { createApiClient, type AutomataApiClient } from "@ckb-automata/api-client";
 import { Button, InlineNotice } from "@ckb-automata/ui";
 
 import { AutomationDashboardSkeleton } from "./dashboard/dashboard-view.tsx";
@@ -16,14 +16,23 @@ import {
 import { browserWebEnvironment } from "./environment.ts";
 
 type GateState = "checking" | "ready" | "rejected" | "unavailable";
+type NetworkMetadata = Awaited<ReturnType<AutomataApiClient["network"]>>;
+
+const PublicDeploymentMetadataContext = createContext<NetworkMetadata | undefined>(undefined);
+
+export function usePublicDeploymentMetadata(): NetworkMetadata | undefined {
+  return useContext(PublicDeploymentMetadataContext);
+}
 
 export function PublicDeploymentGate({ children }: Readonly<{ children: ReactNode }>) {
   const pathname = usePathname();
   const requiresVerification = requiresPublicDeploymentVerification(pathname);
   const [state, setState] = useState<GateState>("checking");
+  const [metadata, setMetadata] = useState<NetworkMetadata>();
   const [attempt, setAttempt] = useState(0);
   const verify = useCallback(async () => {
     setState("checking");
+    setMetadata(undefined);
     let environment;
     try {
       environment = browserWebEnvironment();
@@ -31,15 +40,16 @@ export function PublicDeploymentGate({ children }: Readonly<{ children: ReactNod
       setState("rejected");
       return;
     }
-    let metadata;
+    let responseMetadata;
     try {
-      metadata = await createApiClient({ baseUrl: environment.apiUrl }).network();
+      responseMetadata = await createApiClient({ baseUrl: environment.apiUrl }).network();
     } catch {
       setState("unavailable");
       return;
     }
     try {
-      assertPublicDeploymentIdentity(metadata, environment);
+      assertPublicDeploymentIdentity(responseMetadata, environment);
+      setMetadata(responseMetadata);
       setState("ready");
     } catch {
       setState("rejected");
@@ -52,7 +62,13 @@ export function PublicDeploymentGate({ children }: Readonly<{ children: ReactNod
   }, [attempt, requiresVerification, verify]);
 
   if (!requiresVerification) return children;
-  if (state === "ready") return children;
+  if (state === "ready" && metadata !== undefined) {
+    return (
+      <PublicDeploymentMetadataContext.Provider value={metadata}>
+        {children}
+      </PublicDeploymentMetadataContext.Provider>
+    );
+  }
   if (state === "checking") {
     if (pathname === "/automations") return <AutomationDashboardSkeleton />;
     if (/^\/automations\/[^/]+$/.test(pathname) && pathname !== "/automations/new") {

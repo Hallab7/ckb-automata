@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import type { LoggerService } from "@nestjs/common";
@@ -10,6 +11,9 @@ import { createApiApplication } from "./bootstrap.ts";
 import { JOB_TEMPLATE_CATALOG, JobReadService } from "./jobs.ts";
 
 const GENESIS_HASH = `0x${"5a7b2eb5a3aa224edb367eb7aba742c6f60efaddb6b9536ab2a2c20e0af6cff3"}`;
+const jobFixture = JSON.parse(
+  await readFile(new URL("../../../contracts/fixtures/job_data_v1.json", import.meta.url), "utf8"),
+) as Readonly<Record<string, string>>;
 const quietLogger: LoggerService = {
   log: () => undefined,
   fatal: () => undefined,
@@ -64,6 +68,59 @@ function readDatabase(checkpoint: { blockNumber: string; blockHash: string } | u
   };
 }
 
+function summaryDatabase() {
+  const transactionQueryCounts: number[] = [];
+  const row = {
+    networkId: "ckb_testnet",
+    jobId: jobFixture["job_id"]!,
+    outpointTxHash: `0x${"12".repeat(32)}`,
+    outpointIndex: "0",
+    sequence: jobFixture["sequence"]!,
+    ownerLockHash: jobFixture["cancel_lock_hash"]!,
+    policyScriptHash: jobFixture["policy_script_hash"]!,
+    policyKind: "recurring",
+    state: "live",
+    capacity: "10000000000",
+    data: Buffer.from(jobFixture["expected_hex"]!.slice(2), "hex"),
+    blockNumber: "100",
+    blockHash: `0x${"34".repeat(32)}`,
+    transactionIndex: "0",
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+  };
+  const database = {
+    transaction: async <T>(operation: (tx: unknown) => Promise<T>) => {
+      let queryCount = 0;
+      const tx = {
+        select: (selection?: Readonly<Record<string, unknown>>) => {
+          queryCount += 1;
+          const current = queryCount;
+          const result =
+            current === 1
+              ? [{ blockNumber: "100", blockHash: `0x${"34".repeat(32)}` }]
+              : selection?.["totalItems"] !== undefined
+                ? [{ totalItems: 1 }]
+                : [row];
+          const builder = Promise.resolve(result) as Promise<typeof result> & {
+            from(): typeof builder;
+            where(): typeof builder;
+            orderBy(): typeof builder;
+            limit(): Promise<typeof result>;
+          };
+          builder.from = () => builder;
+          builder.where = () => builder;
+          builder.orderBy = () => builder;
+          builder.limit = async () => result;
+          return builder;
+        },
+      };
+      const result = await operation(tx);
+      transactionQueryCounts.push(queryCount);
+      return result;
+    },
+  };
+  return { database, transactionQueryCounts };
+}
+
 test("template catalog describes both supported workflows without database state", () => {
   assert.deepEqual(
     JOB_TEMPLATE_CATALOG.map(({ id, execution, triggerMetric, version }) => ({
@@ -113,6 +170,42 @@ test("payment reads exclude DAO harvest rows handled by the dedicated API", asyn
   );
 });
 
+test("compact job lists skip chain-derived recipient totals", async () => {
+  let termsCalls = 0;
+  const source = summaryDatabase();
+  const service = new JobReadService(source.database as never, "ckb_testnet", {
+    pending: { list: async () => [] },
+    quotes: {
+      terms: async (jobId) => {
+        termsCalls += 1;
+        return {
+          jobId,
+          network: "ckb_testnet",
+          template: "recurring",
+          payout: { perExecution: "100", total: "300" },
+          schedule: { totalExecutions: "3" },
+          source: {
+            payloadHash: jobFixture["payload_hash"]!,
+            outPoint: { txHash: `0x${"12".repeat(32)}`, index: "0" },
+          },
+        };
+      },
+    },
+  });
+
+  const compact = await service.list({ limit: 12, summary: "compact" });
+  assert.equal(compact.items.length, 1);
+  assert.equal(compact.summary.totalItems, 1);
+  assert.equal(compact.summary.recipientTotal, null);
+  assert.equal(termsCalls, 0);
+  assert.equal(source.transactionQueryCounts[0], 4);
+
+  const full = await service.list({ limit: 1, summary: "full" });
+  assert.equal(full.summary.recipientTotal, "300");
+  assert.deepEqual(full.summary.nextRecipientAmount, { perExecution: "100", total: "300" });
+  assert.equal(termsCalls, 1);
+});
+
 test("job routes publish an OpenAPI contract with decimal-string integer fields", async () => {
   const result = await createApiApplication(environment(), { logger: quietLogger });
   try {
@@ -136,7 +229,7 @@ test("job routes publish an OpenAPI contract with decimal-string integer fields"
     const parameters = (listOperation.parameters ?? []).map((parameter) =>
       "$ref" in parameter ? parameter.$ref : parameter.name,
     );
-    assert.deepEqual(parameters.toSorted(), ["cursor", "limit", "state", "template"]);
+    assert.deepEqual(parameters.toSorted(), ["cursor", "limit", "state", "summary", "template"]);
     const listResponse = listOperation.responses?.["200"];
     assert.ok(listResponse && "content" in listResponse);
     const listSchema = listResponse.content?.["application/json"]?.schema;
@@ -177,6 +270,12 @@ test("job routes publish an OpenAPI contract with decimal-string integer fields"
     const invalidLimit = await fastify.inject({ method: "GET", url: "/v1/jobs?limit=101" });
     assert.equal(invalidLimit.statusCode, 400);
     assert.equal((invalidLimit.json() as { code: string }).code, "INVALID_JOB_QUERY");
+    const invalidSummary = await fastify.inject({
+      method: "GET",
+      url: "/v1/jobs?summary=approximate",
+    });
+    assert.equal(invalidSummary.statusCode, 400);
+    assert.equal((invalidSummary.json() as { code: string }).code, "INVALID_JOB_QUERY");
     const invalidOwner = await fastify.inject({ method: "GET", url: "/v1/accounts/nope/jobs" });
     assert.equal(invalidOwner.statusCode, 400);
     assert.equal((invalidOwner.json() as { code: string }).code, "INVALID_HASH");

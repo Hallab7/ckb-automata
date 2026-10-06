@@ -38,6 +38,12 @@
           },
           {
             "in": "query",
+            "name": "summary",
+            "required": false,
+            "schema": { "default": "full", "enum": ["compact", "full"], "type": "string" }
+          },
+          {
+            "in": "query",
             "name": "template",
             "required": false,
             "schema": { "enum": ["deadline", "recurring"], "type": "string" }
@@ -1286,6 +1292,12 @@
             "name": "state",
             "required": false,
             "schema": { "enum": ["live", "spent", "orphaned"], "type": "string" }
+          },
+          {
+            "in": "query",
+            "name": "summary",
+            "required": false,
+            "schema": { "default": "full", "enum": ["compact", "full"], "type": "string" }
           },
           {
             "in": "query",
