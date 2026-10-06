@@ -428,12 +428,20 @@ fn build_prepare_case(mutation: PrepareMutation) -> ContractCase {
 }
 
 fn build_roll_case(mutation: RollMutation) -> ContractCase {
+    build_roll_case_with_payout(mutation, false)
+}
+
+fn build_roll_case_with_payout(mutation: RollMutation, payout_to_owner: bool) -> ContractCase {
     let mut context = Context::new_with_deterministic_rng();
     let job_lock = deployed_contract(&mut context, "job-lock");
     let policy = deployed_contract(&mut context, "dao-harvest-policy");
     let vault_code = context.deploy_cell(crate::fixtures::contract_binary("harvest-vault-lock"));
     let owner = always_success_script(&mut context, 21);
-    let payout = always_success_script(&mut context, 22);
+    let payout = if payout_to_owner {
+        owner.clone()
+    } else {
+        always_success_script(&mut context, 22)
+    };
     let executor = always_success_script(&mut context, 23);
     let dao_type = always_success_script(&mut context, 24);
     let owner_hash = owner.calc_script_hash().unpack();
@@ -716,6 +724,16 @@ fn prepare_rejects_principal_type_authority_and_job_substitution() {
 #[test]
 fn claim_pays_exact_compensation_and_redeposits_principal() {
     verify(&build_roll_case(RollMutation::None)).expect("valid harvest roll");
+}
+
+#[test]
+fn claim_can_pay_compensation_to_the_owner_lock() {
+    verify(&build_roll_case_with_payout(RollMutation::None, true))
+        .expect("valid owner compensation payout");
+
+    let error = verify(&build_roll_case_with_payout(RollMutation::Payout, true))
+        .expect_err("incorrect owner compensation must fail");
+    assert!(error.contains("38"), "unexpected error: {error}");
 }
 
 #[test]

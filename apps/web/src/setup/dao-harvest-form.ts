@@ -119,13 +119,7 @@ export async function validateDaoHarvestStep(
   );
   if (payout) {
     try {
-      const payoutLockHash = parseHash32(await context.resolveLockHash(payout));
-      if (
-        context.ownerLockHash !== undefined &&
-        payoutLockHash === parseHash32(context.ownerLockHash)
-      ) {
-        errors["payoutAddress"] = "Use an address different from the owner wallet.";
-      }
+      parseHash32(await context.resolveLockHash(payout));
     } catch {
       errors["payoutAddress"] = "Enter a valid CKB testnet address.";
     }

@@ -109,10 +109,12 @@ test("setup rejects wrong networks, expired quotes, and undersized principal", (
     () => buildDaoHarvestSetup(setupInput({ vaultOccupiedCapacity: 11_000_000_000n })),
     (error) => error instanceof DaoHarvestBuilderError && error.code === "INSUFFICIENT_CAPACITY",
   );
-  assert.throws(
-    () => buildDaoHarvestSetup(setupInput({ payoutLockHash: hash("6") })),
-    (error) => error instanceof DaoHarvestBuilderError && error.code === "UNSAFE_PAYOUT",
-  );
+});
+
+test("setup permits the owner lock to receive DAO compensation", () => {
+  const build = buildDaoHarvestSetup(setupInput({ payoutLockHash: hash("6") }));
+  const payload = DaoHarvestPayloadV1.unpack(hexToBytes(build.payload));
+  assert.deepEqual(payload.payout_lock_hash, payload.owner_lock_hash);
 });
 
 test("prepare rejects a spent vault outpoint before constructing a transaction", async () => {

@@ -478,7 +478,13 @@ fn validate_exact_payout(
         .as_slice()
         .try_into()
         .map_err(|_| ScriptError::PayoutMismatch)?;
-    let mut matches = 0;
+    let owner: [u8; 32] = payload
+        .owner_lock_hash()
+        .as_slice()
+        .try_into()
+        .map_err(|_| ScriptError::PayoutMismatch)?;
+    let payout_is_owner = expected == owner;
+    let mut exact_matches = 0;
     for (index, lock_hash) in QueryIter::new(load_cell_lock_hash, Source::Output).enumerate() {
         if lock_hash == expected {
             let capacity = load_cell_capacity(index, Source::Output)
@@ -487,13 +493,17 @@ fn validate_exact_payout(
                 .map_err(|_| ScriptError::PayoutMismatch)?;
             let data =
                 load_cell_data(index, Source::Output).map_err(|_| ScriptError::PayoutMismatch)?;
-            if capacity != compensation || type_hash.is_some() || !data.is_empty() {
+            if type_hash.is_some() || !data.is_empty() {
                 return Err(ScriptError::PayoutMismatch);
             }
-            matches += 1;
+            if capacity == compensation {
+                exact_matches += 1;
+            } else if !payout_is_owner {
+                return Err(ScriptError::PayoutMismatch);
+            }
         }
     }
-    if matches == 1 {
+    if (payout_is_owner && exact_matches >= 1) || (!payout_is_owner && exact_matches == 1) {
         Ok(())
     } else {
         Err(ScriptError::PayoutMismatch)

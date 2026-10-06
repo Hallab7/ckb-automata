@@ -362,12 +362,6 @@ export function buildDaoHarvestSetup(input: DaoHarvestSetupInput): DaoHarvestSet
   assertNetwork(input.deployment, input.expectedGenesisHash);
   const owner = parseHash32(input.ownerLockHash);
   const payout = parseHash32(input.payoutLockHash);
-  if (owner === payout) {
-    throw new DaoHarvestBuilderError(
-      "UNSAFE_PAYOUT",
-      "compensation address must differ from the owner refund address",
-    );
-  }
   const principal = parseShannons(input.principal);
   const vaultOccupied = parseShannons(input.vaultOccupiedCapacity);
   const jobOccupied = parseShannons(input.jobOccupiedCapacity);

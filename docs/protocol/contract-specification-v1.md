@@ -174,6 +174,9 @@ builders should still use the order below for deterministic review.
 | DAO prepare                  | Canonical order is successor vault, executor reward, successor Job Cell, executor change; scripts locate protected outputs by identity.                         |
 | DAO roll                     | Canonical order is new vault deposit, executor reward, compensation payout, optional owner residual, executor change.                                           |
 
+When the DAO compensation payout and owner are the same lock, the exact compensation
+output remains required and the additional plain owner residual is permitted.
+
 Executor fee inputs and change are outside the job-controlled set. Their placement
 does not permit omission, duplication, or redirection of contract-controlled value.
 

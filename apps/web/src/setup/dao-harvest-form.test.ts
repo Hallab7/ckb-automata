@@ -76,7 +76,7 @@ test("valid harvest details pass for a connected funded wallet", async () => {
   assert.deepEqual(errors, {});
 });
 
-test("harvest validation rejects the owner wallet as the compensation address", async () => {
+test("harvest validation permits the owner wallet as the compensation address", async () => {
   const errors = await validateDaoHarvestStep(
     "details",
     {
@@ -92,5 +92,5 @@ test("harvest validation rejects the owner wallet as the compensation address", 
       walletReady: true,
     },
   );
-  assert.match(errors["payoutAddress"] ?? "", /different from the owner wallet/);
+  assert.deepEqual(errors, {});
 });
