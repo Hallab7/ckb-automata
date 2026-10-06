@@ -37,8 +37,9 @@ export interface QueuePolicy {
   readonly removeOnFail: Readonly<{ readonly age: number; readonly count: number }>;
 }
 
-const COMPLETE_RETENTION = Object.freeze({ age: 24 * 60 * 60, count: 1_000 });
-const FAILURE_RETENTION = Object.freeze({ age: 7 * 24 * 60 * 60, count: 5_000 });
+const COMPLETE_RETENTION = Object.freeze({ age: 6 * 60 * 60, count: 50 });
+const FAILURE_RETENTION = Object.freeze({ age: 2 * 24 * 60 * 60, count: 100 });
+const EVENT_RETENTION = Object.freeze({ events: Object.freeze({ maxLen: 1_000 }) });
 
 function policy(attempts: number, delay: number, jitter = 0.25): QueuePolicy {
   return Object.freeze({
@@ -129,6 +130,7 @@ export function queueRegistrationOptions(): readonly {
   readonly name: AutomataQueue;
   readonly defaultJobOptions: JobsOptions;
   readonly forceDisconnectOnShutdown: false;
+  readonly streams: typeof EVENT_RETENTION;
 }[] {
   return Object.freeze(
     AUTOMATA_QUEUES.map((name) =>
@@ -136,6 +138,7 @@ export function queueRegistrationOptions(): readonly {
         name,
         defaultJobOptions: QUEUE_POLICIES[name],
         forceDisconnectOnShutdown: false as const,
+        streams: EVENT_RETENTION,
       }),
     ),
   );

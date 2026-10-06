@@ -51,9 +51,14 @@ function registryFixture() {
 }
 
 test("every durable queue has bounded retry and retention policy", () => {
+  const registrations = queueRegistrationOptions();
   assert.deepEqual(
-    queueRegistrationOptions().map(({ name }) => name),
+    registrations.map(({ name }) => name),
     AUTOMATA_QUEUES,
+  );
+  assert.equal(
+    registrations.every(({ streams }) => streams.events.maxLen === 1_000),
+    true,
   );
   for (const queue of AUTOMATA_QUEUES) {
     const policy = QUEUE_POLICIES[queue];
