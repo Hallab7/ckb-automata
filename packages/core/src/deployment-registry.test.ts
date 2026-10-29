@@ -42,9 +42,17 @@ test("the pinned public manifest is canonical and selected by testnet genesis", 
     result.deployment.manifest.daoHarvest?.contracts["dao-harvest-policy"].cellDep.outPoint.txHash,
     result.deployment.manifest.daoHarvest?.deployment.transactionHash,
   );
-  assert.notEqual(
+  assert.equal(
     result.deployment.manifest.daoHarvest?.contracts["harvest-vault-lock"].cellDep.outPoint.txHash,
     result.deployment.manifest.daoHarvest?.deployment.transactionHash,
+  );
+  assert.equal(
+    result.deployment.manifest.daoHarvest?.contracts["harvest-vault-lock"].cellDep.outPoint.index,
+    "0x1",
+  );
+  assert.equal(
+    result.deployment.manifest.daoHarvest?.contracts["dao-harvest-policy"].cellDep.outPoint.index,
+    "0x2",
   );
 });
 

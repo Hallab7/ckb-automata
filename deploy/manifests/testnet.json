@@ -13,7 +13,7 @@
     "warning": "Public deployment account identifier only; no credential is published"
   },
   "artifacts": {
-    "sourceRevision": "38f41b3d1a0dd6e9da63de1f138a16adca5a99c4",
+    "sourceRevision": "3b3a3a958cee5b08d8d20a074fc8f1fc8ed526b6",
     "schemaSha256": "3b74c4fa45e48d801c3b515b6e6513865aefa86bcce0eca9667aff83cfcab2c2",
     "builder": {
       "baseImage": "rust:1.93.1-bookworm@sha256:7c4ae649a84014c467d79319bbf17ce2632ae8b8be123ac2fb2ea5be46823f31",
@@ -36,8 +36,8 @@
     }
   },
   "deployment": {
-    "transactionHash": "0x8e036cf24406f93b63a8df1ee547b120b86ea7616872674cef1d99343bf15c03",
-    "blockHash": "0x5f4d742b1b4f87fefe0bb904b759f318097fc0a32a222ce01309ccf6737ed3a2"
+    "transactionHash": "0xdac59f41bfb6a32e8fc8c6a1914c83745b816fcd884717b98a49270d36139625",
+    "blockHash": "0xdda8b7adad7ac92537ae2c7baecf44db6d56ceddf1331ad6568b684a8c4694f8"
   },
   "contracts": {
     "job-lock": {
@@ -67,17 +67,17 @@
       "sizeBytes": 32256
     },
     "recurring-policy": {
-      "codeHash": "0xa4108a2b1e0c53d35cb2dd5e0ba6ae683c3078e160d9c747d137d23adff64601",
+      "codeHash": "0xce775515267d76d2944592c0573d8ac51bf30591cf901b3ba3d6fb3620aaa8e0",
       "hashType": "data1",
       "cellDep": {
         "outPoint": {
-          "txHash": "0x8e036cf24406f93b63a8df1ee547b120b86ea7616872674cef1d99343bf15c03",
-          "index": "0x2"
+          "txHash": "0xdac59f41bfb6a32e8fc8c6a1914c83745b816fcd884717b98a49270d36139625",
+          "index": "0x0"
         },
         "depType": "code"
       },
-      "binarySha256": "7d611649afc5b3168c0ce2b0331bca6d5275b2280636609c1b504e7e055df58a",
-      "sizeBytes": 36008
+      "binarySha256": "053ed026e2547f85d54d998c9fe94fc72223f47d632ce5f2e8ab4fd8ba744acd",
+      "sizeBytes": 36664
     },
     "demo-campaign-type": {
       "codeHash": "0x3fbd29a852f1776b63267c46343a27bba39827fbd91bc8da2b637f43f854d04e",
@@ -108,35 +108,35 @@
   },
   "daoHarvest": {
     "deployment": {
-      "transactionHash": "0x8e036cf24406f93b63a8df1ee547b120b86ea7616872674cef1d99343bf15c03",
-      "blockHash": "0x5f4d742b1b4f87fefe0bb904b759f318097fc0a32a222ce01309ccf6737ed3a2"
+      "transactionHash": "0xdac59f41bfb6a32e8fc8c6a1914c83745b816fcd884717b98a49270d36139625",
+      "blockHash": "0xdda8b7adad7ac92537ae2c7baecf44db6d56ceddf1331ad6568b684a8c4694f8"
     },
     "contracts": {
       "harvest-vault-lock": {
-        "codeHash": "0xa4693f462087a7e980817a7769224a11d1f4e3025f8aa97f1b49d724c4d7ae32",
+        "codeHash": "0xa53e1515d9487268fab486af5043c72f2bfdc83fa2a56eedb89d4d28428b1862",
         "hashType": "data1",
         "cellDep": {
           "outPoint": {
-            "txHash": "0xc5cb0fdd0967ca38f67c40b64a46a4925e7d954cf432368b70538757a09b9822",
-            "index": "0x0"
+            "txHash": "0xdac59f41bfb6a32e8fc8c6a1914c83745b816fcd884717b98a49270d36139625",
+            "index": "0x1"
           },
           "depType": "code"
         },
-        "binarySha256": "b543f869868c94bb56552f074c7d40ea32faf5b8ad1abd4b3e72d7c20f141b08",
-        "sizeBytes": 15336
+        "binarySha256": "5f880e12cc16f4781ccdc64cf7eaef3aeee4f7c26295356108235da48e3d75c1",
+        "sizeBytes": 29504
       },
       "dao-harvest-policy": {
-        "codeHash": "0x88422959b9c206818cd20ad5e342c4395672194ab8291ef81cf325632db45bf8",
+        "codeHash": "0x7270612d297ab007f16737e8ee8b61b0b297c8f47ebabd2ac0875539be8f3625",
         "hashType": "data1",
         "cellDep": {
           "outPoint": {
-            "txHash": "0x8e036cf24406f93b63a8df1ee547b120b86ea7616872674cef1d99343bf15c03",
-            "index": "0x3"
+            "txHash": "0xdac59f41bfb6a32e8fc8c6a1914c83745b816fcd884717b98a49270d36139625",
+            "index": "0x2"
           },
           "depType": "code"
         },
-        "binarySha256": "687877d79e3a995c7ed0faa4ec28a36fff4a1ccff5c8b9d28b672d7fff195e21",
-        "sizeBytes": 44840
+        "binarySha256": "db3307653faab3731d232c50d79408aaa1f5194a262841fe5c8178cc9627da99",
+        "sizeBytes": 45856
       }
     },
     "nervosDao": {
@@ -157,9 +157,9 @@
   },
   "verification": {
     "kind": "resolved-code-deps-and-ckb-vm-fixtures",
-    "transactionHash": "0x8e036cf24406f93b63a8df1ee547b120b86ea7616872674cef1d99343bf15c03",
-    "blockHash": "0x5f4d742b1b4f87fefe0bb904b759f318097fc0a32a222ce01309ccf6737ed3a2",
-    "contract": "job-lock",
+    "transactionHash": "0xdac59f41bfb6a32e8fc8c6a1914c83745b816fcd884717b98a49270d36139625",
+    "blockHash": "0xdda8b7adad7ac92537ae2c7baecf44db6d56ceddf1331ad6568b684a8c4694f8",
+    "contract": "recurring-policy",
     "status": "committed"
   }
 }
