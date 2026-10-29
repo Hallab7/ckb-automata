@@ -6,15 +6,16 @@ as operational or advisory. The checked-in Molecule files remain the only inputs
 binding generation, and the Rust scripts remain authoritative when prose and code
 cannot be reconciled.
 
-The deployed scripts are `job-lock`, `deadline-policy`, `recurring-policy`,
-`demo-campaign-type`, and `campaign-lock`. The testnet-gated DAO extension adds
-the reproducibly built `harvest-vault-lock` and `dao-harvest-policy`; they are not
-part of the current public manifest. V1 is for local development and CKB testnet
+The public testnet manifest registers `job-lock`, `deadline-policy`,
+`recurring-policy`, `demo-campaign-type`, `campaign-lock`,
+`harvest-vault-lock`, and `dao-harvest-policy`, with immutable deployment
+outpoints and binary digests. V1 is for local development and CKB testnet
 evaluation; no mainnet deployment is supported.
 
-The DAO harvest payload and both scripts have CKB-VM conformance evidence. They
-remain undeployed until every later integration and pilot gate in the focused DAO
-Harvest plan is complete.
+The DAO Harvest payload and scripts have CKB-VM conformance evidence and a
+manifest-pinned public testnet deployment. Source changes made after the pinned
+binary digests, including new owner operations, are not live until a new
+deployment and integrity-checked manifest revision are published.
 
 ## Encoding and Hashing
 
@@ -41,7 +42,7 @@ The generated Rust and TypeScript bindings and the JSON fixtures under
 [`job-data-v1.md`](job-data-v1.md),
 [`recurring-payload-v1.md`](recurring-payload-v1.md), and
 [`campaign-state-v1.md`](campaign-state-v1.md) for deployed field semantics. See
-[`dao-harvest-v1.md`](dao-harvest-v1.md) for the planned harvest payload and
+[`dao-harvest-v1.md`](dao-harvest-v1.md) for the Harvest payload and
 transaction layouts.
 
 ## Witness Envelopes
