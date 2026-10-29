@@ -3,6 +3,8 @@ import { PERSONAL, blake2b } from "@nervosnetwork/ckb-sdk-utils";
 export const DAO_HARVEST_PAYLOAD_VERSION = 1 as const;
 export const DAO_HARVEST_PAYLOAD_DOMAIN = "ckb-automata/policy-payload/v1" as const;
 export const DAO_HARVEST_EXECUTOR_SET_DOMAIN = "ckb-automata/dao-harvest-executors/v1" as const;
+export const DAO_HARVEST_VAULT_COMMITMENT_DOMAIN =
+  "ckb-automata/dao-harvest-vault-commitment/v1" as const;
 export const DAO_HARVEST_QUOTE_VALID_BLOCKS = 10n;
 export const MAX_DAO_HARVEST_PREPARE_EXECUTORS = 8 as const;
 
@@ -95,6 +97,49 @@ export function derivePrepareExecutorSetHash(
   new DataView(body.buffer).setUint32(0, normalized.length, true);
   normalized.forEach((identity, index) => body.set(identity, 4 + index * BYTE32_LENGTH));
   return hashDomain(DAO_HARVEST_EXECUTOR_SET_DOMAIN, body);
+}
+
+export interface DaoHarvestVaultCommitmentInput {
+  readonly version: Uint8Array;
+  readonly ownerLockHash: Uint8Array;
+  readonly payoutLockHash: Uint8Array;
+  readonly daoTypeHash: Uint8Array;
+  readonly principalCapacity: Uint8Array;
+  readonly executorReward: Uint8Array;
+  readonly minCompensation: Uint8Array;
+  readonly prepareBufferEpochs: Uint8Array;
+  readonly confirmationMarginEpochs: Uint8Array;
+  readonly totalCycles: Uint8Array;
+  readonly endEpochSince: Uint8Array;
+}
+
+export function deriveDaoHarvestVaultCommitment(input: DaoHarvestVaultCommitmentInput): Uint8Array {
+  const fields = [
+    input.version,
+    requireByte32(input.ownerLockHash, "ownerLockHash"),
+    requireByte32(input.payoutLockHash, "payoutLockHash"),
+    requireByte32(input.daoTypeHash, "daoTypeHash"),
+    input.principalCapacity,
+    input.executorReward,
+    input.minCompensation,
+    input.prepareBufferEpochs,
+    input.confirmationMarginEpochs,
+    input.totalCycles,
+    input.endEpochSince,
+  ];
+  const expectedLengths = [2, 32, 32, 32, 8, 8, 8, 8, 8, 4, 8];
+  fields.forEach((field, index) => {
+    if (field.length !== expectedLengths[index]) {
+      throw new RangeError(`vault commitment field ${index} has an invalid length`);
+    }
+  });
+  const body = new Uint8Array(fields.reduce((total, field) => total + field.length, 0));
+  let offset = 0;
+  for (const field of fields) {
+    body.set(field, offset);
+    offset += field.length;
+  }
+  return hashDomain(DAO_HARVEST_VAULT_COMMITMENT_DOMAIN, body);
 }
 
 export function classifyDaoHarvestCellData(data: Uint8Array): DaoHarvestDaoState {

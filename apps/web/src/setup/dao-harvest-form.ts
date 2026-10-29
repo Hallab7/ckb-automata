@@ -8,7 +8,7 @@ import { ckbToShannons, shannonsToCkb } from "./ckb-amount.ts";
 import { validateAutomationTitle } from "./automation-title.ts";
 import type { SetupDraft, SetupErrors, SetupStepId } from "./setup-flow.ts";
 
-export const DAO_HARVEST_MINIMUM_CKB = "210";
+export const DAO_HARVEST_MINIMUM_CKB = "242";
 export const DAO_HARVEST_REWARD_PER_ACTION_CKB = "61";
 export const DAO_HARVEST_ESTIMATED_NETWORK_FEE_CKB = "1";
 export const DAO_HARVEST_MAX_CYCLES = 12;

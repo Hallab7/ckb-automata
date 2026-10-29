@@ -10,6 +10,7 @@ pub const OWNER_RECOVER_OPERATION: u8 = 4;
 
 const POLICY_PAYLOAD_DOMAIN: &[u8] = b"ckb-automata/policy-payload/v1";
 const EXECUTOR_SET_DOMAIN: &[u8] = b"ckb-automata/dao-harvest-executors/v1";
+const VAULT_COMMITMENT_DOMAIN: &[u8] = b"ckb-automata/dao-harvest-vault-commitment/v1";
 const RELATIVE_FLAG: u64 = 1 << 63;
 const EPOCH_METRIC: u64 = 0b01 << 61;
 const RESERVED_MASK: u64 = 0b1_1111 << 56;
@@ -73,6 +74,10 @@ pub fn prepare_executor_set_hash(
     let mut result = [0_u8; 32];
     hasher.finalize(&mut result);
     Ok(result)
+}
+
+pub fn vault_commitment(parts: &[&[u8]]) -> Option<[u8; 32]> {
+    domain_hash(VAULT_COMMITMENT_DOMAIN, parts)
 }
 
 pub fn is_withdrawing_dao_data(data: &[u8]) -> Option<bool> {

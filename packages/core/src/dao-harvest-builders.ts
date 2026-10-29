@@ -28,6 +28,7 @@ import {
 import {
   DAO_HARVEST_OPERATIONS,
   deriveDaoHarvestPayloadHash,
+  deriveDaoHarvestVaultCommitment,
   derivePrepareExecutorSetHash,
   normalizePrepareExecutorSet,
 } from "./dao-harvest.ts";
@@ -54,7 +55,7 @@ import {
 type Hex = `0x${string}`;
 
 export const DAO_HARVEST_SETUP_INTENT_DOMAIN = "ckb-automata/dao-harvest-setup-intent/v1" as const;
-export const DAO_HARVEST_VAULT_OCCUPIED_CAPACITY = 210n * 100_000_000n;
+export const DAO_HARVEST_VAULT_OCCUPIED_CAPACITY = 242n * 100_000_000n;
 export const DAO_HARVEST_JOB_OCCUPIED_CAPACITY = CONTRACT_CAPACITY.jobCellV1;
 
 export type DaoHarvestBuilderErrorCode =
@@ -284,6 +285,12 @@ function u32(value: number): Uint8Array {
   return bytes;
 }
 
+function u64(value: bigint): Uint8Array {
+  const bytes = new Uint8Array(8);
+  new DataView(bytes.buffer).setBigUint64(0, value, true);
+  return bytes;
+}
+
 function concatenate(...values: readonly Uint8Array[]): Uint8Array {
   const result = new Uint8Array(values.reduce((total, value) => total + value.length, 0));
   let offset = 0;
@@ -328,13 +335,20 @@ function proof(executors: readonly Uint8Array[]): Uint8Array {
   return concatenate(Uint8Array.of(executors.length), ...executors);
 }
 
-function vaultArgs(jobId: Hash32, owner: Hash32, jobLock: Hash32, policy: Hash32): Hex {
+function vaultArgs(
+  jobId: Hash32,
+  owner: Hash32,
+  jobLock: Hash32,
+  policy: Hash32,
+  commitment: Hash32,
+): Hex {
   return bytesToHex(
     concatenate(
       hash32ToBytes(jobId),
       hash32ToBytes(owner),
       hash32ToBytes(jobLock),
       hash32ToBytes(policy),
+      hash32ToBytes(commitment),
     ),
   ) as Hex;
 }
@@ -408,6 +422,24 @@ export function buildDaoHarvestSetup(input: DaoHarvestSetupInput): DaoHarvestSet
     input.prepareExecutorLockHashes.map((hash) => hash32ToBytes(parseHash32(hash))),
   );
   const executorSetHash = hash32FromBytes(derivePrepareExecutorSetHash(executors));
+  const versionBytes = new Uint8Array(2);
+  new DataView(versionBytes.buffer).setUint16(0, 1, true);
+  const totalCyclesBytes = u32(Number(cycles));
+  const vaultCommitment = hash32FromBytes(
+    deriveDaoHarvestVaultCommitment({
+      version: versionBytes,
+      ownerLockHash: hash32ToBytes(owner),
+      payoutLockHash: hash32ToBytes(payout),
+      daoTypeHash: hash32ToBytes(daoTypeHash),
+      principalCapacity: u64(principal),
+      executorReward: u64(reward),
+      minCompensation: u64(minCompensation),
+      prepareBufferEpochs: u64(buffer),
+      confirmationMarginEpochs: u64(margin),
+      totalCycles: totalCyclesBytes,
+      endEpochSince: u64(endSince),
+    }),
+  );
   const baseIntent = Object.freeze({
     version: 1,
     genesisHash: input.deployment.genesisHash,
@@ -427,6 +459,7 @@ export function buildDaoHarvestSetup(input: DaoHarvestSetupInput): DaoHarvestSet
     policyScriptHash,
     jobLockHash,
     daoTypeHash,
+    vaultCommitment,
   });
   const intentHash = domainHash(DAO_HARVEST_SETUP_INTENT_DOMAIN, normalizedIntentBytes(baseIntent));
   const jobId = hash32FromBytes(
@@ -441,7 +474,7 @@ export function buildDaoHarvestSetup(input: DaoHarvestSetupInput): DaoHarvestSet
   );
   const vaultLock = deploymentScript(
     input.deployment.vaultLock,
-    vaultArgs(jobId, owner, jobLockHash, policyScriptHash),
+    vaultArgs(jobId, owner, jobLockHash, policyScriptHash, vaultCommitment),
   );
   const vaultLockHash = parseHash32(scriptToHash(vaultLock));
   const payloadBytes = DaoHarvestPayloadV1.pack({
@@ -1228,7 +1261,7 @@ export async function buildDaoHarvestMatureRecovery(
   const ownerHash = parseHash32(inputValue.ownerLockHash);
   const vaultLockArgs = hexToBytes(vault.output.lock.args);
   const committedOwner =
-    vaultLockArgs.length === 128 ? bytesToHex(vaultLockArgs.slice(32, 64)) : null;
+    vaultLockArgs.length === 160 ? bytesToHex(vaultLockArgs.slice(32, 64)) : null;
   const expectedVaultScript = inputValue.deployment.vaultLock.script;
   const expectedDaoType = deploymentScript(inputValue.deployment.daoType, "0x");
   if (

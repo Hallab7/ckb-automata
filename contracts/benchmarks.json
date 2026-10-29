@@ -101,26 +101,26 @@
     {
       "id": "dao-harvest.prepare.valid",
       "outcome": "valid",
-      "measuredCycles": 315909,
-      "budgetCycles": 400000
+      "measuredCycles": 415284,
+      "budgetCycles": 600000
     },
     {
       "id": "dao-harvest.prepare.invalid-principal",
       "outcome": "rejected",
-      "measuredCycles": 306236,
-      "budgetCycles": 400000
+      "measuredCycles": 405607,
+      "budgetCycles": 600000
     },
     {
       "id": "dao-harvest.roll.valid",
       "outcome": "valid",
-      "measuredCycles": 281699,
-      "budgetCycles": 400000
+      "measuredCycles": 378750,
+      "budgetCycles": 500000
     },
     {
       "id": "dao-harvest.roll.invalid-payout",
       "outcome": "rejected",
-      "measuredCycles": 278429,
-      "budgetCycles": 400000
+      "measuredCycles": 375480,
+      "budgetCycles": 500000
     }
   ],
   "capacities": [

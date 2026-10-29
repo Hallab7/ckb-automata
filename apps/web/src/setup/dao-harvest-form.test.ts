@@ -26,12 +26,12 @@ test("harvest preview keeps principal separate from capped charges", () => {
 test("one-time selection ignores a stale finite count", () => {
   const preview = daoHarvestFundingPreview({
     ...DAO_HARVEST_INITIAL_DRAFT,
-    principalCkb: "210",
+    principalCkb: "242",
     recurrence: "once",
     cycleCount: "999",
   });
   assert.equal(preview.cycleCount, 1);
-  assert.equal(preview.totalCkb, "714");
+  assert.equal(preview.totalCkb, "746");
 });
 
 test("harvest validation rejects invalid address, small amount, count, and balance", async () => {
@@ -40,7 +40,7 @@ test("harvest validation rejects invalid address, small amount, count, and balan
     {
       ...DAO_HARVEST_INITIAL_DRAFT,
       payoutAddress: "not-an-address",
-      principalCkb: "209",
+      principalCkb: "241",
       recurrence: "finite",
       cycleCount: "13",
     },
@@ -52,7 +52,7 @@ test("harvest validation rejects invalid address, small amount, count, and balan
       walletReady: true,
     },
   );
-  assert.match(errors["principalCkb"] ?? "", /at least 210 CKB/);
+  assert.match(errors["principalCkb"] ?? "", /at least 242 CKB/);
   assert.match(errors["payoutAddress"] ?? "", /valid CKB testnet/);
   assert.match(errors["cycleCount"] ?? "", /between 2 and 12/);
 });

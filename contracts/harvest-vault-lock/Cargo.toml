@@ -13,5 +13,6 @@ bench = false
 test = false
 
 [dependencies]
+ckb-hash.workspace = true
 ckb-std.workspace = true
 molecule.workspace = true

@@ -125,7 +125,7 @@ function HarvestDetails(context: SetupStepRenderContext) {
         />
         <TextField
           {...error(context, "principalCkb")}
-          hint="This exact amount is re-deposited after every harvest. Minimum 210 CKB."
+          hint="This exact amount is re-deposited after every harvest. Minimum 242 CKB."
           inputMode="decimal"
           label="Original amount (CKB)"
           name="principalCkb"

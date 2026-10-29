@@ -6,6 +6,7 @@ import {
   DAO_HARVEST_DAO_STATES,
   classifyDaoHarvestCellData,
   deriveDaoHarvestPayloadHash,
+  deriveDaoHarvestVaultCommitment,
   derivePrepareExecutorSetHash,
   normalizePrepareExecutorSet,
 } from "./dao-harvest.ts";
@@ -16,6 +17,7 @@ interface DaoHarvestFixture {
   prepare_executor_set_hash: string;
   expected_hex: string;
   expected_payload_hash: string;
+  expected_vault_commitment: string;
 }
 
 function decodeHex(value: string): Uint8Array {
@@ -28,6 +30,15 @@ function decodeHex(value: string): Uint8Array {
 
 function encodeHex(value: Uint8Array): string {
   return `0x${Array.from(value, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function littleEndian(input: string | number, bytes: 2 | 4 | 8): Uint8Array {
+  const encoded = new Uint8Array(bytes);
+  const view = new DataView(encoded.buffer);
+  if (bytes === 2) view.setUint16(0, Number(input), true);
+  else if (bytes === 4) view.setUint32(0, Number(input), true);
+  else view.setBigUint64(0, BigInt(input), true);
+  return encoded;
 }
 
 async function fixture(): Promise<DaoHarvestFixture> {
@@ -51,6 +62,30 @@ test("DAO harvest hashes match the Rust fixture", async () => {
       ),
     ),
     value.expected_payload_hash,
+  );
+  const raw = JSON.parse(
+    await readFile(
+      new URL("../../../contracts/fixtures/dao_harvest_payload_v1.json", import.meta.url),
+      "utf8",
+    ),
+  ) as Record<string, string | number>;
+  assert.equal(
+    encodeHex(
+      deriveDaoHarvestVaultCommitment({
+        version: littleEndian(raw["version"]!, 2),
+        ownerLockHash: decodeHex(String(raw["owner_lock_hash"])),
+        payoutLockHash: decodeHex(String(raw["payout_lock_hash"])),
+        daoTypeHash: decodeHex(String(raw["dao_type_hash"])),
+        principalCapacity: littleEndian(raw["principal_capacity"]!, 8),
+        executorReward: littleEndian(raw["executor_reward"]!, 8),
+        minCompensation: littleEndian(raw["min_compensation"]!, 8),
+        prepareBufferEpochs: littleEndian(raw["prepare_buffer_epochs"]!, 8),
+        confirmationMarginEpochs: littleEndian(raw["confirmation_margin_epochs"]!, 8),
+        totalCycles: littleEndian(raw["total_cycles"]!, 4),
+        endEpochSince: littleEndian(raw["end_epoch_since"]!, 8),
+      }),
+    ),
+    value.expected_vault_commitment,
   );
 });
 

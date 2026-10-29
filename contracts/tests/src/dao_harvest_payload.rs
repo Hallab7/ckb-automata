@@ -6,7 +6,7 @@ use crate::{
     dao_harvest::{
         DAO_HARVEST_PAYLOAD_VERSION, ExecutorSetError, dao_harvest_payload_hash,
         decode_relative_epoch_duration, is_withdrawing_dao_data, maximum_withdraw_capacity,
-        prepare_executor_set_hash,
+        prepare_executor_set_hash, vault_commitment,
     },
     dao_harvest_witness::{VaultOperation, parse_vault_operation},
     generated_dao_harvest::DaoHarvestPayloadV1,
@@ -31,6 +31,7 @@ struct DaoHarvestFixture {
     policy_script_hash: String,
     expected_hex: String,
     expected_payload_hash: String,
+    expected_vault_commitment: String,
 }
 
 fn decode_hex(value: &str) -> Vec<u8> {
@@ -119,6 +120,46 @@ fn rust_dao_harvest_payload_matches_cross_language_vectors() {
     assert_eq!(
         dao_harvest_payload_hash(&byte32(&fixture.policy_script_hash), encoded.as_slice()),
         Some(byte32(&fixture.expected_payload_hash))
+    );
+    assert_eq!(
+        vault_commitment(&[
+            &fixture.version.to_le_bytes(),
+            &byte32(&fixture.owner_lock_hash),
+            &byte32(&fixture.payout_lock_hash),
+            &byte32(&fixture.dao_type_hash),
+            &fixture
+                .principal_capacity
+                .parse::<u64>()
+                .unwrap()
+                .to_le_bytes(),
+            &fixture
+                .executor_reward
+                .parse::<u64>()
+                .unwrap()
+                .to_le_bytes(),
+            &fixture
+                .min_compensation
+                .parse::<u64>()
+                .unwrap()
+                .to_le_bytes(),
+            &fixture
+                .prepare_buffer_epochs
+                .parse::<u64>()
+                .unwrap()
+                .to_le_bytes(),
+            &fixture
+                .confirmation_margin_epochs
+                .parse::<u64>()
+                .unwrap()
+                .to_le_bytes(),
+            &fixture.total_cycles.to_le_bytes(),
+            &fixture
+                .end_epoch_since
+                .parse::<u64>()
+                .unwrap()
+                .to_le_bytes(),
+        ]),
+        Some(byte32(&fixture.expected_vault_commitment))
     );
 }
 

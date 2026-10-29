@@ -137,6 +137,7 @@ confirmed transaction immune to a deeper reorganization.
 | ------------------------------------------------ | ------------------------------------------------------------------------------ | ----------------------------------------------------- |
 | Executor redirects original amount               | Exact withdrawing and re-deposit capacity, lock, type, and data checks         | Contract implementation defect                        |
 | Executor redirects compensation                  | Immutable payout lock and exact payout validation                              | Owner approved the wrong address                      |
+| Forged copy-job targets the real vault           | Vault-bound immutable-terms commitment plus exact successor payload hash       | Contract implementation defect                        |
 | Executor increases its reward                    | Exact phase-specific reward and Job Cell conservation                          | Contract implementation defect                        |
 | Executor submits phase one too early             | Absolute epoch `since` and policy checks                                       | Incorrect configured lower bound                      |
 | Approved executor submits phase one after cutoff | Restricted executor set, queue cutoff, alert, and operational audit            | Approved executor can deliberately grief timing       |

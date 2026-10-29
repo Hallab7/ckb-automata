@@ -225,7 +225,7 @@ function setupRequest(value: unknown): SetupRequest {
       throw new TypeError("lock resolutions must match the owner and payout hashes");
     }
     if (parseShannons(principal) < DAO_HARVEST_VAULT_OCCUPIED_CAPACITY) {
-      throw new RangeError("original amount must be at least 210 CKB");
+      throw new RangeError("original amount must be at least 242 CKB");
     }
     if (!Number.isSafeInteger(totalCycles) || totalCycles < 1 || totalCycles > 12) {
       throw new RangeError("number of harvests must be between 1 and 12");

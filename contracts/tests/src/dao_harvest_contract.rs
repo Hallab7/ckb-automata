@@ -37,6 +37,7 @@ enum PrepareMutation {
     MissingBoundJob,
     PolicyBinding,
     Budget,
+    ShadowPayout,
 }
 
 #[derive(Clone, Copy)]
@@ -47,6 +48,7 @@ enum RollMutation {
     Header,
     MalformedDaoData,
     Early,
+    ShadowPayout,
 }
 
 #[derive(Clone, Copy)]
@@ -84,13 +86,37 @@ fn vault_args(
     owner_hash: [u8; 32],
     job_lock_hash: [u8; 32],
     policy_hash: [u8; 32],
+    commitment: [u8; 32],
 ) -> Bytes {
-    let mut args = Vec::with_capacity(128);
+    let mut args = Vec::with_capacity(160);
     args.extend_from_slice(&job_id);
     args.extend_from_slice(&owner_hash);
     args.extend_from_slice(&job_lock_hash);
     args.extend_from_slice(&policy_hash);
+    args.extend_from_slice(&commitment);
     Bytes::from(args)
+}
+
+fn vault_commitment(
+    owner_hash: [u8; 32],
+    payout_hash: [u8; 32],
+    dao_type_hash: [u8; 32],
+    min_compensation: u64,
+) -> [u8; 32] {
+    crate::dao_harvest::vault_commitment(&[
+        &1_u16.to_le_bytes(),
+        &owner_hash,
+        &payout_hash,
+        &dao_type_hash,
+        &PRINCIPAL.to_le_bytes(),
+        &REWARD.to_le_bytes(),
+        &min_compensation.to_le_bytes(),
+        &((1 << 63) | EPOCH_METRIC | 4).to_le_bytes(),
+        &((1 << 63) | EPOCH_METRIC | 1).to_le_bytes(),
+        &1_u32.to_le_bytes(),
+        &0_u64.to_le_bytes(),
+    ])
+    .expect("valid vault commitment")
 }
 
 fn harvest_payload(
@@ -230,15 +256,21 @@ fn build_creation_case(wrong_dao_type: bool) -> ContractCase {
     let executor_hash = executor.calc_script_hash().unpack();
     let job_lock_hash = job_lock.calc_script_hash().unpack();
     let policy_hash = policy.calc_script_hash().unpack();
+    let dao_type_hash = dao_type.calc_script_hash().unpack();
     let vault = context
         .build_script_with_hash_type(
             &vault_code,
             ScriptHashType::Data1,
-            vault_args([0x11; 32], owner_hash, job_lock_hash, policy_hash),
+            vault_args(
+                [0x11; 32],
+                owner_hash,
+                job_lock_hash,
+                policy_hash,
+                vault_commitment(owner_hash, payout_hash, dao_type_hash, 1),
+            ),
         )
         .expect("vault script");
     let vault_hash = vault.calc_script_hash().unpack();
-    let dao_type_hash = dao_type.calc_script_hash().unpack();
     let mut executor_set = [executor_hash];
     let payload = harvest_payload(
         owner_hash,
@@ -314,13 +346,14 @@ fn build_prepare_case(mutation: PrepareMutation) -> ContractCase {
     let payout_hash = payout.calc_script_hash().unpack();
     let approved_hash = approved_executor.calc_script_hash().unpack();
     let executor = if matches!(mutation, PrepareMutation::UnauthorizedExecutor) {
-        other_executor
+        other_executor.clone()
     } else {
         approved_executor
     };
     let executor_hash = executor.calc_script_hash().unpack();
     let job_lock_hash = job_lock.calc_script_hash().unpack();
     let policy_hash = policy.calc_script_hash().unpack();
+    let dao_type_hash = dao_type.calc_script_hash().unpack();
     let bound_policy_hash = if matches!(mutation, PrepareMutation::PolicyBinding) {
         [0x99; 32]
     } else {
@@ -330,15 +363,25 @@ fn build_prepare_case(mutation: PrepareMutation) -> ContractCase {
         .build_script_with_hash_type(
             &vault_code,
             ScriptHashType::Data1,
-            vault_args([0x11; 32], owner_hash, job_lock_hash, bound_policy_hash),
+            vault_args(
+                [0x11; 32],
+                owner_hash,
+                job_lock_hash,
+                bound_policy_hash,
+                vault_commitment(owner_hash, payout_hash, dao_type_hash, 1),
+            ),
         )
         .expect("vault script");
     let vault_hash = vault.calc_script_hash().unpack();
-    let dao_type_hash = dao_type.calc_script_hash().unpack();
     let mut approved_set = [approved_hash];
+    let payload_payout_hash = if matches!(mutation, PrepareMutation::ShadowPayout) {
+        other_executor.calc_script_hash().unpack()
+    } else {
+        payout_hash
+    };
     let payload = harvest_payload(
         owner_hash,
-        payout_hash,
+        payload_payout_hash,
         vault_hash,
         dao_type_hash,
         &mut approved_set,
@@ -485,27 +528,44 @@ fn build_roll_case_with_options(
     let policy = deployed_contract(&mut context, "dao-harvest-policy");
     let vault_code = context.deploy_cell(crate::fixtures::contract_binary("harvest-vault-lock"));
     let owner = always_success_script(&mut context, 21);
-    let payout = if payout_to_owner {
+    let committed_payout = if payout_to_owner {
         owner.clone()
     } else {
         always_success_script(&mut context, 22)
     };
+    let payout = if matches!(mutation, RollMutation::ShadowPayout) {
+        always_success_script(&mut context, 25)
+    } else {
+        committed_payout.clone()
+    };
     let executor = always_success_script(&mut context, 23);
     let dao_type = always_success_script(&mut context, 24);
     let owner_hash = owner.calc_script_hash().unpack();
+    let committed_payout_hash = committed_payout.calc_script_hash().unpack();
     let payout_hash = payout.calc_script_hash().unpack();
     let executor_hash = executor.calc_script_hash().unpack();
     let job_lock_hash = job_lock.calc_script_hash().unpack();
     let policy_hash = policy.calc_script_hash().unpack();
+    let dao_type_hash = dao_type.calc_script_hash().unpack();
     let vault = context
         .build_script_with_hash_type(
             &vault_code,
             ScriptHashType::Data1,
-            vault_args([0x11; 32], owner_hash, job_lock_hash, policy_hash),
+            vault_args(
+                [0x11; 32],
+                owner_hash,
+                job_lock_hash,
+                policy_hash,
+                vault_commitment(
+                    owner_hash,
+                    committed_payout_hash,
+                    dao_type_hash,
+                    min_compensation,
+                ),
+            ),
         )
         .expect("vault script");
     let vault_hash = vault.calc_script_hash().unpack();
-    let dao_type_hash = dao_type.calc_script_hash().unpack();
     let mut executor_set = [executor_hash];
     let payload = harvest_payload_with_minimum(
         owner_hash,
@@ -672,7 +732,7 @@ fn build_owner_vault_case(include_owner: bool) -> ContractCase {
         .build_script_with_hash_type(
             &vault_code,
             ScriptHashType::Data1,
-            vault_args([0x11; 32], owner_hash, job_lock_hash, [0; 32]),
+            vault_args([0x11; 32], owner_hash, job_lock_hash, [0; 32], [0; 32]),
         )
         .expect("vault script");
     let vault_cell = context.create_cell(
@@ -902,6 +962,7 @@ fn prepare_rejects_principal_type_authority_and_job_substitution() {
     assert_prepare_fails(PrepareMutation::MissingBoundJob, 43);
     assert_prepare_fails(PrepareMutation::PolicyBinding, 43);
     assert_prepare_fails(PrepareMutation::Budget, 28);
+    assert_prepare_fails(PrepareMutation::ShadowPayout, 43);
 }
 
 #[test]
@@ -936,6 +997,7 @@ fn claim_rejects_value_header_data_and_timing_mutations() {
     assert_roll_fails(RollMutation::Header, 38);
     assert_roll_fails(RollMutation::MalformedDaoData, 36);
     assert_roll_fails(RollMutation::Early, 23);
+    assert_roll_fails(RollMutation::ShadowPayout, 43);
 }
 
 #[test]

@@ -106,13 +106,16 @@ export {
   DAO_HARVEST_PAYLOAD_DOMAIN,
   DAO_HARVEST_PAYLOAD_VERSION,
   DAO_HARVEST_QUOTE_VALID_BLOCKS,
+  DAO_HARVEST_VAULT_COMMITMENT_DOMAIN,
   MAX_DAO_HARVEST_PREPARE_EXECUTORS,
   classifyDaoHarvestCellData,
   deriveDaoHarvestPayloadHash,
+  deriveDaoHarvestVaultCommitment,
   derivePrepareExecutorSetHash,
   normalizePrepareExecutorSet,
   type DaoHarvestDaoState,
   type DaoHarvestOperation,
+  type DaoHarvestVaultCommitmentInput,
 } from "./dao-harvest.ts";
 
 export {

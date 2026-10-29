@@ -88,6 +88,7 @@ dependencies = [
 name = "automata-harvest-vault-lock"
 version = "0.0.0"
 dependencies = [
+ "ckb-hash",
  "ckb-std",
  "molecule",
 ]

@@ -141,7 +141,13 @@ Inputs
 
 Outputs
   [vault] new Nervos DAO deposit
-          lock = Harvest Vault Lock(job_id, owner_lock_hash, job_lock_hash, policy_script_hash)
+          lock = Harvest Vault Lock(
+                   job_id,
+                   owner_lock_hash,
+                   job_lock_hash,
+                   policy_script_hash,
+                   immutable_terms_commitment
+                 )
           type = deployed Nervos DAO type
           data = eight zero bytes
           capacity = principal_capacity
@@ -159,6 +165,15 @@ Witness
 Setup requires `sequence = 0`, `remaining_runs = total_cycles * 2`, reward equal to
 `executor_reward`, the first exact epoch lower bound in `not_before`, the immutable optional end
 epoch in `not_after`, and enough Job Cell spendable capacity for every approved action reward.
+
+The final 32 bytes of the 160-byte vault-lock arguments commit, under the
+`ckb-automata/dao-harvest-vault-commitment/v1` domain, to every immutable economic term except the
+vault lock hash itself and the separately owner-rotatable executor-set hash. The commitment covers
+the owner, compensation payout, DAO type, principal, reward, compensation preference, timing
+parameters, cycle count, and end epoch. Both the vault lock and policy recompute it from the payload
+on every automated vault spend. A copied Job Cell therefore cannot use the real vault with a
+different payout or other economic terms. Normal prepare successors must also preserve the exact
+input payload hash; executor rotation remains a distinct owner-authorized operation.
 
 ## Prepare transaction
 

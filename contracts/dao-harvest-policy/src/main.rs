@@ -426,10 +426,11 @@ fn validate_reward_budget(job: &JobDataV1, source: Source) -> Result<(), ScriptE
             .map_err(|_| ScriptError::CapacityNotConserved)?;
         let successor =
             JobDataV1::from_slice(&successor_data).map_err(|_| ScriptError::InvalidData)?;
-        if read_u64(successor.remaining_budget().as_slice())
-            != expected_budget
-                .checked_sub(reward)
-                .ok_or(ScriptError::ArithmeticOverflow)?
+        if successor.payload_hash().as_slice() != job.payload_hash().as_slice()
+            || read_u64(successor.remaining_budget().as_slice())
+                != expected_budget
+                    .checked_sub(reward)
+                    .ok_or(ScriptError::ArithmeticOverflow)?
         {
             return Err(ScriptError::CapacityNotConserved);
         }
@@ -516,7 +517,7 @@ fn validate_vault_binding(
     let vault_lock =
         load_cell_lock(vault_index, vault_source).map_err(|_| ScriptError::InvalidDaoCell)?;
     let args = vault_lock.args().raw_data();
-    if args.len() != 128
+    if args.len() != 160
         || &args[..32] != job.job_id().as_slice()
         || &args[32..64] != payload.owner_lock_hash().as_slice()
     {
@@ -531,6 +532,23 @@ fn validate_vault_binding(
         load_cell_lock_hash(0, job_lock_source).map_err(|_| ScriptError::MissingBoundJob)?;
     let policy_hash = load_script_hash().map_err(|_| ScriptError::PolicyHashMismatch)?;
     if &args[64..96] != job_lock_hash.as_slice() || &args[96..128] != policy_hash.as_slice() {
+        return Err(ScriptError::MissingBoundJob);
+    }
+    let commitment = dao_harvest::vault_commitment(&[
+        payload.version().as_slice(),
+        payload.owner_lock_hash().as_slice(),
+        payload.payout_lock_hash().as_slice(),
+        payload.dao_type_hash().as_slice(),
+        payload.principal_capacity().as_slice(),
+        payload.executor_reward().as_slice(),
+        payload.min_compensation().as_slice(),
+        payload.prepare_buffer_epochs().as_slice(),
+        payload.confirmation_margin_epochs().as_slice(),
+        payload.total_cycles().as_slice(),
+        payload.end_epoch_since().as_slice(),
+    ])
+    .ok_or(ScriptError::ArithmeticOverflow)?;
+    if &args[128..160] != commitment.as_slice() {
         return Err(ScriptError::MissingBoundJob);
     }
     Ok(())

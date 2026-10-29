@@ -175,7 +175,7 @@ test("active deployment builds an exact unsigned setup and rejects understated f
   const result = await adapter.build("setup", {
     ownerLockHash,
     payoutLockHash,
-    principal: "21000000000",
+    principal: "24200000000",
     totalCycles: 1,
     lockResolutions: [ownerLock, payoutLock],
   });
@@ -183,7 +183,7 @@ test("active deployment builds an exact unsigned setup and rejects understated f
   assert.equal(result.operation, "setup");
   assert.match(result.jobId ?? "", /^0x[0-9a-f]{64}$/);
   assert.equal(transaction.inputs.length, 0);
-  assert.equal(BigInt(transaction.outputs[0]!.capacity), 21_000_000_000n);
+  assert.equal(BigInt(transaction.outputs[0]!.capacity), 24_200_000_000n);
   assert.equal(BigInt(transaction.outputs[1]!.capacity), 50_300_000_000n);
   assert.equal(transaction.cellDeps.length, 5);
   assert.deepEqual(remembered, [ownerLock, payoutLock]);
@@ -191,7 +191,7 @@ test("active deployment builds an exact unsigned setup and rejects understated f
   const sameAddressResult = await adapter.build("setup", {
     ownerLockHash,
     payoutLockHash: ownerLockHash,
-    principal: "21000000000",
+    principal: "24200000000",
     totalCycles: 1,
     lockResolutions: [ownerLock, ownerLock],
   });
@@ -202,7 +202,7 @@ test("active deployment builds an exact unsigned setup and rejects understated f
     adapter.build("setup", {
       ownerLockHash,
       payoutLockHash,
-      principal: "21000000000",
+      principal: "24200000000",
       totalCycles: 1,
       lockResolutions: [ownerLock, ownerLock],
     }),
@@ -237,7 +237,7 @@ test("active deployment builds an exact unsigned setup and rejects understated f
   assert.equal(projected.malformed, 0);
   assert.equal(projected.projections.length, 1);
   assert.equal(projected.projections[0]?.jobId, result.jobId);
-  assert.equal(projected.projections[0]?.principalCapacity, 21_000_000_000n);
+  assert.equal(projected.projections[0]?.principalCapacity, 24_200_000_000n);
   assert.equal(projected.projections[0]?.vaultState, "deposited");
   const setupHash = `0x${"cd".repeat(32)}`;
   const ownerHash = `0x${"ef".repeat(32)}`;
@@ -377,24 +377,24 @@ test("active deployment builds an exact unsigned setup and rejects understated f
     jobId: result.jobId,
     ownerLockHash,
     payoutLockHash,
-    principal: "21000000000",
+    principal: "24200000000",
     totalCycles: "1",
   });
   await assert.rejects(
     adapter.build("setup", {
       ownerLockHash,
       payoutLockHash,
-      principal: "20999999999",
+      principal: "24199999999",
       totalCycles: 1,
       lockResolutions: [ownerLock, payoutLock],
     }),
-    /at least 210 CKB/,
+    /at least 242 CKB/,
   );
   await assert.rejects(
     adapter.build("setup", {
       ownerLockHash,
       payoutLockHash,
-      principal: "21000000000",
+      principal: "24200000000",
       totalCycles: 1,
       lockResolutions: [ownerLock, payoutLock],
       extra: true,
