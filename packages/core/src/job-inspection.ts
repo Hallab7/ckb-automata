@@ -487,7 +487,8 @@ export function validateDeploymentManifest(
     issues,
   );
   const codeHashes = new Set<string>();
-  const depIndices = new Set<string>();
+  const depOutPoints = new Set<string>();
+  let contractsFromLatestDeployment = 0;
   for (const name of DEPLOYED_CONTRACT_NAMES) {
     const contract = contracts[name];
     if (contract.hashType !== "data1") {
@@ -506,27 +507,31 @@ export function validateDeploymentManifest(
         "deployed contracts must use code cell deps",
       );
     }
-    if (contract.cellDep.outPoint.txHash !== deploymentTransactionHash) {
-      issue(
-        issues,
-        "INCONSISTENT_DEPLOYMENT",
-        `$.contracts.${name}.cellDep.outPoint.txHash`,
-        "must reference the deployment transaction",
-      );
+    if (contract.cellDep.outPoint.txHash === deploymentTransactionHash) {
+      contractsFromLatestDeployment += 1;
     }
     if (codeHashes.has(contract.codeHash)) {
       issue(issues, "INCONSISTENT_DEPLOYMENT", `$.contracts.${name}.codeHash`, "must be unique");
     }
-    if (depIndices.has(contract.cellDep.outPoint.index)) {
+    const outPointIdentity = `${contract.cellDep.outPoint.txHash}:${contract.cellDep.outPoint.index}`;
+    if (depOutPoints.has(outPointIdentity)) {
       issue(
         issues,
         "INCONSISTENT_DEPLOYMENT",
-        `$.contracts.${name}.cellDep.outPoint.index`,
-        "must be unique",
+        `$.contracts.${name}.cellDep`,
+        "must identify a unique code cell",
       );
     }
     codeHashes.add(contract.codeHash);
-    depIndices.add(contract.cellDep.outPoint.index);
+    depOutPoints.add(outPointIdentity);
+  }
+  if (contractsFromLatestDeployment === 0) {
+    issue(
+      issues,
+      "INCONSISTENT_DEPLOYMENT",
+      "$.deployment.transactionHash",
+      "must contain at least one active deployed contract",
+    );
   }
 
   const verificationContract = verification["contract"];

@@ -149,9 +149,9 @@ test("the deployed local manifest is structurally consistent and network-bound",
   assert.ok(wrongNetwork.issues.some(({ code }) => code === "WRONG_NETWORK"));
 
   const altered = structuredClone(rawManifest) as {
-    contracts: { "job-lock": { cellDep: { outPoint: { txHash: string } } } };
+    deployment: { transactionHash: string };
   };
-  altered.contracts["job-lock"].cellDep.outPoint.txHash = `0x${"aa".repeat(32)}`;
+  altered.deployment.transactionHash = `0x${"aa".repeat(32)}`;
   const alteredResult = validateDeploymentManifest(altered);
   assert.equal(alteredResult.status, "invalid");
   if (alteredResult.status !== "invalid") return;

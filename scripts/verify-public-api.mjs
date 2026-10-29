@@ -48,7 +48,7 @@ assert.equal(network.genesisHash, manifest.genesisHash);
 assert.equal(network.confirmationDepth, 5);
 assert.equal(
   network.deploymentManifestHash,
-  "0fe4b1f45b6fc4bc719d7e197ff4f58fb222e300f4c077a19b81b0e8bf64a1c3",
+  "709b841490ad328be6e82c63f52e87607150d5c0075ca15818b4e45ef5fd0477",
 );
 assert.deepEqual(network.supportedPolicyVersions?.["dao-harvest"], [1]);
 

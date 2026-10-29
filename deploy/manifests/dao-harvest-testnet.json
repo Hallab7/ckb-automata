@@ -1,10 +1,10 @@
 {
   "network": "ckb_testnet",
   "genesisHash": "0x10639e0895502b5688a6be8cf69460d76541bfa4821629d86d62ba0aae3f9606",
-  "manifestSha256": "0fe4b1f45b6fc4bc719d7e197ff4f58fb222e300f4c077a19b81b0e8bf64a1c3",
+  "manifestSha256": "709b841490ad328be6e82c63f52e87607150d5c0075ca15818b4e45ef5fd0477",
   "deployment": {
-    "transactionHash": "0xc64456e82fc7b8b5fe75cd11921f33c79c4a9f83dd843cc08d8277efbe8721fe",
-    "blockHash": "0x6a624bbaf05cb02f8b284ce444cc37cf5696ff576a4ff8c83ae4b0daf9ae747d"
+    "transactionHash": "0x8e036cf24406f93b63a8df1ee547b120b86ea7616872674cef1d99343bf15c03",
+    "blockHash": "0x5f4d742b1b4f87fefe0bb904b759f318097fc0a32a222ce01309ccf6737ed3a2"
   },
   "secp256k1Blake160": {
     "cellDep": {
@@ -17,12 +17,12 @@
   },
   "jobLock": {
     "script": {
-      "codeHash": "0x49bac0e6cbf5030c72212a745872cd2ba3e1ca97597bdb73fae3efb706da3165",
+      "codeHash": "0xcfb3eae4ae6a9a375087313e5681f2cb9cb2341ed7aa891aa61706f4fdb4e3ff",
       "hashType": "data1"
     },
     "cellDep": {
       "outPoint": {
-        "txHash": "0xef471574d2f58c38d3e9d9380d98f853c9bcf5388730a767ac6f1ff35ab8cc64",
+        "txHash": "0x8e036cf24406f93b63a8df1ee547b120b86ea7616872674cef1d99343bf15c03",
         "index": "0x0"
       },
       "depType": "code"
@@ -30,13 +30,13 @@
   },
   "policy": {
     "script": {
-      "codeHash": "0xe52976ae5a666d335679268f7d8946e22e22cad6e0795606290afc60df917bfc",
+      "codeHash": "0x88422959b9c206818cd20ad5e342c4395672194ab8291ef81cf325632db45bf8",
       "hashType": "data1"
     },
     "cellDep": {
       "outPoint": {
-        "txHash": "0xc64456e82fc7b8b5fe75cd11921f33c79c4a9f83dd843cc08d8277efbe8721fe",
-        "index": "0x0"
+        "txHash": "0x8e036cf24406f93b63a8df1ee547b120b86ea7616872674cef1d99343bf15c03",
+        "index": "0x3"
       },
       "depType": "code"
     }
