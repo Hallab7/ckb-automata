@@ -54,3 +54,10 @@ fees, and refill it through a monitored operation. Alert when a balance exceeds
 the cap, a transaction targets an unknown destination, or an outgoing
 transaction cannot be linked to an executor job. Key rotation changes executor
 identity metadata only and must not require user migration.
+
+The balance cap, destination/linkage alerts, refill approval, key separation,
+and rotation interval are operational controls, not executor runtime checks.
+The runtime enforces key/lock matching, exact configured transaction fees,
+minimum reward margin, dry-run cycle limits, and valid executor-owned fee-cell
+selection. The authoritative control matrix is in
+[Executor Operations](../operations/executors.md#wallet-limits).

@@ -15,11 +15,28 @@ select one canonical winner without making either process a prerequisite for the
 
 ## Wallet limits
 
-- Fund each operator with 500 testnet CKB and never exceed the 1,000 CKB hard cap.
+- Fund each operator with 500 testnet CKB and keep it below the 1,000 CKB operational cap.
 - Never reuse an owner, recipient, refund, deployment, or personal wallet key.
 - Alert on an unknown destination, an unlinked outgoing transaction, or a balance above the cap.
 - Keep `EXECUTOR_FEE_PRIVATE_KEY` only in the service secret manager. Its matching public lock args
   belong in `EXECUTOR_LOCK_ARGS`.
+
+These controls are split between runtime enforcement and operator procedure:
+
+| Control                                                                        | Enforcement             | Evidence                                      |
+| ------------------------------------------------------------------------------ | ----------------------- | --------------------------------------------- |
+| Private key matches `EXECUTOR_LOCK_ARGS`                                       | Runtime startup check   | Executor refuses to initialize on a mismatch  |
+| Transaction fee equals `EXECUTOR_TRANSACTION_FEE`                              | Runtime simulation gate | Build is rejected before signing or broadcast |
+| Reward covers fee plus `EXECUTOR_MIN_MARGIN`                                   | Runtime simulation gate | Unprofitable build is rejected                |
+| Dry-run cycles stay within `EXECUTOR_MAX_CYCLES`                               | Runtime simulation gate | Excessive-cycle build is rejected             |
+| Fee input is a live plain cell owned by the executor and can fund valid change | Runtime adapter check   | Build stops when no suitable cell exists      |
+| Initial 500 CKB funding and 1,000 CKB balance cap                              | Operator procedure      | Funding record and external balance monitor   |
+| Unknown-destination and unlinked-outgoing alerts                               | Operator monitoring     | External chain monitor or alerting service    |
+| Key separation, refill approval, and 30-day rotation                           | Operator procedure      | Secret-manager and operations audit records   |
+
+`/health/live` and `/health/ready` do not measure the fee-key balance, enforce the 1,000 CKB cap,
+or prove that destination monitoring is active. Until those checks are implemented in a monitored
+runtime component, a runbook statement or configured alert must not be described as code-enforced.
 
 ## Health and isolation
 
