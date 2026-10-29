@@ -1,5 +1,9 @@
 # Deadline Policy Adapter
 
+This adapter executes the legacy campaign-backed conditional deadline policy.
+New direct scheduled-payment integrations must use the separate policy boundary
+defined by [ADR 0008](../architecture/0008-separate-plain-payments-from-campaigns.md).
+
 The deadline policy is the Job Cell type script for the demo campaign action.
 Its 32-byte script args are the full type-script hash of the one campaign it
 may finalize. The Job Lock and policy adapter both run in the finalization

@@ -1,5 +1,9 @@
 # Deadline Creation Builder
 
+This V1 builder creates the legacy conditional deadline form: a campaign-backed
+pay-or-refund outcome. It is not the long-term direct scheduled-payment policy.
+See [ADR 0008](../architecture/0008-separate-plain-payments-from-campaigns.md).
+
 The deadline builder returns one normalized intent and an unsigned CKB
 transaction whose first two outputs are immutable:
 
