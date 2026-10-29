@@ -177,7 +177,12 @@ fn validate_execution() -> Result<(), ScriptError> {
 
     let payout_index = validate_unique_payout(&payload)?;
     let request = load_execution_request()?;
-    if !request.controlled_output_indices[..request.controlled_output_count].contains(&payout_index)
+    let controlled = &request.controlled_output_indices[..request.controlled_output_count];
+    let successor_index = unique_policy_output_index()?;
+    if controlled.len() != 3
+        || !controlled.contains(&request.reward_output_index)
+        || !controlled.contains(&payout_index)
+        || !controlled.contains(&successor_index)
     {
         return Err(ScriptError::CapacityNotConserved);
     }
@@ -200,7 +205,36 @@ fn validate_execution() -> Result<(), ScriptError> {
     {
         return Err(ScriptError::TriggerHashMismatch);
     }
+    let expected_successor_capacity = load_cell_capacity(0, Source::GroupInput)
+        .map_err(|_| ScriptError::CapacityNotConserved)?
+        .checked_sub(read_u64(job.reward().as_slice()))
+        .and_then(|value| value.checked_sub(read_u64(payload.amount().as_slice())))
+        .ok_or(ScriptError::ArithmeticOverflow)?;
+    let successor_capacity = load_cell_capacity(0, Source::GroupOutput)
+        .map_err(|_| ScriptError::CapacityNotConserved)?;
+    let expected_successor_budget = read_u64(job.remaining_budget().as_slice())
+        .checked_sub(read_u64(job.reward().as_slice()))
+        .ok_or(ScriptError::ArithmeticOverflow)?;
+    if successor_capacity != expected_successor_capacity
+        || read_u64(successor.remaining_budget().as_slice()) != expected_successor_budget
+    {
+        return Err(ScriptError::CapacityNotConserved);
+    }
     Ok(())
+}
+
+fn unique_policy_output_index() -> Result<usize, ScriptError> {
+    let policy_hash = load_script_hash().map_err(|_| ScriptError::PolicyHashMismatch)?;
+    let mut found = None;
+    for (index, type_hash) in QueryIter::new(load_cell_type_hash, Source::Output).enumerate() {
+        if type_hash == Some(policy_hash) {
+            if found.is_some() {
+                return Err(ScriptError::SuccessorCountMismatch);
+            }
+            found = Some(index);
+        }
+    }
+    found.ok_or(ScriptError::SuccessorCountMismatch)
 }
 
 fn validate_final_execution() -> Result<(), ScriptError> {

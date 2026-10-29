@@ -41,6 +41,8 @@ enum Mutation {
     SkippedInterval,
     Overflow,
     ZeroInterval,
+    DrainSuccessor,
+    DrainBudget,
 }
 
 struct PayoutCase {
@@ -109,12 +111,17 @@ fn build_case_with_executor_extra(mutation: Mutation, executor_extra: u64) -> Pa
     } else {
         first_not_before + INTERVAL
     };
+    let successor_budget = if matches!(mutation, Mutation::DrainBudget) {
+        REWARD
+    } else {
+        20_000_000_000
+    };
     let successor_data = JobDataV1::from_slice(&input_data)
         .expect("input job")
         .as_builder()
         .sequence(1_u64.to_le_bytes())
         .trigger_params_hash(absolute_block_trigger_hash(successor_not_before))
-        .remaining_budget(20_000_000_000_u64.to_le_bytes())
+        .remaining_budget(successor_budget.to_le_bytes())
         .not_before(successor_not_before.to_le_bytes())
         .remaining_runs(2_u32.to_le_bytes())
         .build()
@@ -157,8 +164,16 @@ fn build_case_with_executor_extra(mutation: Mutation, executor_extra: u64) -> Pa
         None
     };
     let duplicate = matches!(mutation, Mutation::Duplicate);
-    let successor_capacity =
-        JOB_CAPACITY - REWARD - payout_capacity - if duplicate { PAYOUT } else { 0 };
+    let stolen_capacity = if matches!(mutation, Mutation::DrainSuccessor) {
+        50_000_000_000
+    } else {
+        0
+    };
+    let successor_capacity = JOB_CAPACITY
+        - REWARD
+        - payout_capacity
+        - if duplicate { PAYOUT } else { 0 }
+        - stolen_capacity;
     let input_since = if matches!(mutation, Mutation::Early) {
         first_not_before - 1
     } else {
@@ -210,15 +225,30 @@ fn build_case_with_executor_extra(mutation: Mutation, executor_extra: u64) -> Pa
                 .type_(Some(recurring_policy).pack())
                 .build(),
         )
+        .output_data(successor_data.pack());
+    if stolen_capacity > 0 {
+        builder = builder
+            .output(
+                CellOutput::new_builder()
+                    .capacity(stolen_capacity)
+                    .lock(executor.lock.clone())
+                    .build(),
+            )
+            .output_data(Bytes::new().pack());
+    }
+    builder = builder
         .output(
             CellOutput::new_builder()
                 .capacity(EXECUTOR_CAPACITY + executor_extra - FEE)
                 .lock(executor.lock)
                 .build(),
         )
-        .output_data(successor_data.pack())
         .output_data(Bytes::new().pack());
-    let controlled_outputs: &[u32] = if duplicate { &[0, 1, 2, 3] } else { &[0, 1, 2] };
+    let controlled_outputs: &[u32] = if duplicate || stolen_capacity > 0 {
+        &[0, 1, 2, 3]
+    } else {
+        &[0, 1, 2]
+    };
     let execution = execution_witness(0, 0, executor_hash, controlled_outputs)
         .as_builder()
         .output_type(Some(payload).pack())
@@ -272,6 +302,12 @@ fn recurring_policy_rejects_rewritten_or_invalid_next_triggers() {
     assert_fails(Mutation::SkippedInterval, 18);
     assert_fails(Mutation::Overflow, 34);
     assert_fails(Mutation::ZeroInterval, 10);
+}
+
+#[test]
+fn recurring_policy_rejects_successor_budget_drain() {
+    assert_fails(Mutation::DrainSuccessor, 28);
+    assert_fails(Mutation::DrainBudget, 28);
 }
 
 proptest! {

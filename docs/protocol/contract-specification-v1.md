@@ -117,8 +117,10 @@ their domain-separated hash equals `refund_commitment`.
 - Every execution uses a valid absolute block lower bound derived as
   `first_not_before + sequence * interval_blocks` with checked arithmetic.
 - A non-final run pays one plain recipient output and creates one constrained
-  successor. A final run pays the executor and recipient and returns the exact
-  residual to the owner without a successor.
+  successor. Its controlled list is exactly reward, payout, and successor; its capacity decreases
+  by exactly the reward and payout, and its remaining budget decreases by exactly the reward. A
+  final run pays the executor and recipient and returns the exact residual to the owner without a
+  successor.
 
 ### Deadline Policy and Campaign
 

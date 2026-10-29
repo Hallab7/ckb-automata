@@ -29,15 +29,18 @@ exact committed `amount`, have no type script, and contain empty data.
 
 This admits only a plain native-CKB payout. A wrong recipient, changed amount,
 typed asset cell, early input, or second output to the recipient is rejected.
-The Job Lock independently requires the payout to be listed among the
-job-controlled outputs and conserves all Job Cell capacity across the reward,
-payout, and successor.
+The recurring policy requires the controlled set to contain exactly three distinct outputs: the
+executor reward, recipient payout, and unique successor. The successor capacity must equal the
+input Job Cell capacity minus exactly one reward and one payout, and its remaining budget must equal
+the input budget minus exactly one reward. The Job Lock independently conserves that same complete
+capacity across the declared set. An executor cannot declare an additional controlled output,
+shrink the successor, or reduce its future reward budget.
 
 ## Verification Status
 
 - Fixture-backed CKB-VM: verified for a valid integrated Job Lock and recurring
   policy execution.
-- Mutation coverage: wrong recipient, amount, asset type, lower bound, and
-  duplicate payout.
+- Mutation coverage: wrong recipient, amount, asset type, lower bound, duplicate payout, additional
+  controlled output, reduced successor capacity, and reduced successor budget.
 - Local chain: not exercised in this implementation unit.
 - Public testnet: not exercised or claimed in this implementation unit.
