@@ -49,6 +49,16 @@ enum RollMutation {
     Early,
 }
 
+#[derive(Clone, Copy)]
+enum RotationMutation {
+    None,
+    MissingOwner,
+    SameSet,
+    ChangedPayout,
+    ChangedProgress,
+    MissingProof,
+}
+
 struct ContractCase {
     context: Context,
     transaction: TransactionView,
@@ -130,6 +140,18 @@ fn harvest_payload_with_minimum(
 
 fn payload_envelope(payload: &Bytes, executor_hashes: &[[u8; 32]]) -> Bytes {
     let mut envelope = payload.to_vec();
+    if !executor_hashes.is_empty() {
+        envelope.push(executor_hashes.len() as u8);
+        for hash in executor_hashes {
+            envelope.extend_from_slice(hash);
+        }
+    }
+    Bytes::from(envelope)
+}
+
+fn rotation_envelope(input: &Bytes, output: &Bytes, executor_hashes: &[[u8; 32]]) -> Bytes {
+    let mut envelope = input.to_vec();
+    envelope.extend_from_slice(output);
     if !executor_hashes.is_empty() {
         envelope.push(executor_hashes.len() as u8);
         for hash in executor_hashes {
@@ -703,6 +725,140 @@ fn build_owner_vault_case(include_owner: bool) -> ContractCase {
     }
 }
 
+fn build_rotation_case(mutation: RotationMutation) -> ContractCase {
+    let mut context = Context::new_with_deterministic_rng();
+    let job_lock = deployed_contract(&mut context, "job-lock");
+    let policy = deployed_contract(&mut context, "dao-harvest-policy");
+    let owner = always_success_script(&mut context, 41);
+    let stranger = always_success_script(&mut context, 42);
+    let payout = always_success_script(&mut context, 43);
+    let changed_payout = always_success_script(&mut context, 44);
+    let old_executor = always_success_script(&mut context, 45);
+    let new_executor = always_success_script(&mut context, 46);
+    let vault = always_success_script(&mut context, 47);
+    let dao_type = always_success_script(&mut context, 48);
+    let owner_hash = owner.calc_script_hash().unpack();
+    let payout_hash = payout.calc_script_hash().unpack();
+    let changed_payout_hash = changed_payout.calc_script_hash().unpack();
+    let vault_hash = vault.calc_script_hash().unpack();
+    let dao_type_hash = dao_type.calc_script_hash().unpack();
+    let old_executor_hash = old_executor.calc_script_hash().unpack();
+    let new_executor_hash = new_executor.calc_script_hash().unpack();
+    let policy_hash = policy.calc_script_hash().unpack();
+    let mut old_set = [old_executor_hash];
+    let mut new_set = if matches!(mutation, RotationMutation::SameSet) {
+        [old_executor_hash]
+    } else {
+        [new_executor_hash]
+    };
+    let input_payload = harvest_payload(
+        owner_hash,
+        payout_hash,
+        vault_hash,
+        dao_type_hash,
+        &mut old_set,
+    );
+    let output_payload = harvest_payload(
+        owner_hash,
+        if matches!(mutation, RotationMutation::ChangedPayout) {
+            changed_payout_hash
+        } else {
+            payout_hash
+        },
+        vault_hash,
+        dao_type_hash,
+        &mut new_set,
+    );
+    let input_payload_hash =
+        dao_harvest_payload_hash(&policy_hash, &input_payload).expect("input payload hash");
+    let output_payload_hash =
+        dao_harvest_payload_hash(&policy_hash, &output_payload).expect("output payload hash");
+    let input_data = job_data(
+        owner_hash,
+        policy_hash,
+        input_payload_hash,
+        0,
+        2,
+        REWARD * 2,
+        epoch(0),
+        [0x71; 32],
+    );
+    let output_data = job_data(
+        owner_hash,
+        policy_hash,
+        output_payload_hash,
+        if matches!(mutation, RotationMutation::ChangedProgress) {
+            1
+        } else {
+            0
+        },
+        2,
+        REWARD * 2,
+        epoch(0),
+        [0x71; 32],
+    );
+    let job_cell = context.create_cell(
+        CellOutput::new_builder()
+            .capacity(JOB_CAPACITY)
+            .lock(job_lock.clone())
+            .type_(Some(policy.clone()).pack())
+            .build(),
+        input_data,
+    );
+    let authority = if matches!(mutation, RotationMutation::MissingOwner) {
+        stranger
+    } else {
+        owner.clone()
+    };
+    let owner_cell = context.create_cell(
+        CellOutput::new_builder()
+            .capacity(EXECUTOR_CAPACITY)
+            .lock(authority)
+            .build(),
+        Bytes::new(),
+    );
+    let mut request = vec![4];
+    request.extend_from_slice(&0_u32.to_le_bytes());
+    let proof: &[[u8; 32]] = if matches!(mutation, RotationMutation::MissingProof) {
+        &[]
+    } else {
+        &new_set
+    };
+    let transaction = TransactionBuilder::default()
+        .input(CellInput::new_builder().previous_output(job_cell).build())
+        .input(CellInput::new_builder().previous_output(owner_cell).build())
+        .output(
+            CellOutput::new_builder()
+                .capacity(JOB_CAPACITY)
+                .lock(job_lock)
+                .type_(Some(policy).pack())
+                .build(),
+        )
+        .output(
+            CellOutput::new_builder()
+                .capacity(EXECUTOR_CAPACITY - FEE)
+                .lock(owner)
+                .build(),
+        )
+        .output_data(output_data.pack())
+        .output_data(Bytes::new().pack())
+        .witness(
+            WitnessArgs::new_builder()
+                .input_type(Some(Bytes::from(request)).pack())
+                .output_type(Some(rotation_envelope(&input_payload, &output_payload, proof)).pack())
+                .build()
+                .as_bytes()
+                .pack(),
+        )
+        .witness(WitnessArgs::default().as_bytes().pack())
+        .build();
+    let transaction = context.complete_tx(transaction);
+    ContractCase {
+        context,
+        transaction,
+    }
+}
+
 fn verify(case: &ContractCase) -> Result<(), String> {
     case.context
         .verify_tx(&case.transaction, MAX_CYCLES)
@@ -787,6 +943,28 @@ fn owner_can_exit_the_vault_without_service_authority() {
     verify(&build_owner_vault_case(true)).expect("owner-authorized vault exit");
     let error = verify(&build_owner_vault_case(false)).expect_err("stranger vault exit must fail");
     assert!(error.contains("16"), "unexpected error: {error}");
+}
+
+#[test]
+fn owner_can_rotate_prepare_executors_without_spending_the_dao_vault() {
+    verify(&build_rotation_case(RotationMutation::None)).expect("valid executor rotation");
+}
+
+#[test]
+fn executor_rotation_rejects_missing_owner_and_any_other_intent_change() {
+    for (mutation, code) in [
+        (RotationMutation::MissingOwner, 16),
+        (RotationMutation::SameSet, 42),
+        (RotationMutation::ChangedPayout, 25),
+        (RotationMutation::ChangedProgress, 25),
+        (RotationMutation::MissingProof, 42),
+    ] {
+        let error = verify(&build_rotation_case(mutation)).expect_err("rotation must fail");
+        assert!(
+            error.contains(&code.to_string()),
+            "expected script error {code}, got {error}"
+        );
+    }
 }
 
 pub(crate) fn benchmark_cases() -> Vec<crate::benchmarks::BenchmarkCase> {

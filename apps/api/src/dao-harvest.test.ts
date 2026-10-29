@@ -3,14 +3,19 @@ import test from "node:test";
 
 import type { LoggerService } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
-import { scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
+import { WitnessArgs } from "@ckb-ccc/shell";
+import { bytesToHex, hexToBytes, scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
 
 import testnetManifest from "../../../deploy/manifests/testnet.json" with { type: "json" };
 import {
+  buildDaoHarvestExecutorRotation,
   createDeploymentRegistry,
   deploymentRegistry,
   hashDeploymentManifest,
+  parseHash32,
+  parseOutPoint,
   registeredDaoHarvestDeployment,
+  type ResolvedLiveCell,
   type UnsignedDeadlineTransaction,
 } from "@ckb-automata/core";
 
@@ -89,17 +94,17 @@ test("mutation service cannot sign, broadcast, or build before deployment regist
 
 test("active deployment builds an exact unsigned setup and rejects understated funding", async () => {
   const ownerLock = {
-    codeHash: `0x${"01".repeat(32)}`,
+    codeHash: parseHash32(`0x${"01".repeat(32)}`),
     hashType: "type" as const,
     args: "0x1111" as const,
   };
   const payoutLock = {
-    codeHash: `0x${"02".repeat(32)}`,
+    codeHash: parseHash32(`0x${"02".repeat(32)}`),
     hashType: "type" as const,
     args: "0x2222" as const,
   };
-  const ownerLockHash = scriptToHash(ownerLock);
-  const payoutLockHash = scriptToHash(payoutLock);
+  const ownerLockHash = parseHash32(scriptToHash(ownerLock));
+  const payoutLockHash = parseHash32(scriptToHash(payoutLock));
   const remembered: unknown[] = [];
   const manifest = structuredClone(testnetManifest) as Record<string, unknown>;
   manifest["daoHarvest"] = {
@@ -234,6 +239,88 @@ test("active deployment builds an exact unsigned setup and rejects understated f
   assert.equal(projected.projections[0]?.jobId, result.jobId);
   assert.equal(projected.projections[0]?.principalCapacity, 21_000_000_000n);
   assert.equal(projected.projections[0]?.vaultState, "deposited");
+  const setupHash = `0x${"cd".repeat(32)}`;
+  const ownerHash = `0x${"ef".repeat(32)}`;
+  const vaultOutPoint = parseOutPoint({ txHash: setupHash, index: 0n });
+  const jobOutPoint = parseOutPoint({ txHash: setupHash, index: 1n });
+  const ownerOutPoint = parseOutPoint({ txHash: ownerHash, index: 0n });
+  const outputType = WitnessArgs.fromBytes(transaction.witnesses[0]!).outputType;
+  assert.ok(outputType);
+  const envelope = hexToBytes(outputType);
+  const payloadSize = new DataView(
+    envelope.buffer,
+    envelope.byteOffset,
+    envelope.byteLength,
+  ).getUint32(0, true);
+  const payload = bytesToHex(envelope.slice(0, payloadSize)) as `0x${string}`;
+  const liveCells = new Map<string, ResolvedLiveCell>([
+    [
+      `${vaultOutPoint.txHash}:${vaultOutPoint.index}`,
+      {
+        outPoint: vaultOutPoint,
+        output: transaction.outputs[0]!,
+        data: transaction.outputsData[0]!,
+      },
+    ],
+    [
+      `${jobOutPoint.txHash}:${jobOutPoint.index}`,
+      {
+        outPoint: jobOutPoint,
+        output: transaction.outputs[1]!,
+        data: transaction.outputsData[1]!,
+      },
+    ],
+    [
+      `${ownerOutPoint.txHash}:${ownerOutPoint.index}`,
+      {
+        outPoint: ownerOutPoint,
+        output: { capacity: 10_000_000_000n, lock: ownerLock, type: null },
+        data: "0x" as const,
+      },
+    ],
+  ]);
+  const rotation = await buildDaoHarvestExecutorRotation({
+    deployment: registeredDaoHarvestDeployment(registered.deployment),
+    expectedGenesisHash: registered.deployment.genesisHash,
+    resolver: {
+      resolve: async (outPoint) => liveCells.get(`${outPoint.txHash}:${outPoint.index}`) ?? null,
+    },
+    vaultOutPoint,
+    jobOutPoint,
+    ownerOutPoint,
+    ownerLock,
+    ownerLockHash,
+    payload,
+    prepareExecutorLockHashes: [parseHash32(`0x${"f0".repeat(32)}`)],
+  });
+  const rotated = extractDaoHarvestProjections(
+    {
+      header: {
+        epoch: { integer: 13_920n, numerator: 1_153n, denominator: 1_800n },
+        hash: `0x${"ac".repeat(32)}`,
+        number: 22_583_954n,
+      },
+      transactions: [
+        {
+          hash: () => `0x${"ce".repeat(32)}`,
+          inputs: rotation.transaction.inputs,
+          outputs: rotation.transaction.outputs.map((output) => ({
+            ...output,
+            capacity: BigInt(output.capacity),
+            type: output.type ?? undefined,
+          })),
+          outputsData: rotation.transaction.outputsData,
+          witnesses: rotation.transaction.witnesses,
+        },
+      ],
+    } as never,
+    registeredDaoHarvestDeployment(registered.deployment),
+  );
+  assert.equal(rotated.malformed, 0);
+  assert.equal(rotated.projections.length, 0);
+  assert.equal(rotated.rotations.length, 1);
+  assert.equal(rotated.rotations[0]?.jobId, result.jobId);
+  assert.notEqual(rotated.rotations[0]?.payload, payload);
   const transactionHash = `0x${"cd".repeat(32)}`;
   let inserted: Record<string, unknown> | undefined;
   const pending = new DaoHarvestPendingService(

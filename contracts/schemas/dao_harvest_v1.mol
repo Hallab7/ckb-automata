@@ -13,8 +13,9 @@
 // protected DAO input and output.
 // principal_capacity: exact full capacity preserved in phase one and atomically
 // returned to a new DAO deposit in phase two.
-// prepare_executor_set_hash: H("ckb-automata/dao-harvest-executors/v1",
-// uint32_le(count) || sorted unique executor lock hashes). Count is 1..8.
+// prepare_executor_set_hash: active H("ckb-automata/dao-harvest-executors/v1",
+// uint32_le(count) || sorted unique executor lock hashes). Count is 1..8. The
+// owner may replace only this field through the executor-rotation operation.
 // executor_reward: exact separately funded reward for each prepare or roll
 // action. V1 uses one fixed reward so the shared Job Lock reward remains
 // immutable across successors.
@@ -33,11 +34,13 @@
 // end_epoch_since: zero means no separate end bound; otherwise a valid absolute
 // epoch since that an executor cannot extend.
 //
-// JobDataV1.payload_hash commits this complete immutable payload using
+// JobDataV1.payload_hash commits this complete policy payload using
 // H("ckb-automata/policy-payload/v1", policy_script_hash || molecule_bytes).
 // JobDataV1 sequence, trigger_params_hash, remaining_budget, not_before, and
 // remaining_runs carry mutable progress. JobDataV1.not_after mirrors the
-// immutable end_epoch_since. The co-spent DAO cell data determines DEPOSITED
+// end_epoch_since. Automated successors preserve the hash exactly; an
+// owner-authorized executor rotation replaces it with a payload that changes
+// only prepare_executor_set_hash. The co-spent DAO cell data determines DEPOSITED
 // (eight zero bytes) or WITHDRAWING (original deposit block number), so neither
 // state nor a changing DAO outpoint belongs here.
 

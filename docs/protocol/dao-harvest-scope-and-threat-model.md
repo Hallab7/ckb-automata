@@ -75,6 +75,8 @@ never owner authorization.
 The first transition has an operational timing trust. CKB `since` can prevent execution before the
 preparation window, but it cannot make a signed or policy-valid transition expire after a cutoff.
 The pilot therefore permits only an owner-approved executor set to perform the first transition.
+The owner can replace that set without spending or recreating the existing DAO position; the
+rotation preserves job progress and every other policy field.
 Those executors are trusted to stop after the cutoff. They are not trusted with custody, payout
 selection, or principal allocation.
 

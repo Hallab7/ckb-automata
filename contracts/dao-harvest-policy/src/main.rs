@@ -104,10 +104,6 @@ fn validate_creation() -> Result<(), ScriptError> {
 fn validate_spend() -> Result<(), ScriptError> {
     let job_data = load_cell_data(0, Source::GroupInput).map_err(|_| ScriptError::InvalidData)?;
     let job = JobDataV1::from_slice(&job_data).map_err(|_| ScriptError::InvalidData)?;
-    let (payload, proof) = load_payload_envelope(0, Source::GroupInput)?;
-    validate_intent(&job, &payload)?;
-    validate_reward_budget(&job, Source::GroupInput)?;
-
     let witness =
         load_witness_args(0, Source::GroupInput).map_err(|_| ScriptError::InvalidWitnessMode)?;
     let input_type = witness
@@ -115,6 +111,15 @@ fn validate_spend() -> Result<(), ScriptError> {
         .to_opt()
         .ok_or(ScriptError::InvalidWitnessMode)?
         .raw_data();
+    if let Some(execution_witness::WitnessOperation::RotateExecutorSet {
+        successor_output_index,
+    }) = execution_witness::parse_witness_operation(&input_type)
+    {
+        return validate_executor_rotation(&job, successor_output_index);
+    }
+    let (payload, proof) = load_payload_envelope(0, Source::GroupInput)?;
+    validate_intent(&job, &payload)?;
+    validate_reward_budget(&job, Source::GroupInput)?;
     match execution_witness::parse_witness_operation(&input_type) {
         Some(execution_witness::WitnessOperation::Execute(request)) => {
             let sequence = read_u64(job.sequence().as_slice());
@@ -139,6 +144,132 @@ fn validate_spend() -> Result<(), ScriptError> {
         }
         _ => Err(ScriptError::InvalidWitnessMode),
     }
+}
+
+fn validate_executor_rotation(
+    input_job: &JobDataV1,
+    successor_output_index: usize,
+) -> Result<(), ScriptError> {
+    if QueryIter::new(load_cell_capacity, Source::GroupOutput).count() != 1 {
+        return Err(ScriptError::SuccessorCountMismatch);
+    }
+    let successor_data = load_cell_data(successor_output_index, Source::Output)
+        .map_err(|_| ScriptError::InvalidData)?;
+    let successor = JobDataV1::from_slice(&successor_data).map_err(|_| ScriptError::InvalidData)?;
+    let (input_payload, successor_payload, proof) = load_rotation_envelope()?;
+    validate_intent(input_job, &input_payload)?;
+    validate_reward_funding(input_job, Source::GroupInput)?;
+    validate_intent(&successor, &successor_payload)?;
+    validate_reward_funding(&successor, Source::GroupOutput)?;
+    validate_owner(&input_payload)?;
+    validate_executor_proof(&successor_payload, &proof, None)?;
+
+    for (input, output) in [
+        (
+            input_payload.version().as_slice(),
+            successor_payload.version().as_slice(),
+        ),
+        (
+            input_payload.owner_lock_hash().as_slice(),
+            successor_payload.owner_lock_hash().as_slice(),
+        ),
+        (
+            input_payload.payout_lock_hash().as_slice(),
+            successor_payload.payout_lock_hash().as_slice(),
+        ),
+        (
+            input_payload.vault_lock_hash().as_slice(),
+            successor_payload.vault_lock_hash().as_slice(),
+        ),
+        (
+            input_payload.dao_type_hash().as_slice(),
+            successor_payload.dao_type_hash().as_slice(),
+        ),
+        (
+            input_payload.principal_capacity().as_slice(),
+            successor_payload.principal_capacity().as_slice(),
+        ),
+        (
+            input_payload.executor_reward().as_slice(),
+            successor_payload.executor_reward().as_slice(),
+        ),
+        (
+            input_payload.min_compensation().as_slice(),
+            successor_payload.min_compensation().as_slice(),
+        ),
+        (
+            input_payload.prepare_buffer_epochs().as_slice(),
+            successor_payload.prepare_buffer_epochs().as_slice(),
+        ),
+        (
+            input_payload.confirmation_margin_epochs().as_slice(),
+            successor_payload.confirmation_margin_epochs().as_slice(),
+        ),
+        (
+            input_payload.total_cycles().as_slice(),
+            successor_payload.total_cycles().as_slice(),
+        ),
+        (
+            input_payload.end_epoch_since().as_slice(),
+            successor_payload.end_epoch_since().as_slice(),
+        ),
+    ] {
+        if input != output {
+            return Err(ScriptError::SuccessorInvariantMismatch);
+        }
+    }
+    if input_payload.prepare_executor_set_hash().as_slice()
+        == successor_payload.prepare_executor_set_hash().as_slice()
+    {
+        return Err(ScriptError::InvalidExecutorSet);
+    }
+    Ok(())
+}
+
+fn load_rotation_envelope()
+-> Result<(DaoHarvestPayloadV1, DaoHarvestPayloadV1, Vec<[u8; 32]>), ScriptError> {
+    let witness =
+        load_witness_args(0, Source::GroupInput).map_err(|_| ScriptError::PayloadHashMismatch)?;
+    let envelope = witness
+        .output_type()
+        .to_opt()
+        .ok_or(ScriptError::PayloadHashMismatch)?
+        .raw_data();
+    if envelope.len() < 8 {
+        return Err(ScriptError::PayloadHashMismatch);
+    }
+    let input_size = read_u32(&envelope[..4]) as usize;
+    if input_size < 4 || input_size + 4 > envelope.len() {
+        return Err(ScriptError::PayloadHashMismatch);
+    }
+    let output_size = read_u32(&envelope[input_size..input_size + 4]) as usize;
+    let payloads_size = input_size
+        .checked_add(output_size)
+        .ok_or(ScriptError::ArithmeticOverflow)?;
+    if output_size < 4 || payloads_size > envelope.len() {
+        return Err(ScriptError::PayloadHashMismatch);
+    }
+    let input = DaoHarvestPayloadV1::from_slice(&envelope[..input_size])
+        .map_err(|_| ScriptError::InvalidData)?;
+    let output = DaoHarvestPayloadV1::from_slice(&envelope[input_size..payloads_size])
+        .map_err(|_| ScriptError::InvalidData)?;
+    let proof_bytes = &envelope[payloads_size..];
+    if proof_bytes.is_empty() {
+        return Err(ScriptError::InvalidExecutorSet);
+    }
+    let count = proof_bytes[0] as usize;
+    if count == 0 || proof_bytes.len() != 1 + count * 32 {
+        return Err(ScriptError::InvalidExecutorSet);
+    }
+    let mut proof = Vec::with_capacity(count);
+    for chunk in proof_bytes[1..].chunks_exact(32) {
+        proof.push(
+            chunk
+                .try_into()
+                .map_err(|_| ScriptError::InvalidExecutorSet)?,
+        );
+    }
+    Ok((input, output, proof))
 }
 
 fn load_payload_envelope(
@@ -284,6 +415,29 @@ fn validate_executor_proof(
 }
 
 fn validate_reward_budget(job: &JobDataV1, source: Source) -> Result<(), ScriptError> {
+    validate_reward_funding(job, source)?;
+    let reward = read_u64(job.reward().as_slice());
+    let remaining_runs = read_u32(job.remaining_runs().as_slice());
+    let expected_budget = reward
+        .checked_mul(remaining_runs as u64)
+        .ok_or(ScriptError::ArithmeticOverflow)?;
+    if source == Source::GroupInput && remaining_runs > 1 {
+        let successor_data = load_cell_data(0, Source::GroupOutput)
+            .map_err(|_| ScriptError::CapacityNotConserved)?;
+        let successor =
+            JobDataV1::from_slice(&successor_data).map_err(|_| ScriptError::InvalidData)?;
+        if read_u64(successor.remaining_budget().as_slice())
+            != expected_budget
+                .checked_sub(reward)
+                .ok_or(ScriptError::ArithmeticOverflow)?
+        {
+            return Err(ScriptError::CapacityNotConserved);
+        }
+    }
+    Ok(())
+}
+
+fn validate_reward_funding(job: &JobDataV1, source: Source) -> Result<(), ScriptError> {
     let reward = read_u64(job.reward().as_slice());
     let remaining_runs = read_u32(job.remaining_runs().as_slice());
     let expected_budget = reward
@@ -302,19 +456,6 @@ fn validate_reward_budget(job: &JobDataV1, source: Source) -> Result<(), ScriptE
         return Err(ScriptError::CapacityNotConserved);
     }
 
-    if source == Source::GroupInput && remaining_runs > 1 {
-        let successor_data = load_cell_data(0, Source::GroupOutput)
-            .map_err(|_| ScriptError::CapacityNotConserved)?;
-        let successor =
-            JobDataV1::from_slice(&successor_data).map_err(|_| ScriptError::InvalidData)?;
-        if read_u64(successor.remaining_budget().as_slice())
-            != expected_budget
-                .checked_sub(reward)
-                .ok_or(ScriptError::ArithmeticOverflow)?
-        {
-            return Err(ScriptError::CapacityNotConserved);
-        }
-    }
     Ok(())
 }
 

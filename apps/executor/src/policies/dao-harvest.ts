@@ -70,6 +70,7 @@ interface DaoHarvestInspection {
   readonly operation: "prepare" | "roll";
   readonly boundarySince: bigint;
   readonly cutoffSince: bigint;
+  readonly prepareExecutorLockHashes: readonly Hash32[];
 }
 
 function stable(value: unknown): string {
@@ -110,42 +111,110 @@ export const DAO_HARVEST_EXECUTOR_REGISTRATION = Object.freeze({
   evaluateEligibility: preliminaryEligibility,
 } satisfies ExecutorAdapterRegistration);
 
-function payloadFromEnvelope(value: Hex): Hex {
+function executorProof(value: Uint8Array): readonly Hash32[] {
+  if (value.length === 0) return Object.freeze([]);
+  const count = value[0]!;
+  if (count === 0 || value.length !== 1 + count * 32) return Object.freeze([]);
+  return Object.freeze(
+    Array.from({ length: count }, (_, index) =>
+      hash32FromBytes(value.slice(1 + index * 32, 1 + (index + 1) * 32)),
+    ),
+  );
+}
+
+function payloadsFromEnvelope(value: Hex): readonly {
+  readonly value: DaoHarvestPayloadV1Value;
+  readonly hex: Hex;
+  readonly prepareExecutorLockHashes: readonly Hash32[];
+}[] {
   const bytes = hexToBytes(value);
   if (bytes.length < 4) throw new Error("payload envelope is truncated");
-  const size = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0, true);
-  if (size < 4 || size > bytes.length) throw new Error("payload envelope size is invalid");
-  return bytesToHex(bytes.slice(0, size)) as Hex;
+  const read = (offset: number) => {
+    if (offset + 4 > bytes.length) return undefined;
+    const size = new DataView(bytes.buffer, bytes.byteOffset + offset, 4).getUint32(0, true);
+    if (size < 4 || offset + size > bytes.length) return undefined;
+    const payload = bytes.slice(offset, offset + size);
+    try {
+      return { size, payload, value: DaoHarvestPayloadV1.unpack(payload) };
+    } catch {
+      return undefined;
+    }
+  };
+  const first = read(0);
+  if (!first) throw new Error("payload envelope size is invalid");
+  const second = read(first.size);
+  if (second) {
+    return Object.freeze([
+      Object.freeze({
+        value: first.value,
+        hex: bytesToHex(first.payload) as Hex,
+        prepareExecutorLockHashes: Object.freeze([]),
+      }),
+      Object.freeze({
+        value: second.value,
+        hex: bytesToHex(second.payload) as Hex,
+        prepareExecutorLockHashes: executorProof(bytes.slice(first.size + second.size)),
+      }),
+    ]);
+  }
+  return Object.freeze([
+    Object.freeze({
+      value: first.value,
+      hex: bytesToHex(first.payload) as Hex,
+      prepareExecutorLockHashes: executorProof(bytes.slice(first.size)),
+    }),
+  ]);
 }
 
 function resolvePayload(context: ExecutorContext): {
   readonly value: DaoHarvestPayloadV1Value;
   readonly hex: Hex;
+  readonly prepareExecutorLockHashes: readonly Hash32[];
 } {
   const policyHash = hash32ToBytes(context.jobInspection.job.policyScriptHash);
-  const matches: { readonly value: DaoHarvestPayloadV1Value; readonly hex: Hex }[] = [];
+  const matches = new Map<
+    Hex,
+    {
+      readonly value: DaoHarvestPayloadV1Value;
+      readonly hex: Hex;
+      readonly prepareExecutorLockHashes: readonly Hash32[];
+    }
+  >();
   for (const envelope of new Set(context.snapshot.payloads)) {
     try {
-      const hex = payloadFromEnvelope(envelope);
-      const bytes = hexToBytes(hex);
-      if (
-        hash32FromBytes(deriveDaoHarvestPayloadHash(policyHash, bytes)) !==
-        context.jobInspection.job.payloadHash
-      ) {
-        continue;
+      for (const candidate of payloadsFromEnvelope(envelope)) {
+        if (
+          hash32FromBytes(deriveDaoHarvestPayloadHash(policyHash, hexToBytes(candidate.hex))) !==
+          context.jobInspection.job.payloadHash
+        ) {
+          continue;
+        }
+        const current = matches.get(candidate.hex);
+        if (
+          !current ||
+          current.prepareExecutorLockHashes.length < candidate.prepareExecutorLockHashes.length
+        ) {
+          matches.set(candidate.hex, candidate);
+        }
       }
-      matches.push({ value: DaoHarvestPayloadV1.unpack(bytes), hex });
     } catch {
       // Unrelated witness output types are not evidence for this job.
     }
   }
-  if (matches.length !== 1) {
+  if (matches.size !== 1) {
     throw new DaoHarvestAdapterError(
       "EXECUTOR_PAYLOAD_HASH_MISMATCH",
       "the snapshot does not contain one committed DAO harvest payload",
     );
   }
-  return matches[0]!;
+  const match = matches.values().next().value;
+  if (!match || match.prepareExecutorLockHashes.length === 0) {
+    throw new DaoHarvestAdapterError(
+      "EXECUTOR_INVALID_APPLICATION_STATE",
+      "the approved DAO harvest executor set is unavailable",
+    );
+  }
+  return match;
 }
 
 function findLock(context: ExecutorContext, hash: Hash32, label: string): ScriptIdentity {
@@ -239,6 +308,7 @@ function inspectDaoHarvest(context: ExecutorContext): DaoHarvestInspection {
     operation,
     boundarySince: encodeAbsoluteEpochSince(boundary),
     cutoffSince: encodeAbsoluteEpochSince(cutoff),
+    prepareExecutorLockHashes: resolved.prepareExecutorLockHashes,
   });
 }
 
@@ -348,8 +418,7 @@ async function buildDaoHarvest(
     authorityOccupiedCapacity: minimumPlainCellCapacity(context.identity.rewardLock),
     networkFee: context.identity.transactionFee,
     payload: inspection.payloadHex,
-    prepareExecutorLockHashes:
-      context.snapshot.deployment.manifest.daoHarvest!.prepareExecutorLockHashes,
+    prepareExecutorLockHashes: inspection.prepareExecutorLockHashes,
   } as const;
   if (inspection.operation === "prepare") {
     const result = await buildDaoHarvestPrepare({

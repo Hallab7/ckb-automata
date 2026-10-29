@@ -15,7 +15,13 @@ import { jobEvents, jobs, jobVersions } from "../database/schema.ts";
 import { extractSupportedJobCells, type DiscoveredJobCell } from "./job-discovery.ts";
 
 export type JobTransitionKind =
-  "one_shot" | "recurring" | "cancelled" | "recovered" | "topped_up" | "consumed_by_other";
+  | "one_shot"
+  | "recurring"
+  | "cancelled"
+  | "recovered"
+  | "topped_up"
+  | "executor_rotated"
+  | "consumed_by_other";
 
 export interface JobTransitionResult {
   readonly indexedTransitions: number;
@@ -26,7 +32,7 @@ export interface JobTransitionResult {
 
 type WitnessOperation =
   | { readonly kind: "execute"; readonly executorLockHash: Hash32 }
-  | { readonly kind: "cancel" | "recover" | "top_up" | "unknown" };
+  | { readonly kind: "cancel" | "recover" | "top_up" | "executor_rotation" | "unknown" };
 
 function hexBytes(value: string): Uint8Array {
   if (!/^0x(?:[0-9a-f]{2})*$/.test(value)) throw new TypeError("witness bytes are not canonical");
@@ -41,6 +47,7 @@ function witnessOperation(witness: string | undefined): WitnessOperation {
     if (bytes.length === 1 && bytes[0] === 1) return Object.freeze({ kind: "cancel" });
     if (bytes.length === 1 && bytes[0] === 2) return Object.freeze({ kind: "recover" });
     if (bytes.length === 5 && bytes[0] === 3) return Object.freeze({ kind: "top_up" });
+    if (bytes.length === 5 && bytes[0] === 4) return Object.freeze({ kind: "executor_rotation" });
     if (bytes[0] === 0 && bytes.length >= 42) {
       const controlledCount = bytes[37] ?? 0;
       if (
@@ -84,6 +91,8 @@ export function classifyJobTransition(
       return hasSuccessor ? "consumed_by_other" : "recovered";
     case "top_up":
       return hasSuccessor ? "topped_up" : "consumed_by_other";
+    case "executor_rotation":
+      return hasSuccessor ? "executor_rotated" : "consumed_by_other";
     case "unknown":
       return "consumed_by_other";
   }

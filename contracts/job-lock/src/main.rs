@@ -62,6 +62,9 @@ fn program_entry() -> Result<(), ScriptError> {
         execution_witness::WitnessOperation::TopUp {
             successor_output_index,
         } => validate_top_up(successor_output_index),
+        execution_witness::WitnessOperation::RotateExecutorSet {
+            successor_output_index,
+        } => validate_executor_rotation(successor_output_index),
     }
 }
 
@@ -192,6 +195,91 @@ fn validate_top_up(successor_output_index: usize) -> Result<(), ScriptError> {
     if successor_capacity < input_capacity
         || successor_budget > successor_spendable
         || successor_reward > successor_budget
+    {
+        return Err(ScriptError::CapacityNotConserved);
+    }
+    Ok(())
+}
+
+fn validate_executor_rotation(successor_output_index: usize) -> Result<(), ScriptError> {
+    let job = load_job()?;
+    validate_supported_live_job(&job)?;
+    validate_policy_commitment(&job)?;
+    validate_owner_authorization(&job)?;
+
+    let job_lock_hash = load_script_hash().map_err(|_| ScriptError::InvalidData)?;
+    let successor_count = QueryIter::new(load_cell_lock_hash, Source::Output)
+        .filter(|lock_hash| *lock_hash == job_lock_hash)
+        .count();
+    let successor_lock = load_cell_lock_hash(successor_output_index, Source::Output)
+        .map_err(|_| ScriptError::SuccessorCountMismatch)?;
+    if successor_count != 1 || successor_lock != job_lock_hash {
+        return Err(ScriptError::SuccessorCountMismatch);
+    }
+
+    let successor_policy = load_cell_type_hash(successor_output_index, Source::Output)
+        .map_err(|_| ScriptError::PolicyHashMismatch)?
+        .ok_or(ScriptError::PolicyHashMismatch)?;
+    if successor_policy != job.policy_script_hash().as_slice() {
+        return Err(ScriptError::PolicyHashMismatch);
+    }
+    let successor_data = load_cell_data(successor_output_index, Source::Output)
+        .map_err(|_| ScriptError::InvalidData)?;
+    let successor = JobDataV1::from_slice(&successor_data).map_err(|_| ScriptError::InvalidData)?;
+    for (input, output) in [
+        (job.version().as_slice(), successor.version().as_slice()),
+        (job.flags().as_slice(), successor.flags().as_slice()),
+        (job.job_id().as_slice(), successor.job_id().as_slice()),
+        (job.sequence().as_slice(), successor.sequence().as_slice()),
+        (job.state().as_slice(), successor.state().as_slice()),
+        (
+            job.trigger_kind().as_slice(),
+            successor.trigger_kind().as_slice(),
+        ),
+        (
+            job.trigger_params_hash().as_slice(),
+            successor.trigger_params_hash().as_slice(),
+        ),
+        (
+            job.policy_script_hash().as_slice(),
+            successor.policy_script_hash().as_slice(),
+        ),
+        (job.reward().as_slice(), successor.reward().as_slice()),
+        (
+            job.remaining_budget().as_slice(),
+            successor.remaining_budget().as_slice(),
+        ),
+        (
+            job.not_before().as_slice(),
+            successor.not_before().as_slice(),
+        ),
+        (job.not_after().as_slice(), successor.not_after().as_slice()),
+        (
+            job.remaining_runs().as_slice(),
+            successor.remaining_runs().as_slice(),
+        ),
+        (
+            job.cancel_lock_hash().as_slice(),
+            successor.cancel_lock_hash().as_slice(),
+        ),
+    ] {
+        if input != output {
+            return Err(ScriptError::SuccessorInvariantMismatch);
+        }
+    }
+    if job.payload_hash().as_slice() == successor.payload_hash().as_slice() {
+        return Err(ScriptError::InvalidExecutorSet);
+    }
+
+    let input_capacity =
+        load_cell_capacity(0, Source::GroupInput).map_err(|_| ScriptError::InvalidData)?;
+    let successor_capacity = load_cell_capacity(successor_output_index, Source::Output)
+        .map_err(|_| ScriptError::CapacityNotConserved)?;
+    let successor_occupied = load_cell_occupied_capacity(successor_output_index, Source::Output)
+        .map_err(|_| ScriptError::CapacityNotConserved)?;
+    let successor_budget = read_u64(successor.remaining_budget().as_slice());
+    if successor_capacity != input_capacity
+        || successor_budget > successor_capacity.saturating_sub(successor_occupied)
     {
         return Err(ScriptError::CapacityNotConserved);
     }

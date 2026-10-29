@@ -52,12 +52,13 @@ is the first witness for the script group unless stated otherwise.
 
 ### Job Lock `input_type`
 
-| First byte | Operation | Remaining bytes                                                                                                                  |
-| ---------- | --------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `0`        | Execute   | `reward_output_index:u32`, `executor_lock_hash:byte32`, `controlled_count:u8`, then that many distinct `output_index:u32` values |
-| `1`        | Cancel    | None; total payload length is one byte                                                                                           |
-| `2`        | Recover   | None; total payload length is one byte                                                                                           |
-| `3`        | Top up    | `successor_output_index:u32`; total payload length is five bytes                                                                 |
+| First byte | Operation                    | Remaining bytes                                                                                                                  |
+| ---------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `0`        | Execute                      | `reward_output_index:u32`, `executor_lock_hash:byte32`, `controlled_count:u8`, then that many distinct `output_index:u32` values |
+| `1`        | Cancel                       | None; total payload length is one byte                                                                                           |
+| `2`        | Recover                      | None; total payload length is one byte                                                                                           |
+| `3`        | Top up                       | `successor_output_index:u32`; total payload length is five bytes                                                                 |
+| `4`        | Rotate DAO prepare executors | `successor_output_index:u32`; owner-authorized and DAO Harvest only                                                              |
 
 Execute has an exact length of `38 + controlled_count * 4`, where the count is
 from 1 through 16. The reward index must be in the controlled set. The executor
@@ -66,15 +67,15 @@ authorizes the transaction.
 
 ### Policy and Campaign Payloads
 
-| Script and action               | Witness field | Bytes                                                                                                                  |
-| ------------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Recurring policy create/execute | `output_type` | Complete canonical `RecurringPayloadV1`                                                                                |
-| Campaign create                 | `output_type` | Ordered 76-byte pledge records containing `tx_hash:32`, `output_index:u32`, `refund_lock_hash:32`, and `amount:u64`    |
-| Campaign refund finalization    | `input_type`  | The same ordered pledge records committed at creation                                                                  |
-| Deadline policy finalization    | `input_type`  | The Job Lock execute request; the policy reads and independently checks its reward index and executor lock commitment  |
-| DAO harvest policy              | `output_type` | Canonical `DaoHarvestPayloadV1`, followed on setup and prepare by `count:u8` and that many sorted executor lock hashes |
-| Harvest vault automation        | `lock`        | `mode:0`, operation `0` or `1`, and the bound global Job input index as `u32`                                          |
-| Harvest vault owner exit        | `lock`        | `mode:1` and owner operation `2`, `3`, or `4`; DAO `input_type` remains reserved for the deposit-header index          |
+| Script and action               | Witness field | Bytes                                                                                                                 |
+| ------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Recurring policy create/execute | `output_type` | Complete canonical `RecurringPayloadV1`                                                                               |
+| Campaign create                 | `output_type` | Ordered 76-byte pledge records containing `tx_hash:32`, `output_index:u32`, `refund_lock_hash:32`, and `amount:u64`   |
+| Campaign refund finalization    | `input_type`  | The same ordered pledge records committed at creation                                                                 |
+| Deadline policy finalization    | `input_type`  | The Job Lock execute request; the policy reads and independently checks its reward index and executor lock commitment |
+| DAO harvest policy              | `output_type` | Canonical payload; rotation carries old payload, new payload, then the new sorted executor-set proof                  |
+| Harvest vault automation        | `lock`        | `mode:0`, operation `0` or `1`, and the bound global Job input index as `u32`                                         |
+| Harvest vault owner exit        | `lock`        | `mode:1` and owner operation `2`, `3`, or `4`; DAO `input_type` remains reserved for the deposit-header index         |
 
 Pledge records are strictly ordered by transaction hash and then output index.
 Their checked amount sum equals `pledged`, their count equals `pledge_count`, and
@@ -93,7 +94,7 @@ their domain-separated hash equals `refund_commitment`.
 - A one-shot execution creates no Job Lock successor. A recurring execution
   creates exactly one successor, increments sequence by one, decrements runs by
   one, decreases budget, preserves immutable intent, and advances its trigger.
-- Cancel, recover, and top up require a distinct co-spent input whose full lock
+- Cancel, recover, top up, and DAO executor rotation require a distinct co-spent input whose full lock
   hash equals `cancel_lock_hash`.
 - Cancel validates a supported live job and returns the complete Job Cell to the
   owner. Recover permits unsupported or invalid but structurally decodable job
@@ -103,6 +104,9 @@ their domain-separated hash equals `refund_commitment`.
   and only increases reward, budget, or both with sufficient added capacity.
   Recurring jobs keep reward unchanged because it is committed by
   `RecurringPayloadV1`; they may increase remaining budget only.
+- DAO executor rotation creates one equal-capacity Job successor, preserves all
+  job fields except `payload_hash`, and permits the new payload to change only
+  `prepare_executor_set_hash`. It neither spends the DAO vault nor pays a reward.
 
 ### Recurring Policy
 
@@ -172,6 +176,7 @@ builders should still use the order below for deterministic review.
 | Execute, final recurring     | Controlled list must be exactly executor reward, recipient payout, owner residual.                                                                              |
 | Cancel or recover            | Full transaction output index `0` is the complete plain owner refund.                                                                                           |
 | Top up                       | Witness points to the only Job Lock successor; no other output position is consensus-significant.                                                               |
+| DAO executor rotation        | Witness points to the only Job Lock successor; the DAO vault is not spent and remains at its existing outpoint.                                                 |
 | Campaign creation            | The campaign is the only output in its type group; pledge records, not transaction outputs, use strict outpoint ordering.                                       |
 | Campaign success             | Canonical Job-controlled order is executor reward, owner refund. The unique success payout and terminal marker are found by lock/type identity.                 |
 | Campaign refund              | Canonical Job-controlled order is executor reward, owner refund. Campaign refunds are contiguous in pledge-record order immediately before the terminal marker. |

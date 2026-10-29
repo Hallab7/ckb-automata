@@ -7,6 +7,7 @@ import { hexToBytes, scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
 import type { ResolvedLiveCell } from "./cancellation.ts";
 import { createEpoch, parseHash32, parseOutPoint, type Hash32 } from "./chain-values.ts";
 import {
+  buildDaoHarvestExecutorRotation,
   buildDaoHarvestPrepare,
   buildDaoHarvestRoll,
   buildDaoHarvestSetup,
@@ -40,6 +41,7 @@ const executorLock = { codeHash: hash("8"), hashType: "type" as const, args: "0x
 const ownerLockHash = parseHash32(scriptToHash(ownerLock));
 const payoutLockHash = parseHash32(scriptToHash(payoutLock));
 const executorLockHash = parseHash32(scriptToHash(executorLock));
+const replacementExecutorLockHash = hash("0");
 const PRINCIPAL = 10_000_000_000n;
 const VAULT_OCCUPIED = 6_100_000_000n;
 const JOB_OCCUPIED = 2_000_000_000n;
@@ -286,4 +288,77 @@ test("setup accepts the exact minimum principal and maximum finite cycle count",
   const job = JobDataV1.unpack(hexToBytes(maximum.jobData));
   assert.equal(job.remaining_runs.toString(), (maximumCycles * 2n).toString());
   assert.equal(capacity(maximum.transaction.outputs[0]!), VAULT_OCCUPIED);
+});
+
+test("owner rotation changes only the approved prepare executor commitment", async () => {
+  const initial = setup();
+  const setupHash = hash("9");
+  const ownerHash = hash("d");
+  const vaultOutPoint = point(setupHash, 0);
+  const jobOutPoint = point(setupHash, 1);
+  const ownerOutPoint = point(ownerHash, 0);
+  const cells = new Map<string, ResolvedLiveCell>([
+    [
+      key(vaultOutPoint),
+      {
+        outPoint: vaultOutPoint,
+        output: initial.transaction.outputs[0]!,
+        data: initial.transaction.outputsData[0]!,
+      },
+    ],
+    [
+      key(jobOutPoint),
+      {
+        outPoint: jobOutPoint,
+        output: initial.transaction.outputs[1]!,
+        data: initial.transaction.outputsData[1]!,
+      },
+    ],
+    [
+      key(ownerOutPoint),
+      {
+        outPoint: ownerOutPoint,
+        output: { capacity: 10_000_000_000n, lock: ownerLock, type: null },
+        data: "0x",
+      },
+    ],
+  ]);
+  const resolver = Object.freeze({
+    resolve: async (outPoint: ReturnType<typeof point>) => cells.get(key(outPoint)) ?? null,
+  });
+  const rotation = await buildDaoHarvestExecutorRotation({
+    deployment,
+    expectedGenesisHash: deployment.genesisHash,
+    resolver,
+    vaultOutPoint,
+    jobOutPoint,
+    ownerOutPoint,
+    ownerLock,
+    ownerLockHash,
+    payload: initial.payload,
+    prepareExecutorLockHashes: [replacementExecutorLockHash],
+  });
+  const before = JobDataV1.unpack(hexToBytes(initial.jobData));
+  const after = JobDataV1.unpack(hexToBytes(rotation.transaction.outputsData[0]!));
+  assert.notDeepEqual(after.payload_hash, before.payload_hash);
+  assert.deepEqual({ ...after, payload_hash: before.payload_hash }, before);
+  assert.equal(rotation.transaction.outputs[0]!.capacity, initial.transaction.outputs[1]!.capacity);
+  assert.equal(rotation.intent["kind"], "rotate_prepare_executors");
+  assert.equal(rotation.intent["preservesVault"], true);
+
+  await assert.rejects(
+    buildDaoHarvestExecutorRotation({
+      deployment,
+      expectedGenesisHash: deployment.genesisHash,
+      resolver,
+      vaultOutPoint,
+      jobOutPoint,
+      ownerOutPoint,
+      ownerLock,
+      ownerLockHash,
+      payload: initial.payload,
+      prepareExecutorLockHashes: [executorLockHash],
+    }),
+    /unchanged/,
+  );
 });

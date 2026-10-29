@@ -234,6 +234,11 @@ export interface DaoHarvestOwnerExitInput extends DaoHarvestOwnerBuildInput {
   readonly depositBlockNumber: IntegerInput;
 }
 
+export interface DaoHarvestRotateExecutorsInput extends DaoHarvestOwnerBuildInput {
+  readonly vaultOutPoint: OutPoint;
+  readonly prepareExecutorLockHashes: readonly Hash32[];
+}
+
 export interface DaoHarvestMatureRecoveryInput {
   readonly deployment: DaoHarvestDeployment;
   readonly expectedGenesisHash: Hash32;
@@ -560,6 +565,10 @@ function executionWitness(
 
 function vaultWitness(operation: 0 | 1, jobInputIndex = 1): Hex {
   return bytesToHex(concatenate(Uint8Array.of(0, operation), u32(jobInputIndex))) as Hex;
+}
+
+function executorRotationWitness(successorOutputIndex: number): Hex {
+  return bytesToHex(concatenate(Uint8Array.of(4), u32(successorOutputIndex))) as Hex;
 }
 
 function successorJob(
@@ -1022,6 +1031,91 @@ export function buildDaoHarvestStopRecurrence(
   input: DaoHarvestOwnerBuildInput,
 ): Promise<DaoHarvestTransitionBuild> {
   return buildOwnerJobRefund(input, "stop_recurrence", "0x01");
+}
+
+export async function buildDaoHarvestExecutorRotation(
+  inputValue: DaoHarvestRotateExecutorsInput,
+): Promise<DaoHarvestTransitionBuild> {
+  assertNetwork(inputValue.deployment, inputValue.expectedGenesisHash);
+  const [vault, job, ownerCell] = await Promise.all([
+    resolveRequired(inputValue.resolver, inputValue.vaultOutPoint, "vault"),
+    resolveRequired(inputValue.resolver, inputValue.jobOutPoint, "job"),
+    resolveRequired(inputValue.resolver, inputValue.ownerOutPoint, "owner"),
+  ]);
+  const state = validateLiveState(inputValue.deployment, inputValue.payload, vault, job);
+  const ownerHash = parseHash32(inputValue.ownerLockHash);
+  if (
+    bytesToHex(Uint8Array.from(state.payload.owner_lock_hash)) !== ownerHash ||
+    scriptToHash(inputValue.ownerLock) !== ownerHash ||
+    scriptToHash(ownerCell.output.lock) !== ownerHash
+  ) {
+    throw new DaoHarvestBuilderError(
+      "INVALID_CELL",
+      "executor rotation input does not match the committed owner",
+    );
+  }
+  const executors = normalizePrepareExecutorSet(
+    inputValue.prepareExecutorLockHashes.map((hash) => hash32ToBytes(parseHash32(hash))),
+  );
+  const executorSetHash = hash32FromBytes(derivePrepareExecutorSetHash(executors));
+  if (bytesToHex(Uint8Array.from(state.payload.prepare_executor_set_hash)) === executorSetHash) {
+    throw new DaoHarvestBuilderError("INVALID_CELL", "the approved executor set is unchanged");
+  }
+  const successorPayloadBytes = DaoHarvestPayloadV1.pack({
+    ...state.payload,
+    prepare_executor_set_hash: [...hash32ToBytes(executorSetHash)],
+  });
+  const successorPayloadHash = hash32FromBytes(
+    deriveDaoHarvestPayloadHash(hash32ToBytes(state.policyHash), successorPayloadBytes),
+  );
+  const successorJobBytes = JobDataV1.pack({
+    ...state.job,
+    payload_hash: [...hash32ToBytes(successorPayloadHash)],
+  });
+  const rotationEnvelope = bytesToHex(
+    concatenate(hexToBytes(inputValue.payload), successorPayloadBytes, proof(executors)),
+  ) as Hex;
+  const transaction: UnsignedTransaction = Object.freeze({
+    version: "0x0",
+    cellDeps: Object.freeze(baseDeps(inputValue.deployment) as CellDepIdentity[]),
+    headerDeps: Object.freeze([]),
+    inputs: Object.freeze([cellInput(inputValue.jobOutPoint), cellInput(inputValue.ownerOutPoint)]),
+    outputs: Object.freeze([
+      Object.freeze({
+        capacity: toRpcHex(parseShannons(job.output.capacity)),
+        lock: job.output.lock,
+        type: job.output.type,
+      }),
+      Object.freeze({
+        capacity: toRpcHex(parseShannons(ownerCell.output.capacity)),
+        lock: inputValue.ownerLock,
+        type: null,
+      }),
+    ]),
+    outputsData: Object.freeze([bytesToHex(successorJobBytes) as Hex, "0x" as Hex]),
+    witnesses: Object.freeze([
+      serializeWitnessArgs({
+        lock: "",
+        inputType: executorRotationWitness(0),
+        outputType: rotationEnvelope,
+      }) as Hex,
+      "0x" as Hex,
+    ]),
+  });
+  return Object.freeze({
+    transaction,
+    signingEntries: Object.freeze<DaoHarvestSigningEntry[]>([
+      { role: "owner", inputIndexes: Object.freeze([1]), lockHash: ownerHash },
+    ]),
+    intent: Object.freeze({
+      kind: "rotate_prepare_executors",
+      executorSetHash,
+      preservesVault: true,
+      paysExecutorReward: false,
+    }),
+    policyScriptHash: state.policyHash,
+    payloadHash: successorPayloadHash,
+  });
 }
 
 export async function buildDaoHarvestOwnerExit(

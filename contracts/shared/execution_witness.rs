@@ -14,6 +14,7 @@ pub enum WitnessOperation {
     Cancel,
     Recover,
     TopUp { successor_output_index: usize },
+    RotateExecutorSet { successor_output_index: usize },
 }
 
 pub fn parse_witness_operation(bytes: &[u8]) -> Option<WitnessOperation> {
@@ -21,6 +22,9 @@ pub fn parse_witness_operation(bytes: &[u8]) -> Option<WitnessOperation> {
         [1] => Some(WitnessOperation::Cancel),
         [2] => Some(WitnessOperation::Recover),
         [3, index @ ..] if index.len() == 4 => Some(WitnessOperation::TopUp {
+            successor_output_index: read_u32(index) as usize,
+        }),
+        [4, index @ ..] if index.len() == 4 => Some(WitnessOperation::RotateExecutorSet {
             successor_output_index: read_u32(index) as usize,
         }),
         execution if execution.len() >= 38 && execution[0] == 0 => {

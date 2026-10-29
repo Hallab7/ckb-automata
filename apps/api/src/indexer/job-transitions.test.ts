@@ -23,10 +23,11 @@ test("classifies one-shot and recurring execution from successor presence", () =
   assert.equal(executorLockHashFromWitness(execute), `0x${"11".repeat(32)}`);
 });
 
-test("classifies cancellation, recovery, and top-up witness modes", () => {
+test("classifies cancellation, recovery, top-up, and executor rotation witness modes", () => {
   assert.equal(classifyJobTransition(witness("0x01"), false), "cancelled");
   assert.equal(classifyJobTransition(witness("0x02"), false), "recovered");
   assert.equal(classifyJobTransition(witness("0x0300000000"), true), "topped_up");
+  assert.equal(classifyJobTransition(witness("0x0400000000"), true), "executor_rotated");
 });
 
 test("records malformed and contradictory consumption as consumed by other", () => {
@@ -34,6 +35,7 @@ test("records malformed and contradictory consumption as consumed by other", () 
   assert.equal(executorLockHashFromWitness("0x"), undefined);
   assert.equal(classifyJobTransition(witness("0x01"), true), "consumed_by_other");
   assert.equal(classifyJobTransition(witness("0x0300000000"), false), "consumed_by_other");
+  assert.equal(classifyJobTransition(witness("0x0400000000"), false), "consumed_by_other");
 });
 
 test("skips transactional input scans when no live Job Cell can be consumed", async () => {

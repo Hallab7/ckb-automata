@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { WitnessArgs } from "@ckb-ccc/shell";
-import { scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
+import { bytesToHex, hexToBytes, scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
+import { DaoHarvestPayloadV1, JobDataV1 } from "@ckb-automata/molecule";
 
 import testnetManifest from "../../../../deploy/manifests/testnet.json" with { type: "json" };
 import {
@@ -12,9 +13,14 @@ import {
   calculateDaoHarvestQuote,
   createDeploymentRegistry,
   createEpoch,
+  deriveDaoHarvestPayloadHash,
+  derivePrepareExecutorSetHash,
   encodeAbsoluteEpochSince,
   encodeRelativeEpochSince,
   hashDeploymentManifest,
+  hash32FromBytes,
+  hash32ToBytes,
+  normalizePrepareExecutorSet,
   packEpoch,
   parseBlockNumber,
   parseHash32,
@@ -245,6 +251,62 @@ test("DAO harvest adapter waits before prepare when projected compensation is be
     assert.equal(result.eligibility.reason, "EXECUTOR_NOT_YET_ELIGIBLE");
     assert.equal(result.eligibility.terminal, false);
   }
+});
+
+test("DAO harvest adapter resolves a rotated payload and uses its executor proof", async () => {
+  const initial = await fixture();
+  const originalEnvelope = hexToBytes(initial.payloadEnvelope);
+  const originalSize = new DataView(
+    originalEnvelope.buffer,
+    originalEnvelope.byteOffset,
+    4,
+  ).getUint32(0, true);
+  const originalPayload = originalEnvelope.slice(0, originalSize);
+  const decodedPayload = DaoHarvestPayloadV1.unpack(originalPayload);
+  const rotatedExecutors = normalizePrepareExecutorSet([
+    hash32ToBytes(parseHash32(scriptToHash(executorLock))),
+    hash32ToBytes(parseHash32(`0x${"34".repeat(32)}`)),
+  ]);
+  const rotatedPayload = DaoHarvestPayloadV1.pack({
+    ...decodedPayload,
+    prepare_executor_set_hash: [...derivePrepareExecutorSetHash(rotatedExecutors)],
+  });
+  const policyHash = initial.snapshot.job.output.type
+    ? parseHash32(scriptToHash(initial.snapshot.job.output.type))
+    : assert.fail("missing policy script");
+  const rotatedPayloadHash = deriveDaoHarvestPayloadHash(hash32ToBytes(policyHash), rotatedPayload);
+  const job = JobDataV1.unpack(hexToBytes(initial.snapshot.job.data));
+  const rotatedJob = bytesToHex(
+    JobDataV1.pack({ ...job, payload_hash: [...rotatedPayloadHash] }),
+  ) as `0x${string}`;
+  const rotatedEnvelope = new Uint8Array(
+    originalPayload.length + rotatedPayload.length + 1 + rotatedExecutors.length * 32,
+  );
+  rotatedEnvelope.set(originalPayload, 0);
+  rotatedEnvelope.set(rotatedPayload, originalPayload.length);
+  rotatedEnvelope[originalPayload.length + rotatedPayload.length] = rotatedExecutors.length;
+  rotatedExecutors.forEach((hash, index) =>
+    rotatedEnvelope.set(hash, originalPayload.length + rotatedPayload.length + 1 + index * 32),
+  );
+  const result = await runExecutorAdapter(
+    new ExecutorAdapterRegistry([DAO_HARVEST_EXECUTOR_ADAPTER]),
+    {
+      ...initial.snapshot,
+      job: { ...initial.snapshot.job, data: rotatedJob },
+      payloads: [bytesToHex(rotatedEnvelope) as `0x${string}`],
+    },
+    { rewardLock: executorLock, transactionFee: parseShannons("1000000") },
+  );
+  assert.equal(result.status, "built");
+  if (result.status !== "built") return;
+  const outputType = WitnessArgs.fromBytes(result.build.transaction.witnesses[1]!).outputType;
+  assert.ok(outputType);
+  const preparedEnvelope = hexToBytes(outputType);
+  assert.equal(preparedEnvelope[rotatedPayload.length], 2);
+  assert.equal(
+    hash32FromBytes(rotatedPayloadHash),
+    hash32FromBytes(Uint8Array.from(JobDataV1.unpack(hexToBytes(rotatedJob)).payload_hash)),
+  );
 });
 
 test("DAO harvest adapter claims compensation and re-deposits the exact principal", async () => {

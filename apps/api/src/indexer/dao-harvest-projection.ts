@@ -57,7 +57,15 @@ export interface DaoHarvestProjection {
 
 export interface DaoHarvestProjectionExtraction {
   readonly projections: readonly DaoHarvestProjection[];
+  readonly rotations: readonly DaoHarvestRotationProjection[];
   readonly malformed: number;
+}
+
+export interface DaoHarvestRotationProjection {
+  readonly networkId: string;
+  readonly jobId: Hash32;
+  readonly payload: `0x${string}`;
+  readonly provenance: DaoHarvestProjection["provenance"];
 }
 
 function witnessOutputType(witness: string): Uint8Array | null {
@@ -69,6 +77,21 @@ function witnessOutputType(witness: string): Uint8Array | null {
   const outputOffset = view.getUint32(12, true);
   if (total !== bytes.length || outputOffset > total) return null;
   const field = bytes.slice(outputOffset);
+  if (field.length < 4) return null;
+  const length = new DataView(field.buffer, field.byteOffset, field.byteLength).getUint32(0, true);
+  return length === field.length - 4 ? field.slice(4) : null;
+}
+
+function witnessInputType(witness: string): Uint8Array | null {
+  if (!/^0x(?:[0-9a-f]{2})*$/.test(witness)) return null;
+  const bytes = hexToBytes(witness);
+  if (bytes.length < 16) return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const total = view.getUint32(0, true);
+  const inputOffset = view.getUint32(8, true);
+  const outputOffset = view.getUint32(12, true);
+  if (total !== bytes.length || inputOffset > outputOffset || outputOffset > total) return null;
+  const field = bytes.slice(inputOffset, outputOffset);
   if (field.length < 4) return null;
   const length = new DataView(field.buffer, field.byteOffset, field.byteLength).getUint32(0, true);
   return length === field.length - 4 ? field.slice(4) : null;
@@ -89,18 +112,29 @@ function scriptsMatch(
   );
 }
 
-function payloadFromEnvelope(envelope: Uint8Array): {
+function payloadsFromEnvelope(envelope: Uint8Array): readonly {
   readonly bytes: Uint8Array;
   readonly decoded: ReturnType<typeof DaoHarvestPayloadV1.unpack>;
-} {
+}[] {
   if (envelope.length < 4) throw new Error("missing DAO harvest payload");
-  const size = new DataView(envelope.buffer, envelope.byteOffset, envelope.byteLength).getUint32(
-    0,
-    true,
-  );
-  if (size < 4 || size > envelope.length) throw new Error("invalid DAO harvest payload size");
-  const bytes = envelope.slice(0, size);
-  return { bytes, decoded: DaoHarvestPayloadV1.unpack(bytes) };
+  const payloads: {
+    readonly bytes: Uint8Array;
+    readonly decoded: ReturnType<typeof DaoHarvestPayloadV1.unpack>;
+  }[] = [];
+  let offset = 0;
+  while (payloads.length < 2 && offset + 4 <= envelope.length) {
+    const size = new DataView(envelope.buffer, envelope.byteOffset + offset, 4).getUint32(0, true);
+    if (size < 4 || offset + size > envelope.length) break;
+    const bytes = envelope.slice(offset, offset + size);
+    try {
+      payloads.push({ bytes, decoded: DaoHarvestPayloadV1.unpack(bytes) });
+    } catch {
+      break;
+    }
+    offset += size;
+  }
+  if (payloads.length === 0) throw new Error("invalid DAO harvest payload size");
+  return Object.freeze(payloads);
 }
 
 export function extractDaoHarvestProjections(
@@ -108,6 +142,7 @@ export function extractDaoHarvestProjections(
   deployment: DaoHarvestDeployment,
 ): DaoHarvestProjectionExtraction {
   const projections: DaoHarvestProjection[] = [];
+  const rotations: DaoHarvestRotationProjection[] = [];
   let malformed = 0;
   const blockHash = parseHash32(block.header.hash);
   const blockNumber = BigInt(block.header.number);
@@ -116,9 +151,11 @@ export function extractDaoHarvestProjections(
     const txHash = parseHash32(transaction.hash());
     const envelope = witnessOutputType(String(transaction.witnesses[0] ?? "0x"));
     if (!envelope) continue;
-    let payload: ReturnType<typeof payloadFromEnvelope>;
+    const inputType = witnessInputType(String(transaction.witnesses[0] ?? "0x"));
+    const executorRotation = inputType?.length === 5 && inputType[0] === 4;
+    let payloads: ReturnType<typeof payloadsFromEnvelope>;
     try {
-      payload = payloadFromEnvelope(envelope);
+      payloads = payloadsFromEnvelope(envelope);
     } catch {
       continue;
     }
@@ -137,10 +174,14 @@ export function extractDaoHarvestProjections(
         const payloadHash = hash32FromBytes(Uint8Array.from(job.payload_hash));
         if (!policyScript) throw new Error("missing policy script");
         const policyHash = parseHash32(scriptToHash(policyScript));
-        const expectedPayloadHash = hash32FromBytes(
-          deriveDaoHarvestPayloadHash(hash32ToBytes(policyHash), payload.bytes),
+        const matchingPayloads = payloads.filter(
+          (candidate) =>
+            hash32FromBytes(
+              deriveDaoHarvestPayloadHash(hash32ToBytes(policyHash), candidate.bytes),
+            ) === payloadHash,
         );
-        if (payloadHash !== expectedPayloadHash) throw new Error("payload commitment mismatch");
+        if (matchingPayloads.length !== 1) throw new Error("payload commitment mismatch");
+        const payload = matchingPayloads[0]!;
         const expectedVaultHash = bytesToHex(Uint8Array.from(payload.decoded.vault_lock_hash));
         const expectedDaoHash = bytesToHex(Uint8Array.from(payload.decoded.dao_type_hash));
         const vaultIndexes = transaction.outputs.flatMap((candidate, index) =>
@@ -150,6 +191,18 @@ export function extractDaoHarvestProjections(
             ? [index]
             : [],
         );
+        if (vaultIndexes.length === 0) {
+          if (!executorRotation) throw new Error("missing DAO vault output");
+          rotations.push(
+            Object.freeze({
+              networkId: deployment.network,
+              jobId: hash32FromBytes(Uint8Array.from(job.job_id)),
+              payload: bytesToHex(payload.bytes) as `0x${string}`,
+              provenance: Object.freeze({ blockNumber, blockHash, transactionIndex }),
+            }),
+          );
+          continue;
+        }
         if (vaultIndexes.length !== 1) throw new Error("ambiguous vault output");
         const vaultIndex = vaultIndexes[0]!;
         const vaultOutput = transaction.outputs[vaultIndex]!;
@@ -195,7 +248,11 @@ export function extractDaoHarvestProjections(
       }
     }
   }
-  return Object.freeze({ projections: Object.freeze(projections), malformed });
+  return Object.freeze({
+    projections: Object.freeze(projections),
+    rotations: Object.freeze(rotations),
+    malformed,
+  });
 }
 
 export interface DaoHarvestProjectionResult extends DaoHarvestProjectionExtraction {
@@ -214,7 +271,12 @@ export class DaoHarvestProjectionStore {
     deployment: RegisteredDeployment,
   ): Promise<DaoHarvestProjectionResult> {
     if (deployment.manifest.daoHarvest === undefined) {
-      return Object.freeze({ projections: Object.freeze([]), malformed: 0, persisted: 0 });
+      return Object.freeze({
+        projections: Object.freeze([]),
+        rotations: Object.freeze([]),
+        malformed: 0,
+        persisted: 0,
+      });
     }
     const extraction = extractDaoHarvestProjections(
       block,
@@ -232,7 +294,11 @@ export class DaoHarvestProjectionStore {
           .map((input) => [`${input.txHash}:${input.index}`, input] as const),
       ).values(),
     ];
-    if (extraction.projections.length === 0 && inputs.length === 0) {
+    if (
+      extraction.projections.length === 0 &&
+      extraction.rotations.length === 0 &&
+      inputs.length === 0
+    ) {
       return Object.freeze({ ...extraction, persisted: 0 });
     }
     await this.#database.transaction(async (transaction) => {
@@ -275,7 +341,27 @@ export class DaoHarvestProjectionStore {
             set: values,
           });
       }
-      const projectedJobIds = new Set<string>(extraction.projections.map(({ jobId }) => jobId));
+      for (const rotation of extraction.rotations) {
+        await transaction
+          .update(daoHarvestJobs)
+          .set({
+            payload: Buffer.from(rotation.payload.slice(2), "hex"),
+            observedBlockNumber: rotation.provenance.blockNumber.toString(),
+            observedBlockHash: rotation.provenance.blockHash,
+            canonical: true,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(daoHarvestJobs.networkId, deployment.network),
+              eq(daoHarvestJobs.jobId, rotation.jobId),
+            ),
+          );
+      }
+      const projectedJobIds = new Set<string>([
+        ...extraction.projections.map(({ jobId }) => jobId),
+        ...extraction.rotations.map(({ jobId }) => jobId),
+      ]);
       const inputTransactionHashes = [...new Set(inputs.map(({ txHash }) => txHash))];
       const possibleConsumptions =
         inputTransactionHashes.length === 0
@@ -329,6 +415,9 @@ export class DaoHarvestProjectionStore {
           );
       }
     });
-    return Object.freeze({ ...extraction, persisted: extraction.projections.length });
+    return Object.freeze({
+      ...extraction,
+      persisted: extraction.projections.length + extraction.rotations.length,
+    });
   }
 }
