@@ -841,12 +841,6 @@ export async function buildDaoHarvestRoll(
     withdrawingAccumulatedRate: inputValue.withdrawingAccumulatedRate,
   });
   const compensation = parseShannons(maximum - principal);
-  if (compensation < BigInt(state.payload.min_compensation.toString())) {
-    throw new DaoHarvestBuilderError(
-      "INVALID_HEADER",
-      "confirmed DAO compensation is below the approved minimum",
-    );
-  }
   if (compensation < parseShannons(inputValue.payoutOccupiedCapacity)) {
     throw new DaoHarvestBuilderError(
       "INSUFFICIENT_CAPACITY",

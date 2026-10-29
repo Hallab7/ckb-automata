@@ -90,6 +90,24 @@ fn harvest_payload(
     dao_type_hash: [u8; 32],
     executor_hashes: &mut [[u8; 32]],
 ) -> Bytes {
+    harvest_payload_with_minimum(
+        owner_hash,
+        payout_hash,
+        vault_hash,
+        dao_type_hash,
+        executor_hashes,
+        1,
+    )
+}
+
+fn harvest_payload_with_minimum(
+    owner_hash: [u8; 32],
+    payout_hash: [u8; 32],
+    vault_hash: [u8; 32],
+    dao_type_hash: [u8; 32],
+    executor_hashes: &mut [[u8; 32]],
+    min_compensation: u64,
+) -> Bytes {
     let executor_set_hash =
         prepare_executor_set_hash(executor_hashes).expect("valid executor fixture");
     DaoHarvestPayloadV1::new_builder()
@@ -101,7 +119,7 @@ fn harvest_payload(
         .principal_capacity(PRINCIPAL.to_le_bytes())
         .prepare_executor_set_hash(executor_set_hash)
         .executor_reward(REWARD.to_le_bytes())
-        .min_compensation(1_u64.to_le_bytes())
+        .min_compensation(min_compensation.to_le_bytes())
         .prepare_buffer_epochs(((1 << 63) | EPOCH_METRIC | 4).to_le_bytes())
         .confirmation_margin_epochs(((1 << 63) | EPOCH_METRIC | 1).to_le_bytes())
         .total_cycles(1_u32.to_le_bytes())
@@ -428,10 +446,18 @@ fn build_prepare_case(mutation: PrepareMutation) -> ContractCase {
 }
 
 fn build_roll_case(mutation: RollMutation) -> ContractCase {
-    build_roll_case_with_payout(mutation, false)
+    build_roll_case_with_options(mutation, false, 1)
 }
 
 fn build_roll_case_with_payout(mutation: RollMutation, payout_to_owner: bool) -> ContractCase {
+    build_roll_case_with_options(mutation, payout_to_owner, 1)
+}
+
+fn build_roll_case_with_options(
+    mutation: RollMutation,
+    payout_to_owner: bool,
+    min_compensation: u64,
+) -> ContractCase {
     let mut context = Context::new_with_deterministic_rng();
     let job_lock = deployed_contract(&mut context, "job-lock");
     let policy = deployed_contract(&mut context, "dao-harvest-policy");
@@ -459,12 +485,13 @@ fn build_roll_case_with_payout(mutation: RollMutation, payout_to_owner: bool) ->
     let vault_hash = vault.calc_script_hash().unpack();
     let dao_type_hash = dao_type.calc_script_hash().unpack();
     let mut executor_set = [executor_hash];
-    let payload = harvest_payload(
+    let payload = harvest_payload_with_minimum(
         owner_hash,
         payout_hash,
         vault_hash,
         dao_type_hash,
         &mut executor_set,
+        min_compensation,
     );
     let payload_hash =
         dao_harvest_payload_hash(&policy_hash, &payload).expect("harvest payload hash");
@@ -724,6 +751,16 @@ fn prepare_rejects_principal_type_authority_and_job_substitution() {
 #[test]
 fn claim_pays_exact_compensation_and_redeposits_principal() {
     verify(&build_roll_case(RollMutation::None)).expect("valid harvest roll");
+}
+
+#[test]
+fn claim_progresses_after_prepare_even_when_compensation_is_below_the_preference() {
+    verify(&build_roll_case_with_options(
+        RollMutation::None,
+        false,
+        u64::MAX,
+    ))
+    .expect("minimum compensation must not block a prepared DAO claim");
 }
 
 #[test]

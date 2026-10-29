@@ -340,9 +340,6 @@ fn validate_roll(job: &JobDataV1, payload: &DaoHarvestPayloadV1) -> Result<(), S
     let compensation = maximum
         .checked_sub(principal)
         .ok_or(ScriptError::PrincipalMismatch)?;
-    if compensation < read_u64(payload.min_compensation().as_slice()) {
-        return Err(ScriptError::CompensationBelowMinimum);
-    }
     validate_exact_payout(payload, compensation)
 }
 

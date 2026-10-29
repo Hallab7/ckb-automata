@@ -18,8 +18,9 @@
 // executor_reward: exact separately funded reward for each prepare or roll
 // action. V1 uses one fixed reward so the shared Job Lock reward remains
 // immutable across successors.
-// min_compensation: claim/redeposit is forbidden below this gross compensation;
-// approved executors also apply it to their pre-prepare quote.
+// min_compensation: off-chain preparation preference for projected gross
+// compensation. It cannot block claim/redeposit after preparation fixes the
+// withdrawal amount.
 // prepare_buffer_epochs: non-zero relative epoch duration before the target
 // boundary at which phase one becomes eligible.
 // confirmation_margin_epochs: non-zero relative epoch duration before the

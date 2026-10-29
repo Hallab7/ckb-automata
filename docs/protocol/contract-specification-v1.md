@@ -142,6 +142,10 @@ their domain-separated hash equals `refund_commitment`.
 - Roll uses the linked deposit and withdrawal headers to calculate maximum DAO
   withdrawal capacity. It atomically creates a fresh zero-data deposit with the
   exact principal and one plain payout containing all compensation.
+- `min_compensation` is a pre-prepare scheduling preference. Executors should
+  not prepare when projected compensation is below it, but once preparation
+  fixes the compensation, the value cannot block the claim and re-deposit
+  transition.
 - Rewards remain in the Job Cell accounting. The vault never pays an executor
   and does not consume `input_type`, which remains available to the DAO script.
 
@@ -218,7 +222,7 @@ copy and off-chain ranges are in [`error-codes.md`](error-codes.md) and
 | `37` | `PrincipalMismatch`          | The protected original amount changed                       |
 | `38` | `PayoutMismatch`             | Compensation has the wrong recipient or amount              |
 | `39` | `UnauthorizedExecutor`       | An unapproved executor attempted DAO preparation            |
-| `40` | `CompensationBelowMinimum`   | Gross compensation is below the approved minimum            |
+| `40` | `CompensationBelowMinimum`   | Reserved legacy code; V1 roll no longer emits this error    |
 | `41` | `CycleLimitReached`          | A cycle or end-epoch limit forbids the transition           |
 | `42` | `InvalidExecutorSet`         | The prepare executor proof differs from the approved set    |
 | `43` | `MissingBoundJob`            | A vault spend omitted or substituted its exact Job Cell     |

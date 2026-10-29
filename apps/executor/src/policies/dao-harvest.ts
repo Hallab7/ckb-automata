@@ -8,6 +8,7 @@ import {
   addEpochs,
   buildDaoHarvestPrepare,
   buildDaoHarvestRoll,
+  calculateDaoMaximumWithdraw,
   compareEpochFractions,
   decodeAbsoluteEpochSince,
   decodeRelativeEpochSince,
@@ -260,6 +261,28 @@ function fullEligibility(
       terminal: true,
       evidence: basic.evidence,
     });
+  }
+  if (inspection.operation === "prepare") {
+    const depositHeader = findHeader(
+      context,
+      (_number, hash) => hash === inspection.vault.blockHash,
+    );
+    const principal = parseShannons(inspection.payload.principal_capacity.toString());
+    const maximum = calculateDaoMaximumWithdraw({
+      principal,
+      occupiedCapacity: DAO_HARVEST_VAULT_OCCUPIED_CAPACITY,
+      depositAccumulatedRate: headerRate(depositHeader.dao),
+      withdrawingAccumulatedRate: headerRate(context.snapshot.tip.dao),
+    });
+    const projectedCompensation = maximum - principal;
+    if (projectedCompensation < parseShannons(inspection.payload.min_compensation.toString())) {
+      return Object.freeze({
+        status: "ineligible",
+        reason: "EXECUTOR_NOT_YET_ELIGIBLE",
+        terminal: false,
+        evidence: basic.evidence,
+      });
+    }
   }
   return basic;
 }

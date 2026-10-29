@@ -44,7 +44,7 @@ const executorLock: ScriptIdentity = {
   args: "0x3333",
 };
 
-async function fixture() {
+async function fixture(minCompensation = 1n) {
   const manifest = structuredClone(testnetManifest) as Record<string, unknown>;
   manifest["daoHarvest"] = {
     deployment: { transactionHash: `0x${"44".repeat(32)}`, blockHash: `0x${"45".repeat(32)}` },
@@ -107,7 +107,7 @@ async function fixture() {
     jobOccupiedCapacity: DAO_HARVEST_JOB_OCCUPIED_CAPACITY,
     prepareExecutorLockHashes: [parseHash32(scriptToHash(executorLock))],
     executorReward: reward,
-    minCompensation: 1n,
+    minCompensation,
     prepareBufferEpochs: encodeRelativeEpochSince(
       createEpoch({ number: 4n, index: 0n, length: 0n }),
     ),
@@ -146,6 +146,7 @@ async function fixture() {
       number: parseBlockNumber(120n),
       epoch: `0x${packEpoch(createEpoch({ number: 200n, index: 0n, length: 0n })).toString(16)}`,
       timestamp: "0x0",
+      dao: `0x${"00".repeat(8)}${"4c04000000000000"}${"00".repeat(16)}`,
     }),
     job: Object.freeze({
       outPoint: jobOutPoint,
@@ -176,7 +177,15 @@ async function fixture() {
         blockNumber: parseBlockNumber(110n),
       }),
     ]),
-    headers: Object.freeze([]),
+    headers: Object.freeze([
+      Object.freeze({
+        hash: depositHash,
+        number: parseBlockNumber(100n),
+        epoch: "0x0",
+        timestamp: "0x0",
+        dao: `0x${"00".repeat(8)}${"e803000000000000"}${"00".repeat(16)}`,
+      }),
+    ]),
     resolvedLocks: Object.freeze([ownerLock, payoutLock, executorLock]),
     payloads: Object.freeze([outputType.toString() as `0x${string}`]),
     claims: Object.freeze({}),
@@ -221,6 +230,20 @@ test("DAO harvest adapter fails closed after the safe preparation cutoff", async
   assert.equal(result.status, "ineligible");
   if (result.status === "ineligible") {
     assert.equal(result.eligibility.reason, "EXECUTOR_PREPARE_WINDOW_MISSED");
+  }
+});
+
+test("DAO harvest adapter waits before prepare when projected compensation is below preference", async () => {
+  const { snapshot } = await fixture(10_000n * 100_000_000n);
+  const result = await runExecutorAdapter(
+    new ExecutorAdapterRegistry([DAO_HARVEST_EXECUTOR_ADAPTER]),
+    snapshot,
+    { rewardLock: executorLock, transactionFee: parseShannons("1000000") },
+  );
+  assert.equal(result.status, "ineligible");
+  if (result.status === "ineligible") {
+    assert.equal(result.eligibility.reason, "EXECUTOR_NOT_YET_ELIGIBLE");
+    assert.equal(result.eligibility.terminal, false);
   }
 });
 

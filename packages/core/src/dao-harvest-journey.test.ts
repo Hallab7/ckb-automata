@@ -50,7 +50,7 @@ function absoluteEpoch(number: bigint) {
   return encodeAbsoluteEpochSince(createEpoch({ number, index: 0n, length: 0n }));
 }
 
-function setup(cycles = 2n, principal = PRINCIPAL, reward = REWARD) {
+function setup(cycles = 2n, principal = PRINCIPAL, reward = REWARD, minCompensation = 1n) {
   const actions = cycles * 2n;
   return buildDaoHarvestSetup({
     deployment,
@@ -62,7 +62,7 @@ function setup(cycles = 2n, principal = PRINCIPAL, reward = REWARD) {
     jobOccupiedCapacity: JOB_OCCUPIED,
     prepareExecutorLockHashes: [executorLockHash],
     executorReward: reward,
-    minCompensation: 1n,
+    minCompensation,
     prepareBufferEpochs: encodeRelativeEpochSince(
       createEpoch({ number: 4n, index: 0n, length: 0n }),
     ),
@@ -104,7 +104,7 @@ function totalOutputs(transaction: ReturnType<typeof setup>["transaction"]) {
   return transaction.outputs.reduce((total, output) => total + capacity(output), 0n);
 }
 
-test("two linked harvest cycles conserve principal, budgets, compensation, and fees", async () => {
+test("two linked harvest cycles progress below the minimum preference and conserve value", async () => {
   const cells = new Map<string, ResolvedLiveCell>();
   const resolver = Object.freeze({
     resolve: async (outPoint: ReturnType<typeof point>) => cells.get(key(outPoint)) ?? null,
@@ -129,7 +129,7 @@ test("two linked harvest cycles conserve principal, budgets, compensation, and f
   const inputTotal = (...outPoints: readonly ReturnType<typeof point>[]) =>
     outPoints.reduce((total, outPoint) => total + capacity(cells.get(key(outPoint))!.output), 0n);
 
-  const initial = setup();
+  const initial = setup(2n, PRINCIPAL, REWARD, 1_000_000_000n);
   const setupHash = hash("9");
   const authorityHash = hash("e");
   const setupVault = point(setupHash, 0);

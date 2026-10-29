@@ -26,7 +26,7 @@ TypeScript bindings and `dao_harvest_payload_v1.json` are checked representation
 | `principal_capacity`         | Exact full capacity preserved through prepare and re-deposit                   |
 | `prepare_executor_set_hash`  | Commitment to 1 through 8 sorted, unique approved prepare executor lock hashes |
 | `executor_reward`            | Exact Job-funded reward for each prepare or claim/redeposit action             |
-| `min_compensation`           | Minimum gross compensation required for claim and the pre-prepare quote        |
+| `min_compensation`           | Off-chain minimum used before prepare; it cannot block a prepared claim        |
 | `prepare_buffer_epochs`      | Relative epoch duration before a boundary at which prepare opens               |
 | `confirmation_margin_epochs` | Smaller relative epoch duration defining the operational prepare cutoff        |
 | `total_cycles`               | Exact finite number of approved harvest cycles                                 |
