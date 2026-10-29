@@ -35,6 +35,7 @@ import {
   DAO_HARVEST_VAULT_OCCUPIED_CAPACITY,
   addEpochs,
   buildDaoHarvestSetup,
+  buildDaoHarvestStopRecurrence,
   calculateDaoHarvestQuote,
   createEpoch,
   deploymentRegistry,
@@ -42,6 +43,7 @@ import {
   encodeRelativeEpochSince,
   parseEpoch,
   parseHash32,
+  parseOutPoint,
   parseShannons,
   registeredDaoHarvestDeployment,
   selectDaoPrepareWindow,
@@ -245,27 +247,35 @@ function setupRequest(value: unknown): SetupRequest {
 }
 
 export class DaoHarvestTransactionAdapter implements DaoHarvestMutationAdapter {
-  readonly #chain: Pick<CkbReadClient, "getTipHeader">;
+  readonly #chain: Pick<CkbReadClient, "getTipHeader"> &
+    Partial<Pick<CkbReadClient, "getCellLive">>;
   readonly #expectedGenesisHash: string;
   readonly #registry: Pick<DeploymentRegistry, "load">;
   readonly #resolutions: LockResolutionRecorder;
+  readonly #database: AutomataDatabase | undefined;
+  readonly #network: string | undefined;
 
   constructor(
-    chain: Pick<CkbReadClient, "getTipHeader">,
+    chain: Pick<CkbReadClient, "getTipHeader"> & Partial<Pick<CkbReadClient, "getCellLive">>,
     expectedGenesisHash: string,
     resolutions: LockResolutionRecorder,
     registry: Pick<DeploymentRegistry, "load"> = deploymentRegistry,
+    database?: AutomataDatabase,
+    network?: string,
   ) {
     this.#chain = chain;
     this.#expectedGenesisHash = expectedGenesisHash;
     this.#resolutions = resolutions;
     this.#registry = registry;
+    this.#database = database;
+    this.#network = network;
   }
 
   async build(
     operation: DaoHarvestUnsignedBuild["operation"],
     body: unknown,
   ): Promise<DaoHarvestUnsignedBuild> {
+    if (operation === "stop") return this.#stop(body);
     if (operation !== "setup") {
       throw new ServiceUnavailableException(
         "This owner action is available after a harvest automation is indexed",
@@ -332,6 +342,102 @@ export class DaoHarvestTransactionAdapter implements DaoHarvestMutationAdapter {
       intent: build.intent,
       policyCriticalHash: build.payloadHash,
       jobId: build.jobId,
+    });
+  }
+
+  async #stop(body: unknown): Promise<DaoHarvestUnsignedBuild> {
+    if (this.#database === undefined || this.#network === undefined || !this.#chain.getCellLive) {
+      throw new ServiceUnavailableException("DAO harvest owner actions are not configured");
+    }
+    if (typeof body !== "object" || body === null || Array.isArray(body)) {
+      throw new BadRequestException("owner action request must be an object");
+    }
+    const candidate = body as Record<string, unknown>;
+    if (
+      Object.keys(candidate).toSorted().join(",") !== "jobId,ownerLock" ||
+      typeof candidate["jobId"] !== "string"
+    ) {
+      throw new BadRequestException("owner action requires jobId and ownerLock");
+    }
+    const jobId = hash(candidate["jobId"], "jobId");
+    const ownerLock = lockResolution(candidate["ownerLock"], "ownerLock");
+    const ownerLockHash = parseHash32(scriptToHash(ownerLock));
+    const [row] = await this.#database
+      .select({
+        jobTxHash: jobs.outpointTxHash,
+        jobIndex: jobs.outpointIndex,
+        ownerLockHash: jobs.ownerLockHash,
+        payload: daoHarvestJobs.payload,
+      })
+      .from(daoHarvestJobs)
+      .innerJoin(
+        jobs,
+        and(eq(jobs.networkId, daoHarvestJobs.networkId), eq(jobs.jobId, daoHarvestJobs.jobId)),
+      )
+      .where(
+        and(
+          eq(daoHarvestJobs.networkId, this.#network),
+          eq(daoHarvestJobs.jobId, jobId),
+          eq(daoHarvestJobs.canonical, true),
+          eq(jobs.state, "live"),
+        ),
+      )
+      .limit(1);
+    if (!row)
+      throw new NotFoundException("DAO harvest automation was not found or is no longer live");
+    if (row.ownerLockHash !== ownerLockHash) {
+      throw new BadRequestException("ownerLock does not match this DAO harvest automation");
+    }
+    const registered = await this.#registry.load(this.#expectedGenesisHash);
+    if (registered.status !== "ok" || registered.deployment.manifest.daoHarvest === undefined) {
+      throw new ServiceUnavailableException("DAO harvest is not active on this deployment");
+    }
+    const jobOutPoint = parseOutPoint({ txHash: row.jobTxHash, index: row.jobIndex });
+    const live = await this.#chain.getCellLive(jobOutPoint);
+    if (!live) throw new BadRequestException("the indexed DAO harvest Job Cell is no longer live");
+    const chainScript = (value: {
+      readonly codeHash: unknown;
+      readonly hashType: unknown;
+      readonly args: unknown;
+    }): ScriptIdentity =>
+      lockResolution(
+        {
+          codeHash: String(value.codeHash),
+          hashType: String(value.hashType),
+          args: String(value.args),
+        },
+        "live cell script",
+      );
+    const build = await buildDaoHarvestStopRecurrence({
+      deployment: registeredDaoHarvestDeployment(registered.deployment),
+      expectedGenesisHash: registered.deployment.genesisHash,
+      resolver: {
+        resolve: async (outPoint) =>
+          outPoint.txHash === jobOutPoint.txHash && outPoint.index === jobOutPoint.index
+            ? {
+                outPoint: jobOutPoint,
+                output: {
+                  capacity: live.cellOutput.capacity.toString(),
+                  lock: chainScript(live.cellOutput.lock),
+                  type:
+                    live.cellOutput.type === undefined ? null : chainScript(live.cellOutput.type),
+                },
+                data: live.outputData.toString() as `0x${string}`,
+              }
+            : null,
+      },
+      jobOutPoint,
+      ownerLock,
+      ownerLockHash,
+      payload: `0x${Buffer.from(row.payload).toString("hex")}`,
+    });
+    return Object.freeze({
+      operation: "stop" as const,
+      transaction: build.transaction,
+      signingEntries: build.signingEntries,
+      intent: build.intent,
+      policyCriticalHash: build.payloadHash,
+      jobId,
     });
   }
 }

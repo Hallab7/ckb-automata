@@ -78,8 +78,9 @@ function HarvestOwnerAction({
     try {
       if (session.ownerLockHash !== job.ownerLockHash)
         throw new Error("Reconnect the owner wallet.");
+      const ownerLock = await session.getOwnerLock(job.ownerLockHash);
       const [build, network] = await Promise.all([
-        buildAction(api, operation, { jobId: job.jobId, ownerLockHash: job.ownerLockHash }),
+        buildAction(api, operation, { jobId: job.jobId, ownerLock }),
         api.network() as Promise<{
           readonly tip: { readonly blockHash: string; readonly blockNumber: string };
         }>,
@@ -109,9 +110,10 @@ function HarvestOwnerAction({
   const submit = async (prepared: PreparedAction) => {
     setState({ status: "submitting" });
     try {
+      const ownerLock = await session.getOwnerLock(job.ownerLockHash);
       const refreshed = await buildAction(api, operation, {
         jobId: job.jobId,
-        ownerLockHash: job.ownerLockHash,
+        ownerLock,
       });
       if (
         refreshed.policyCriticalHash !== prepared.build.policyCriticalHash ||

@@ -253,6 +253,44 @@ test("active deployment builds an exact unsigned setup and rejects understated f
     envelope.byteLength,
   ).getUint32(0, true);
   const payload = bytesToHex(envelope.slice(0, payloadSize)) as `0x${string}`;
+  const stopQuery = {
+    from: () => stopQuery,
+    innerJoin: () => stopQuery,
+    where: () => stopQuery,
+    limit: async () => [
+      {
+        jobTxHash: setupHash,
+        jobIndex: "1",
+        ownerLockHash,
+        payload: Buffer.from(payload.slice(2), "hex"),
+      },
+    ],
+  };
+  const stopAdapter = new DaoHarvestTransactionAdapter(
+    {
+      getTipHeader: async () => assert.fail("stop must not request a setup quote"),
+      getCellLive: async () => ({
+        outPoint: jobOutPoint,
+        cellOutput: {
+          capacity: BigInt(transaction.outputs[1]!.capacity),
+          lock: transaction.outputs[1]!.lock,
+          type: transaction.outputs[1]!.type ?? undefined,
+        },
+        outputData: transaction.outputsData[1]!,
+      }),
+    } as never,
+    testnetManifest.genesisHash,
+    { remember: async () => undefined },
+    registry,
+    { select: () => stopQuery } as never,
+    registered.deployment.network,
+  );
+  const stop = await stopAdapter.build("stop", { jobId: result.jobId, ownerLock });
+  const stopWitness = WitnessArgs.fromBytes(stop.transaction.witnesses[0]!);
+  assert.equal(stop.operation, "stop");
+  assert.equal(stop.transaction.inputs.length, 1);
+  assert.equal(stopWitness.inputType, "0x01");
+  assert.equal(stopWitness.outputType, payload);
   const liveCells = new Map<string, ResolvedLiveCell>([
     [
       `${vaultOutPoint.txHash}:${vaultOutPoint.index}`,

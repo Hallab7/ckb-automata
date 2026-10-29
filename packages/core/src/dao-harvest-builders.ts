@@ -229,6 +229,10 @@ export interface DaoHarvestOwnerBuildInput {
   readonly payload: Hex;
 }
 
+export type DaoHarvestJobRefundInput = Omit<DaoHarvestOwnerBuildInput, "ownerOutPoint"> & {
+  readonly ownerOutPoint?: OutPoint;
+};
+
 export interface DaoHarvestOwnerExitInput extends DaoHarvestOwnerBuildInput {
   readonly vaultOutPoint: OutPoint;
   readonly depositHeaderHash: Hash32;
@@ -994,19 +998,21 @@ export async function buildDaoHarvestRoll(
 }
 
 async function buildOwnerJobRefund(
-  inputValue: DaoHarvestOwnerBuildInput,
+  inputValue: DaoHarvestJobRefundInput,
   kind: "stop_recurrence" | "owner_exit" | "recovery",
   operation: "0x01" | "0x02",
 ): Promise<DaoHarvestTransitionBuild> {
   assertNetwork(inputValue.deployment, inputValue.expectedGenesisHash);
   const [job, ownerCell] = await Promise.all([
     resolveRequired(inputValue.resolver, inputValue.jobOutPoint, "job"),
-    resolveRequired(inputValue.resolver, inputValue.ownerOutPoint, "owner"),
+    inputValue.ownerOutPoint === undefined
+      ? Promise.resolve(undefined)
+      : resolveRequired(inputValue.resolver, inputValue.ownerOutPoint, "owner"),
   ]);
   const ownerHash = parseHash32(inputValue.ownerLockHash);
   if (
     scriptToHash(inputValue.ownerLock) !== ownerHash ||
-    scriptToHash(ownerCell.output.lock) !== ownerHash
+    (ownerCell !== undefined && scriptToHash(ownerCell.output.lock) !== ownerHash)
   ) {
     throw new DaoHarvestBuilderError(
       "INVALID_CELL",
@@ -1014,45 +1020,73 @@ async function buildOwnerJobRefund(
     );
   }
   const payload = parsePayload(inputValue.payload);
-  if (bytesToHex(Uint8Array.from(payload.owner_lock_hash)) !== ownerHash) {
-    throw new DaoHarvestBuilderError("INVALID_CELL", "owner differs from the DAO harvest policy");
+  let jobData: ReturnType<typeof JobDataV1.unpack>;
+  try {
+    jobData = JobDataV1.unpack(typeof job.data === "string" ? hexToBytes(job.data) : job.data);
+  } catch {
+    throw new DaoHarvestBuilderError("INVALID_CELL", "live Job Cell data is malformed");
   }
+  const jobLock = deploymentScript(inputValue.deployment.jobLock, "0x");
   const policy = deploymentScript(inputValue.deployment.policy, "0x");
   const policyHash = parseHash32(scriptToHash(policy));
   const payloadHash = hash32FromBytes(
     deriveDaoHarvestPayloadHash(hash32ToBytes(policyHash), hexToBytes(inputValue.payload)),
   );
-  const transaction: UnsignedTransaction = Object.freeze({
-    version: "0x0",
-    cellDeps: Object.freeze(baseDeps(inputValue.deployment) as CellDepIdentity[]),
-    headerDeps: Object.freeze([]),
-    inputs: Object.freeze([cellInput(inputValue.jobOutPoint), cellInput(inputValue.ownerOutPoint)]),
-    outputs: Object.freeze([
-      Object.freeze({
-        capacity: toRpcHex(parseShannons(job.output.capacity)),
-        lock: inputValue.ownerLock,
-        type: null,
-      }),
+  if (
+    bytesToHex(Uint8Array.from(payload.owner_lock_hash)) !== ownerHash ||
+    bytesToHex(Uint8Array.from(jobData.cancel_lock_hash)) !== ownerHash ||
+    !sameScript(job.output.lock, jobLock) ||
+    !sameScript(job.output.type, policy) ||
+    bytesToHex(Uint8Array.from(jobData.policy_script_hash)) !== policyHash ||
+    bytesToHex(Uint8Array.from(jobData.payload_hash)) !== payloadHash
+  ) {
+    throw new DaoHarvestBuilderError("INVALID_CELL", "owner differs from the DAO harvest policy");
+  }
+  const inputs = [cellInput(inputValue.jobOutPoint)];
+  const outputs: UnsignedCellOutput[] = [
+    Object.freeze({
+      capacity: toRpcHex(parseShannons(job.output.capacity)),
+      lock: inputValue.ownerLock,
+      type: null,
+    }),
+  ];
+  const outputsData: Hex[] = ["0x"];
+  const witnesses: Hex[] = [
+    serializeWitnessArgs({
+      lock: "",
+      inputType: operation,
+      outputType: inputValue.payload,
+    }) as Hex,
+  ];
+  if (inputValue.ownerOutPoint !== undefined && ownerCell !== undefined) {
+    inputs.push(cellInput(inputValue.ownerOutPoint));
+    outputs.push(
       Object.freeze({
         capacity: toRpcHex(parseShannons(ownerCell.output.capacity)),
         lock: inputValue.ownerLock,
         type: null,
       }),
-    ]),
-    outputsData: Object.freeze(["0x" as Hex, "0x" as Hex]),
-    witnesses: Object.freeze([
-      serializeWitnessArgs({
-        lock: "",
-        inputType: operation,
-        outputType: inputValue.payload,
-      }) as Hex,
-      "0x" as Hex,
-    ]),
+    );
+    outputsData.push("0x");
+    witnesses.push("0x");
+  }
+  const transaction: UnsignedTransaction = Object.freeze({
+    version: "0x0",
+    cellDeps: Object.freeze(baseDeps(inputValue.deployment) as CellDepIdentity[]),
+    headerDeps: Object.freeze([]),
+    inputs: Object.freeze(inputs),
+    outputs: Object.freeze(outputs),
+    outputsData: Object.freeze(outputsData),
+    witnesses: Object.freeze(witnesses),
   });
   return Object.freeze({
     transaction,
     signingEntries: Object.freeze<DaoHarvestSigningEntry[]>([
-      { role: "owner", inputIndexes: Object.freeze([1]), lockHash: ownerHash },
+      {
+        role: "owner",
+        inputIndexes: Object.freeze(inputValue.ownerOutPoint === undefined ? [] : [1]),
+        lockHash: ownerHash,
+      },
     ]),
     intent: Object.freeze({ kind, paysExecutorReward: false, preservesVault: true }),
     policyScriptHash: policyHash,
@@ -1061,7 +1095,7 @@ async function buildOwnerJobRefund(
 }
 
 export function buildDaoHarvestStopRecurrence(
-  input: DaoHarvestOwnerBuildInput,
+  input: DaoHarvestJobRefundInput,
 ): Promise<DaoHarvestTransitionBuild> {
   return buildOwnerJobRefund(input, "stop_recurrence", "0x01");
 }
@@ -1237,7 +1271,7 @@ export async function buildDaoHarvestOwnerExit(
 }
 
 export function buildDaoHarvestRecovery(
-  input: DaoHarvestOwnerBuildInput,
+  input: DaoHarvestJobRefundInput,
 ): Promise<DaoHarvestTransitionBuild> {
   return buildOwnerJobRefund(input, "recovery", "0x02");
 }

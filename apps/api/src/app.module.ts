@@ -315,10 +315,21 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
       },
       {
         provide: DaoHarvestMutationService,
-        inject: [CkbClient, PostgresLockResolutionRecorder],
-        useFactory: (ckbClient: CkbClient, resolutions: PostgresLockResolutionRecorder) =>
+        inject: [CkbClient, PostgresLockResolutionRecorder, DatabaseClient],
+        useFactory: (
+          ckbClient: CkbClient,
+          resolutions: PostgresLockResolutionRecorder,
+          databaseClient: DatabaseClient,
+        ) =>
           new DaoHarvestMutationService(
-            new DaoHarvestTransactionAdapter(ckbClient, environment.CKB_GENESIS_HASH, resolutions),
+            new DaoHarvestTransactionAdapter(
+              ckbClient,
+              environment.CKB_GENESIS_HASH,
+              resolutions,
+              deploymentRegistry,
+              databaseClient.database,
+              environment.CKB_NETWORK,
+            ),
           ),
       },
       {

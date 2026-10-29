@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { DaoHarvestPayloadV1, JobDataV1 } from "@ckb-automata/molecule";
-import { hexToBytes, scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
+import { bytesToHex, hexToBytes, scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
 
 import { createEpoch, parseHash32, parseOutPoint } from "./chain-values.ts";
 import {
@@ -10,6 +10,7 @@ import {
   buildDaoHarvestMatureRecovery,
   buildDaoHarvestPrepare,
   buildDaoHarvestSetup,
+  buildDaoHarvestStopRecurrence,
   type DaoHarvestDeployment,
   type DaoHarvestSetupInput,
 } from "./dao-harvest-builders.ts";
@@ -25,6 +26,21 @@ const contract = (digit: string) => ({
   script: { codeHash: hash(digit), hashType: "type" as const },
   cellDep: dep(digit),
 });
+
+function witnessFields(value: string): { readonly inputType: string; readonly outputType: string } {
+  const bytes = hexToBytes(value);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const inputOffset = view.getUint32(8, true);
+  const outputOffset = view.getUint32(12, true);
+  const field = (start: number, end: number) => {
+    const packed = bytes.slice(start, end);
+    return packed.length === 0 ? "0x" : `0x${bytesToHex(packed.slice(4)).slice(2)}`;
+  };
+  return {
+    inputType: field(inputOffset, outputOffset),
+    outputType: field(outputOffset, bytes.length),
+  };
+}
 
 const deployment: DaoHarvestDeployment = {
   network: "ckb_testnet",
@@ -139,6 +155,48 @@ test("prepare rejects a spent vault outpoint before constructing a transaction",
       claimSince: encodeAbsoluteEpochSince(createEpoch({ number: 380n, index: 0n, length: 0n })),
     }),
     (error) => error instanceof DaoHarvestBuilderError && error.code === "STALE_OUTPOINT",
+  );
+});
+
+test("wallet-funded stop preserves the canonical harvest payload in output_type", async () => {
+  const ownerLock = { codeHash: hash("1"), hashType: "type" as const, args: "0x1234" as const };
+  const ownerLockHash = parseHash32(scriptToHash(ownerLock));
+  const setup = buildDaoHarvestSetup(setupInput({ ownerLockHash }));
+  const jobOutPoint = parseOutPoint({ txHash: hash("e"), index: "1" });
+  const jobCell = {
+    outPoint: jobOutPoint,
+    output: setup.transaction.outputs[1]!,
+    data: setup.transaction.outputsData[1]!,
+  };
+  const build = await buildDaoHarvestStopRecurrence({
+    deployment,
+    expectedGenesisHash: deployment.genesisHash,
+    resolver: {
+      resolve: async () => jobCell,
+    },
+    jobOutPoint,
+    ownerLock,
+    ownerLockHash,
+    payload: setup.payload,
+  });
+  assert.equal(build.transaction.inputs.length, 1);
+  assert.equal(build.transaction.outputs.length, 1);
+  assert.deepEqual(build.signingEntries[0]?.inputIndexes, []);
+  assert.deepEqual(witnessFields(build.transaction.witnesses[0]!), {
+    inputType: "0x01",
+    outputType: setup.payload,
+  });
+  await assert.rejects(
+    buildDaoHarvestStopRecurrence({
+      deployment,
+      expectedGenesisHash: deployment.genesisHash,
+      resolver: { resolve: async () => jobCell },
+      jobOutPoint,
+      ownerLock,
+      ownerLockHash,
+      payload: `${setup.payload.slice(0, -2)}ff` as `0x${string}`,
+    }),
+    (error) => error instanceof DaoHarvestBuilderError && error.code === "INVALID_CELL",
   );
 });
 
