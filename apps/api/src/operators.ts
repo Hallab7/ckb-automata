@@ -1,6 +1,7 @@
 import { lookup } from "node:dns/promises";
+import type { LookupAddress } from "node:dns";
 import { request as httpsRequest } from "node:https";
-import { isIP } from "node:net";
+import { isIP, type LookupFunction } from "node:net";
 
 import {
   BadRequestException,
@@ -180,6 +181,16 @@ function isPublicIp(address: string, family: number): boolean {
   return Number.isInteger(first) && first >= 0x2000 && first <= 0x3fff;
 }
 
+export function pinnedLookup(selected: LookupAddress): LookupFunction {
+  return (_hostname, options, callback) => {
+    if (options.all === true) {
+      callback(null, [selected]);
+      return;
+    }
+    callback(null, selected.address, selected.family);
+  };
+}
+
 async function readPinnedHttpsJson(endpoint: string): Promise<unknown> {
   const origin = new URL(endpoint);
   const addresses = await lookup(origin.hostname, { all: true, verbatim: true });
@@ -196,8 +207,7 @@ async function readPinnedHttpsJson(endpoint: string): Promise<unknown> {
       url,
       {
         headers: { accept: "application/json", "user-agent": "CKAutomata-Operator-Registry/1" },
-        lookup: (_hostname, _options, callback) =>
-          callback(null, selected.address, selected.family),
+        lookup: pinnedLookup(selected),
         method: "GET",
       },
       (response) => {

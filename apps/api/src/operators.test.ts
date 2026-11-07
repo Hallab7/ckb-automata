@@ -7,6 +7,7 @@ import { Address, Script } from "@ckb-ccc/shell";
 import {
   OperatorRegistryService,
   normalizeOperatorEndpoint,
+  pinnedLookup,
   validateHostedOperatorInfo,
   type HostedOperatorInfo,
   type OperatorRegistryRepository,
@@ -115,6 +116,37 @@ test("operator endpoints must be public HTTPS origins", () => {
   ]) {
     assert.throws(() => normalizeOperatorEndpoint(endpoint), BadRequestException);
   }
+});
+
+test("pinned operator DNS lookup supports Node single and all-address callbacks", async () => {
+  const selected = Object.freeze({ address: "8.8.8.8", family: 4 });
+  const resolve = pinnedLookup(selected);
+
+  await new Promise<void>((done, reject) => {
+    resolve("operator.example", { all: true }, (error, addresses, family) => {
+      try {
+        assert.equal(error, null);
+        assert.deepEqual(addresses, [selected]);
+        assert.equal(family, undefined);
+        done();
+      } catch (reason) {
+        reject(reason);
+      }
+    });
+  });
+
+  await new Promise<void>((done, reject) => {
+    resolve("operator.example", { all: false }, (error, address, family) => {
+      try {
+        assert.equal(error, null);
+        assert.equal(address, selected.address);
+        assert.equal(family, selected.family);
+        done();
+      } catch (reason) {
+        reject(reason);
+      }
+    });
+  });
 });
 
 test("hosted identity is bound to the authenticated lock, network, and audited manifests", () => {
