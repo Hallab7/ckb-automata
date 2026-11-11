@@ -57,6 +57,7 @@ dependencies = [
 name = "automata-contract-tests"
 version = "0.0.0"
 dependencies = [
+ "ckb-dao-utils",
  "ckb-hash",
  "ckb-system-scripts",
  "ckb-testtool",

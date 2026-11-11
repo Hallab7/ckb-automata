@@ -125,49 +125,49 @@
     {
       "id": "dao-harvest-v2.setup.valid",
       "outcome": "valid",
-      "measuredCycles": 303991,
+      "measuredCycles": 313036,
       "budgetCycles": 400000
     },
     {
       "id": "dao-harvest-v2.prepare-preferred.valid",
       "outcome": "valid",
-      "measuredCycles": 707335,
+      "measuredCycles": 815574,
       "budgetCycles": 900000
     },
     {
       "id": "dao-harvest-v2.claim-preferred.valid",
       "outcome": "valid",
-      "measuredCycles": 1000499,
+      "measuredCycles": 1080354,
       "budgetCycles": 1300000
     },
     {
       "id": "dao-harvest-v2.claim-fallback.valid",
       "outcome": "valid",
-      "measuredCycles": 1043930,
+      "measuredCycles": 1126143,
       "budgetCycles": 1400000
     },
     {
       "id": "dao-harvest-v2.sweep.valid",
       "outcome": "valid",
-      "measuredCycles": 594469,
+      "measuredCycles": 599898,
       "budgetCycles": 800000
     },
     {
-      "id": "dao-harvest-v2.recover.valid",
+      "id": "dao-harvest-v2.recover-withdrawing.valid",
       "outcome": "valid",
-      "measuredCycles": 697018,
-      "budgetCycles": 900000
+      "measuredCycles": 904248,
+      "budgetCycles": 1200000
     },
     {
       "id": "dao-harvest-v2.rotate.valid",
       "outcome": "valid",
-      "measuredCycles": 719549,
+      "measuredCycles": 724989,
       "budgetCycles": 900000
     },
     {
       "id": "dao-harvest-v2.close.valid",
       "outcome": "valid",
-      "measuredCycles": 119713,
+      "measuredCycles": 124038,
       "budgetCycles": 200000
     }
   ],

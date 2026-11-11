@@ -6,6 +6,9 @@ pub fn native_harness_ready() -> bool {
 
 pub mod fixtures;
 
+#[cfg(test)]
+mod real_dao;
+
 #[allow(
     clippy::clone_on_copy,
     clippy::derivable_impls,

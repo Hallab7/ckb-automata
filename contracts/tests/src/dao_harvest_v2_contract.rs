@@ -2,10 +2,7 @@ use ckb_testtool::{
     builtin::ALWAYS_SUCCESS,
     ckb_types::{
         bytes::Bytes,
-        core::{
-            Capacity, EpochNumberWithFraction, HeaderBuilder, ScriptHashType, TransactionBuilder,
-            TransactionView,
-        },
+        core::{Capacity, ScriptHashType, TransactionBuilder, TransactionView},
         packed::{CellInput, CellOutput, OutPoint, Script, WitnessArgs},
         prelude::*,
     },
@@ -29,6 +26,7 @@ use crate::{
         Bytes as MoleculeBytes, DaoHarvestEnvelopeV2, DaoHarvestPayloadV2,
         DaoHarvestPrepareCreditV2, DaoHarvestProgressV2, DaoHarvestWitnessV2,
     },
+    real_dao::{dao_header, deploy_real_dao},
 };
 
 const CKB: u64 = 100_000_000;
@@ -121,17 +119,6 @@ fn molecule_bytes(value: &[u8]) -> MoleculeBytes {
         .build()
 }
 
-fn dao_header(number: u64, epoch: u64, rate: u64) -> ckb_testtool::ckb_types::core::HeaderView {
-    let mut dao = [0_u8; 32];
-    dao[..8].copy_from_slice(&7_777_u64.to_le_bytes());
-    dao[8..16].copy_from_slice(&rate.to_le_bytes());
-    HeaderBuilder::default()
-        .number(number)
-        .epoch(EpochNumberWithFraction::new(epoch, 0, 1).full_value())
-        .dao(dao.pack())
-        .build()
-}
-
 #[allow(clippy::too_many_arguments)]
 fn build_payload(
     owner_hash: [u8; 32],
@@ -189,7 +176,7 @@ fn build_setup_case(mutation: SetupMutation) -> ContractCase {
     let payout = always_success(&mut context, 2);
     let preferred = always_success(&mut context, 3);
     let fallback = always_success(&mut context, 4);
-    let dao_type = always_success(&mut context, 5);
+    let dao_type = deploy_real_dao(&mut context);
     let owner_hash: [u8; 32] = owner.calc_script_hash().unpack();
     let payout_hash: [u8; 32] = payout.calc_script_hash().unpack();
     let preferred_hash: [u8; 32] = preferred.calc_script_hash().unpack();
@@ -409,6 +396,9 @@ fn build_prepare_case_kind(mutation: PrepareMutation, fallback_mode: bool) -> Co
     let setup_data: Vec<_> = setup_transaction.outputs_data().into_iter().collect();
     let job_cell = context.create_cell(setup_outputs[0].clone(), setup_data[0].raw_data());
     let vault_cell = context.create_cell(setup_outputs[1].clone(), setup_data[1].raw_data());
+    let deposit_header = dao_header(42, 0, 1_000);
+    context.insert_header(deposit_header.clone());
+    context.link_cell_with_block(vault_cell.clone(), deposit_header.hash(), 0);
     let job = JobDataV1::from_slice(&setup_data[0].raw_data()).unwrap();
     let setup_witness =
         WitnessArgs::from_slice(&setup_transaction.witnesses().get(0).unwrap().raw_data()).unwrap();
@@ -581,6 +571,7 @@ fn build_prepare_case_kind(mutation: PrepareMutation, fallback_mode: bool) -> Co
         .output_data(Bytes::copy_from_slice(&42_u64.to_le_bytes()).pack())
         .output_data(Bytes::new().pack())
         .output_data(Bytes::new().pack())
+        .header_dep(deposit_header.hash())
         .witness(
             WitnessArgs::new_builder()
                 .input_type(Some(request.as_bytes()).pack())
@@ -762,8 +753,8 @@ fn build_claim_case_kind(
         1_000
     };
     let withdraw_rate = 1_100;
-    let deposit_header = dao_header(42, 1, deposit_rate);
-    let withdrawing_header = dao_header(84, 180, withdraw_rate);
+    let deposit_header = dao_header(42, 0, deposit_rate);
+    let withdrawing_header = dao_header(84, 179, withdraw_rate);
     context.insert_header(deposit_header.clone());
     context.insert_header(withdrawing_header.clone());
     context.link_cell_with_block(vault_out_point, withdrawing_header.hash(), 0);
@@ -1130,6 +1121,9 @@ fn build_terminal_vault_exit_case(owner_authorized: bool) -> ContractCase {
         .unwrap()
         .raw_data();
     let vault_cell = context.create_cell(vault_output.clone(), vault_data);
+    let terminal_deposit_header = dao_header(126, 360, 1_200);
+    context.insert_header(terminal_deposit_header.clone());
+    context.link_cell_with_block(vault_cell.clone(), terminal_deposit_header.hash(), 0);
     let owner = always_success(&mut context, if owner_authorized { 1 } else { 13 });
     let owner_cell = context.create_cell(
         CellOutput::new_builder()
@@ -1142,13 +1136,9 @@ fn build_terminal_vault_exit_case(owner_authorized: bool) -> ContractCase {
         TransactionBuilder::default()
             .input(CellInput::new_builder().previous_output(vault_cell).build())
             .input(CellInput::new_builder().previous_output(owner_cell).build())
-            .output(
-                CellOutput::new_builder()
-                    .capacity(PRINCIPAL)
-                    .lock(owner)
-                    .build(),
-            )
-            .output_data(Bytes::new().pack())
+            .output(vault_output.clone().as_builder().lock(owner).build())
+            .output_data(Bytes::copy_from_slice(&126_u64.to_le_bytes()).pack())
+            .header_dep(terminal_deposit_header.hash())
             .build(),
     );
     ContractCase {
@@ -1508,8 +1498,8 @@ fn build_withdrawing_recovery_case(settle_prepare_fee: bool) -> ContractCase {
         .operator_proof(molecule_bytes(&[]))
         .successor_payload(molecule_bytes(&[]))
         .build();
-    let deposit_header = dao_header(42, 1, 1_000);
-    let withdrawing_header = dao_header(84, 180, 1_100);
+    let deposit_header = dao_header(42, 0, 1_000);
+    let withdrawing_header = dao_header(84, 179, 1_100);
     context.insert_header(deposit_header.clone());
     context.insert_header(withdrawing_header.clone());
     context.link_cell_with_block(vault_out_point.clone(), withdrawing_header.hash(), 0);
@@ -1747,8 +1737,8 @@ pub(crate) fn benchmark_cases() -> impl Iterator<Item = BenchmarkCase> {
             build_owner_maintenance_case(false),
         ),
         (
-            "dao-harvest-v2.recover.valid",
-            build_owner_maintenance_case(true),
+            "dao-harvest-v2.recover-withdrawing.valid",
+            build_withdrawing_recovery_case(true),
         ),
         ("dao-harvest-v2.rotate.valid", build_rotation_case(false)),
         (
@@ -1900,8 +1890,9 @@ fn owner_sweep_preserves_the_live_job_and_recoverable_reserve() {
 }
 
 #[test]
-fn owner_recovery_returns_job_vault_and_compensation_without_a_service() {
-    verify(&build_owner_maintenance_case(true)).expect("valid deposited-state recovery");
+fn deposited_recovery_is_rejected_by_the_real_dao_script() {
+    verify(&build_owner_maintenance_case(true))
+        .expect_err("a plain payout cannot consume a deposited DAO cell");
 }
 
 #[test]
