@@ -252,9 +252,12 @@ function build(
 ): DaoHarvestV3Build {
   assertContext(input, ownerOperation);
   const payload = DaoHarvestPayloadV3.unpack(input.payload);
-  const progress = DaoHarvestProgressV3.unpack(input.progress);
-  if (Number(payload.version) !== 3 || Number(progress.version) !== 3)
+  const terminalClose = operation === DAO_HARVEST_V3_OPERATIONS.CLOSE;
+  const progress = terminalClose ? undefined : DaoHarvestProgressV3.unpack(input.progress);
+  if (Number(payload.version) !== 3 || (!terminalClose && Number(progress!.version) !== 3))
     throw new Error("V3 builder received another payload version");
+  if (terminalClose && input.progress.length !== 0)
+    throw new Error("V3 terminal close requires an empty progress envelope");
   if (committedHash(payload.owner_lock_hash) !== parseHash32(input.ownerLockHash))
     throw new Error("owner lock does not match the V3 payload");
   if (
@@ -286,7 +289,7 @@ function build(
     throw new Error("operation has an invalid V3 successor payload envelope");
   if (
     [3, 4, 5, 10].includes(operation) &&
-    committedHash(progress.prepare_credit_hash) !==
+    committedHash(progress!.prepare_credit_hash) !==
       hash32FromBytes(deriveDaoHarvestV3PrepareCreditHash(credit))
   )
     throw new Error("prepare credit does not match the live V3 progress");
@@ -299,7 +302,9 @@ function build(
     throw new Error("owner exit requires the DAO vault output at the same transaction index");
   const policyHash = parseHash32(input.policyScriptHash);
   const payloadHash = deriveDaoHarvestV3PayloadHash(hexToBytes(policyHash), input.payload);
-  const progressHash = deriveDaoHarvestV3ProgressHash(input.progress);
+  const progressHash = terminalClose
+    ? new Uint8Array(32)
+    : deriveDaoHarvestV3ProgressHash(input.progress);
   const creditHash =
     credit.length === 0 ? new Uint8Array(32) : deriveDaoHarvestV3PrepareCreditHash(credit);
   const witness = DaoHarvestWitnessV3.pack({

@@ -7,9 +7,11 @@ import {
   serializeWitnessArgs,
 } from "@nervosnetwork/ckb-sdk-utils";
 import {
+  DaoHarvestEnvelopeV3,
   DaoHarvestPayloadV3,
   DaoHarvestPrepareCreditV3,
   DaoHarvestProgressV3,
+  DaoHarvestWitnessV3,
 } from "@ckb-automata/molecule";
 import { parseHash32 } from "./chain-values.ts";
 import type { UnsignedCellOutput } from "./deadline-creation.ts";
@@ -227,9 +229,29 @@ test("typed V3 builders derive every closed witness layout", () => {
     buildDaoHarvestV3OwnerExit,
     buildDaoHarvestV3OwnerRecovery,
   ];
-  builders.forEach((builder, operation) =>
-    assert.equal(builder(fixture(operation)).operation, operation),
-  );
+  builders.forEach((builder, operation) => {
+    const input = fixture(operation);
+    assert.equal(
+      builder(operation === 7 ? { ...input, progress: new Uint8Array() } : input).operation,
+      operation,
+    );
+  });
+});
+
+test("terminal close emits the compensation-lock-only progress commitment", () => {
+  const input = fixture(7);
+  assert.throws(() => buildDaoHarvestV3Close(input), /empty progress envelope/);
+  const build = buildDaoHarvestV3Close({ ...input, progress: new Uint8Array() });
+  const raw = hexToBytes(build.transaction.witnesses[0]!);
+  const view = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
+  const inputTypeStart = view.getUint32(8, true);
+  const outputTypeStart = view.getUint32(12, true);
+  const inputType = raw.slice(inputTypeStart + 4, outputTypeStart);
+  const outputType = raw.slice(outputTypeStart + 4);
+  const witness = DaoHarvestWitnessV3.unpack(inputType);
+  const envelope = DaoHarvestEnvelopeV3.unpack(outputType);
+  assert.deepEqual(witness.progress_hash, Array(32).fill(0));
+  assert.deepEqual(envelope.progress, []);
 });
 
 test("one operator accumulator may satisfy both identity and prepare roles", () => {

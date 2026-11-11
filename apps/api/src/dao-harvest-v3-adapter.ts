@@ -7,6 +7,7 @@ import {
 } from "@nervosnetwork/ckb-sdk-utils";
 import {
   DAO_HARVEST_VAULT_OCCUPIED_CAPACITY,
+  buildDaoHarvestV3Close,
   buildDaoHarvestV3Rotation,
   buildDaoHarvestV3Sweep,
   buildDaoHarvestV3OwnerExit,
@@ -177,6 +178,38 @@ export function daoHarvestV3RotationPayload(
   return Object.freeze({ proof, successorPayload });
 }
 
+export function daoHarvestV3TerminalClosePolicyHash(
+  payloadBytes: Uint8Array,
+  payload: ReturnType<typeof DaoHarvestPayloadV3.unpack>,
+  deployment: DaoHarvestV3DeploymentIdentity,
+  compensationArgs: ReturnType<typeof decodeDaoHarvestV3CompensationLockArgs>,
+  ownerLockHash: string,
+) {
+  const policyScriptHash = parseHash32(bytesToHex(compensationArgs.policyScriptHash));
+  const expectedPolicyScriptHash = parseHash32(
+    scriptToHash({
+      codeHash: deployment.contracts.policy.codeHash,
+      hashType: "data1",
+      args: deployment.contracts.jobLock.codeHash,
+    }),
+  );
+  const expectedPayloadHash = deriveDaoHarvestV3PayloadHash(
+    hexToBytes(expectedPolicyScriptHash),
+    payloadBytes,
+  );
+  if (
+    compensationArgs.jobId.some((value) => value !== 0) ||
+    bytesToHex(compensationArgs.ownerLockHash) !== ownerLockHash ||
+    bytesToHex(compensationArgs.payoutLockHash) !==
+      bytesToHex(Uint8Array.from(payload.payout_lock_hash)) ||
+    policyScriptHash !== expectedPolicyScriptHash ||
+    bytesToHex(compensationArgs.payloadHash) !== bytesToHex(expectedPayloadHash)
+  ) {
+    throw new BadRequestException("the terminal compensation binding is invalid");
+  }
+  return policyScriptHash;
+}
+
 export class DaoHarvestV3TransactionAdapter implements DaoHarvestV3MutationAdapter {
   readonly #chain: CkbReadClient;
   readonly #database: AutomataDatabase;
@@ -194,7 +227,7 @@ export class DaoHarvestV3TransactionAdapter implements DaoHarvestV3MutationAdapt
     this.#deployments = deployments;
   }
   async build(operation: DaoHarvestV3BuildOperation, bodyValue: unknown): Promise<unknown> {
-    if (!["sweep", "rotate", "owner-exit", "owner-recovery"].includes(operation))
+    if (!["sweep", "close", "rotate", "owner-exit", "owner-recovery"].includes(operation))
       throw new ServiceUnavailableException(`DAO Harvest V3 ${operation} builder is not enabled`);
     const body = object(bodyValue, "request");
     const jobId = parseHash32(text(body["jobId"], "jobId"));
@@ -217,6 +250,93 @@ export class DaoHarvestV3TransactionAdapter implements DaoHarvestV3MutationAdapt
     if (row.ownerLockHash !== ownerLockHash)
       throw new BadRequestException("connected wallet is not the automation owner");
     const projection = object(row.projection, "canonical projection");
+    const payloadBytes = hexToBytes(text(projection["payload"], "payload"));
+    const payload = DaoHarvestPayloadV3.unpack(payloadBytes);
+    const deployment = this.#deployments.find(
+      (candidate) =>
+        candidate.contracts.vaultLock.codeHash ===
+          bytesToHex(Uint8Array.from(payload.vault_lock_code_hash)) &&
+        candidate.contracts.compensationLock.codeHash ===
+          bytesToHex(Uint8Array.from(payload.compensation_lock_code_hash)),
+    );
+    if (!deployment)
+      throw new ServiceUnavailableException("the V3 contract revision is unavailable");
+    if (operation === "close") {
+      if (row.lifecycleState !== "completed")
+        throw new BadRequestException("only a completed automation can be closed");
+      const compensationPoint = outPoint(
+        projection["compensationOutPoint"],
+        "compensationOutPoint",
+      );
+      const [compensationCell, identityCell] = await Promise.all([
+        this.#chain.getCellLive(compensationPoint),
+        this.#chain.getCellLive(identityPoint),
+      ]);
+      if (!compensationCell || !identityCell)
+        throw new BadRequestException(
+          "the canonical automation state changed; refresh and try again",
+        );
+      if (
+        chainText(compensationCell.cellOutput.lock.codeHash, "compensation lock code hash") !==
+          deployment.contracts.compensationLock.codeHash ||
+        compensationCell.cellOutput.type !== undefined ||
+        compensationCell.outputData.toString() !== "0x"
+      ) {
+        throw new BadRequestException("the terminal compensation cell does not match the manifest");
+      }
+      if (
+        scriptIdentityHash(chainLock(identityCell.cellOutput.lock)) !== ownerLockHash ||
+        identityCell.cellOutput.type !== undefined ||
+        identityCell.outputData.toString() !== "0x"
+      ) {
+        throw new BadRequestException("the selected owner cell is no longer available");
+      }
+      const payoutLock = lock(body["payoutLock"], "payoutLock");
+      if (scriptIdentityHash(payoutLock) !== bytesToHex(Uint8Array.from(payload.payout_lock_hash)))
+        throw new BadRequestException("payout lock does not match the committed address");
+      const compensationArgs = decodeDaoHarvestV3CompensationLockArgs(
+        hexToBytes(chainLock(compensationCell.cellOutput.lock).args),
+      );
+      const policyScriptHash = daoHarvestV3TerminalClosePolicyHash(
+        payloadBytes,
+        payload,
+        deployment,
+        compensationArgs,
+        ownerLockHash,
+      );
+      const identityCapacity = parseShannons(identityCell.cellOutput.capacity.toString());
+      if (identityCapacity <= fee)
+        throw new BadRequestException("the selected wallet cell cannot cover the network fee");
+      return buildDaoHarvestV3Close({
+        context: {
+          rpcGenesisHash: await this.#chain.getGenesisHash(),
+          deployment,
+          canonicalHeaderHashes: [],
+          liveOutPoints: [compensationPoint, identityPoint].map(txPoint),
+          signerLockHash: ownerLockHash,
+        },
+        policyScriptHash,
+        ownerLockHash,
+        payload: payloadBytes,
+        progress: new Uint8Array(),
+        inputs: {
+          compensation: reviewed(compensationCell, compensationPoint),
+          identity: reviewed(identityCell, identityPoint),
+        },
+        outputs: {
+          additional: [
+            output(
+              parseShannons(compensationCell.cellOutput.capacity.toString()),
+              payoutLock,
+              null,
+            ),
+            output(identityCapacity - fee, ownerLock, null),
+          ],
+        },
+        maximumNetworkFee: fee,
+        allowedFundingLockHashes: [ownerLockHash],
+      });
+    }
     const jobPoint = outPoint(projection["jobOutPoint"], "jobOutPoint");
     const vaultPoint = outPoint(projection["vaultOutPoint"], "vaultOutPoint");
     const compensationPoint = outPoint(projection["compensationOutPoint"], "compensationOutPoint");
@@ -230,19 +350,8 @@ export class DaoHarvestV3TransactionAdapter implements DaoHarvestV3MutationAdapt
       throw new BadRequestException(
         "the canonical automation state changed; refresh and try again",
       );
-    const payloadBytes = hexToBytes(text(projection["payload"], "payload"));
     const progressBytes = hexToBytes(text(projection["progress"], "progress"));
-    const payload = DaoHarvestPayloadV3.unpack(payloadBytes);
     const progress = DaoHarvestProgressV3.unpack(progressBytes);
-    const deployment = this.#deployments.find(
-      (candidate) =>
-        candidate.contracts.vaultLock.codeHash ===
-          bytesToHex(Uint8Array.from(payload.vault_lock_code_hash)) &&
-        candidate.contracts.compensationLock.codeHash ===
-          bytesToHex(Uint8Array.from(payload.compensation_lock_code_hash)),
-    );
-    if (!deployment)
-      throw new ServiceUnavailableException("the V3 contract revision is unavailable");
     if (
       jobCell.cellOutput.type === undefined ||
       chainText(jobCell.cellOutput.type.codeHash, "job policy code hash") !==
@@ -259,6 +368,12 @@ export class DaoHarvestV3TransactionAdapter implements DaoHarvestV3MutationAdapt
     const policyScriptHash = daoHarvestV3PolicyScriptHash(jobCell.cellOutput.type);
     const job = JobDataV1.unpack(hexToBytes(jobCell.outputData.toString()));
     const identityCapacity = parseShannons(identityCell.cellOutput.capacity.toString());
+    if (
+      scriptIdentityHash(chainLock(identityCell.cellOutput.lock)) !== ownerLockHash ||
+      identityCell.cellOutput.type !== undefined ||
+      identityCell.outputData.toString() !== "0x"
+    )
+      throw new BadRequestException("the selected owner cell is no longer available");
     if (identityCapacity <= fee)
       throw new BadRequestException("the selected wallet cell cannot cover the network fee");
     const vaultData = vaultCell.outputData.toString() as Hex;
