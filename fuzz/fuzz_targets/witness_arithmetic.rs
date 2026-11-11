@@ -36,6 +36,16 @@ mod dao_harvest_v2_validation {
     include!("../../contracts/shared/dao_harvest_v2_validation.rs");
 }
 
+#[allow(dead_code)]
+mod dao_harvest_v3 {
+    include!("../../contracts/shared/dao_harvest_v3.rs");
+}
+
+#[allow(dead_code)]
+mod dao_harvest_v3_validation {
+    include!("../../contracts/shared/dao_harvest_v3_validation.rs");
+}
+
 fuzz_target!(|data: &[u8]| {
     let _ = execution_witness::parse_witness_operation(data);
     let _ = dao_harvest_witness::parse_vault_operation(data);
@@ -88,6 +98,36 @@ fuzz_target!(|data: &[u8]| {
         data[44] & 1 != 0,
     );
     let _ = dao_harvest_v2_validation::epoch_at_or_after_delay(
+        read_u64(0),
+        read_u64(8),
+        read_u64(16),
+    );
+    let operation = data[44];
+    let indices = core::array::from_fn(|index| {
+        let start = index * 4;
+        u32::from_le_bytes(data[start..start + 4].try_into().expect("V3 witness index"))
+    });
+    let _ = dao_harvest_v3::operation_is_supported(operation);
+    let _ = dao_harvest_v3::decode_compensation_lock_args(data);
+    let _ = dao_harvest_v3::decode_harvest_vault_lock_args(data);
+    let _ = dao_harvest_v3_validation::validate_witness_layout(operation, &indices);
+    let _ = dao_harvest_v3_validation::validate_progress_transition(
+        operation,
+        data[0] & 1,
+        u32::from_le_bytes(data[4..8].try_into().expect("V3 cycle")),
+        Some(data[8] & 1),
+        Some(u32::from_le_bytes(
+            data[9..13].try_into().expect("V3 successor cycle"),
+        )),
+    );
+    let _ = dao_harvest_v3_validation::allocate_compensation(
+        read_u64(0),
+        read_u64(8),
+        read_u64(16),
+        read_u64(24),
+        data[44] & 1 != 0,
+    );
+    let _ = dao_harvest_v3_validation::epoch_at_or_after_delay(
         read_u64(0),
         read_u64(8),
         read_u64(16),

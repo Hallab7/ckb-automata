@@ -6,15 +6,19 @@ fixed seeds so a failed campaign can be replayed from its command and artifact.
 
 ## Targets
 
-| Target                  | Coverage                                                        |
-| ----------------------- | --------------------------------------------------------------- |
-| `molecule_parsing`      | Job, campaign, and recurring Molecule readers                   |
-| `witness_arithmetic`    | Witness mode dispatch, schedule arithmetic, and output matching |
-| `malformed_transaction` | CKB transaction decoding and access after successful decoding   |
+| Target                  | Coverage                                                      |
+| ----------------------- | ------------------------------------------------------------- |
+| `molecule_parsing`      | Job, campaign, and recurring Molecule readers                 |
+| `witness_arithmetic`    | Witness dispatch, V2/V3 harvest layouts and arithmetic        |
+| `malformed_transaction` | CKB transaction decoding and access after successful decoding |
 
 The fuzz-only crate includes the production parser and arithmetic sources
 directly. This keeps the harnesses aligned with the code executed by the CKB
 scripts instead of maintaining test-only copies.
+
+The real Nervos DAO script is exercised by the CKB-VM state-transition and mutation suite. The
+fuzzer covers the production V3 parsers and arithmetic helpers; it is not presented as a substitute
+for executing the DAO script or for an independent security audit.
 
 ## Local Commands
 

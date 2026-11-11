@@ -47,6 +47,7 @@ enum SetupMutation {
     WitnessVersion,
     DuplicateJob,
     LockCode,
+    UnknownOperation,
 }
 
 #[derive(Clone, Copy)]
@@ -310,7 +311,11 @@ fn build_setup_case(mutation: SetupMutation) -> ContractCase {
             }
             .to_le_bytes(),
         )
-        .operation(SETUP_OPERATION)
+        .operation(if matches!(mutation, SetupMutation::UnknownOperation) {
+            u8::MAX
+        } else {
+            SETUP_OPERATION
+        })
         .flags(0)
         .job_input_index(ABSENT.to_le_bytes())
         .vault_input_index(ABSENT.to_le_bytes())
@@ -1812,6 +1817,14 @@ fn v3_setup_rejects_shadow_cross_version_and_duplicate_jobs() {
     );
     assert_setup_fails(SetupMutation::DuplicateJob, ScriptError::DuplicateJob);
     assert_setup_fails(SetupMutation::LockCode, ScriptError::InvalidDaoCell);
+}
+
+#[test]
+fn unknown_job_operation_rejects_the_atomic_spend_without_orphaning_the_vault() {
+    assert_setup_fails(
+        SetupMutation::UnknownOperation,
+        ScriptError::OperationLayoutMismatch,
+    );
 }
 
 #[test]

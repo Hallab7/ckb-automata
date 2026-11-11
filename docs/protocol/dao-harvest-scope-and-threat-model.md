@@ -6,7 +6,7 @@ Network: CKB testnet only
 
 Feature: CKAutomata Harvest compensation
 
-Protocol version: Draft V1
+Protocol version: V3 (testnet candidate; V1/V2 remain legacy compatibility paths)
 
 ## Product promise
 
@@ -132,6 +132,11 @@ Confirmation depth is an application finality policy. It does not alter CKB cons
 confirmed transaction immune to a deeper reorganization.
 
 ## Misuse cases and controls
+
+CKB transactions are atomic. If a Job Cell spend uses an unknown operation, an invalid operation
+for its current state, or a malformed successor layout, the policy type script rejects the whole
+transaction. No input is consumed, so the Job Cell and its bound vault remain live at their original
+outpoints. An invalid transaction cannot consume the Job Cell while leaving an orphaned valid vault.
 
 | Misuse or failure                                | Required control                                                               | Residual risk                                         |
 | ------------------------------------------------ | ------------------------------------------------------------------------------ | ----------------------------------------------------- |
