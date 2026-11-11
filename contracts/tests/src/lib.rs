@@ -118,6 +118,14 @@ pub mod dao_harvest_v2_validation {
     include!("../../shared/dao_harvest_v2_validation.rs");
 }
 
+pub mod dao_harvest_v3 {
+    include!("../../shared/dao_harvest_v3.rs");
+}
+
+pub mod dao_harvest_v3_validation {
+    include!("../../shared/dao_harvest_v3_validation.rs");
+}
+
 #[allow(
     clippy::clone_on_copy,
     clippy::derivable_impls,
@@ -129,6 +137,19 @@ pub mod dao_harvest_v2_validation {
 )]
 pub mod generated_dao_harvest_v2 {
     include!("../../generated/dao_harvest_v2.rs");
+}
+
+#[allow(
+    clippy::clone_on_copy,
+    clippy::derivable_impls,
+    clippy::if_same_then_else,
+    clippy::manual_is_multiple_of,
+    clippy::needless_borrow,
+    clippy::useless_conversion,
+    clippy::write_literal
+)]
+pub mod generated_dao_harvest_v3 {
+    include!("../../generated/dao_harvest_v3.rs");
 }
 
 pub mod execution_witness {
@@ -195,6 +216,16 @@ mod dao_harvest_v2_schema;
 
 #[cfg(test)]
 mod dao_harvest_v2_contract;
+
+#[cfg(test)]
+mod dao_harvest_v3_schema;
+
+#[cfg(test)]
+mod dao_harvest_v3_contract;
+
+#[cfg(test)]
+#[path = "dao_harvest_v3_validation.rs"]
+mod dao_harvest_v3_validation_tests;
 
 #[cfg(test)]
 #[path = "dao_harvest_v2_validation.rs"]

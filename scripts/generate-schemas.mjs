@@ -18,6 +18,7 @@ const schemaSpecs = [
   { file: "operator_v1", hashConstant: "OPERATOR_V1_SCHEMA_SHA256" },
   { file: "dao_harvest_v1", hashConstant: "DAO_HARVEST_V1_SCHEMA_SHA256" },
   { file: "dao_harvest_v2", hashConstant: "DAO_HARVEST_V2_SCHEMA_SHA256" },
+  { file: "dao_harvest_v3", hashConstant: "DAO_HARVEST_V3_SCHEMA_SHA256" },
 ];
 
 const compilerOutput = execFileSync("moleculec", ["--version"], {

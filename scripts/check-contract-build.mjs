@@ -20,6 +20,10 @@ const binaries = [
   "dao-harvest-policy-v2",
   "harvest-vault-lock-v2",
   "compensation-lock-v2",
+  "dao-harvest-job-lock-v3",
+  "dao-harvest-policy-v3",
+  "harvest-vault-lock-v3",
+  "compensation-lock-v3",
 ];
 const comparisonRoot = new URL("target/reproducibility/", root);
 const artifactRoot = new URL("target/contract-artifacts/", root);
@@ -31,6 +35,7 @@ const schemaFiles = [
   "recurring_v1.mol",
   "dao_harvest_v1.mol",
   "dao_harvest_v2.mol",
+  "dao_harvest_v3.mol",
   "operator_v1.mol",
 ];
 const builderFile = new URL("deploy/docker/contracts-builder.Dockerfile", root);

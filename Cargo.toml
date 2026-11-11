@@ -9,11 +9,15 @@ members = [
   "contracts/dao-harvest-policy",
   "contracts/job-lock-v2",
   "contracts/job-lock-v3",
+  "contracts/dao-harvest-job-lock-v3",
   "contracts/deadline-policy-v2",
   "contracts/recurring-policy-v2",
   "contracts/dao-harvest-policy-v2",
   "contracts/harvest-vault-lock-v2",
   "contracts/compensation-lock-v2",
+  "contracts/dao-harvest-policy-v3",
+  "contracts/harvest-vault-lock-v3",
+  "contracts/compensation-lock-v3",
   "contracts/tests",
 ]
 resolver = "3"
