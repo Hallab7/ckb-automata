@@ -87,6 +87,25 @@ test("V2 harvest setup is fail-closed and accepts only an explicit boolean switc
   );
 });
 
+test("V3 harvest setup and manifest are optional and fail closed", () => {
+  const absent = parseEnvironment(validEnvironment("testnet-public"));
+  assert.equal(absent.DAO_HARVEST_V3_SETUP_ENABLED, undefined);
+  assert.equal(absent.DAO_HARVEST_V3_MANIFEST_PATH, undefined);
+  const enabled = parseEnvironment({
+    ...validEnvironment("testnet-public"),
+    DAO_HARVEST_V3_SETUP_ENABLED: "true",
+    DAO_HARVEST_V3_MANIFEST_PATH: "deploy/v3.json",
+  });
+  assert.equal(enabled.DAO_HARVEST_V3_SETUP_ENABLED, "true");
+  assert.equal(enabled.DAO_HARVEST_V3_MANIFEST_PATH, "deploy/v3.json");
+  assert.throws(() =>
+    parseEnvironment({
+      ...validEnvironment("testnet-public"),
+      DAO_HARVEST_V3_SETUP_ENABLED: "yes",
+    }),
+  );
+});
+
 test("optional observability metadata is validated and disabled placeholders are ignored", () => {
   const disabled = parseEnvironment({
     ...validEnvironment("local"),

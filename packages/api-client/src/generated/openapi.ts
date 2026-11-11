@@ -770,6 +770,57 @@ export type paths = {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/v1/v1/dao-harvest-v3": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /** List canonical DAO Harvest V3 automations */
+        readonly get: operations["DaoHarvestV3Controller_list"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/v1/v1/dao-harvest-v3/{jobId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /** Read one canonical DAO Harvest V3 automation */
+        readonly get: operations["DaoHarvestV3Controller_get"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/v1/v1/dao-harvest-v3/build/{operation}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /** Build a reviewed DAO Harvest V3 transaction */
+        readonly post: operations["DaoHarvestV3Controller_build"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/v1/webhooks": {
         readonly parameters: {
             readonly query?: never;
@@ -4076,6 +4127,75 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    readonly DaoHarvestV3Controller_list: {
+        readonly parameters: {
+            readonly query?: {
+                readonly cursor?: unknown;
+                readonly limit?: unknown;
+                readonly owner?: unknown;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": Record<string, unknown>;
+                };
+            };
+        };
+    };
+    readonly DaoHarvestV3Controller_get: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly jobId: unknown;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": Record<string, unknown>;
+                };
+            };
+        };
+    };
+    readonly DaoHarvestV3Controller_build: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly operation: "setup" | "sweep" | "close" | "rotate" | "owner-exit" | "owner-recovery" | "owner-complete";
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": Record<string, unknown>;
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": Record<string, unknown>;
+                };
             };
         };
     };

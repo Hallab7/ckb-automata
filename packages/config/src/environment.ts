@@ -12,6 +12,8 @@ export const AUTOMATA_ENV_KEYS = [
   "CKB_INDEXER_URL",
   "DAO_HARVEST_V2_MANIFEST_PATH",
   "DAO_HARVEST_V2_SETUP_ENABLED",
+  "DAO_HARVEST_V3_MANIFEST_PATH",
+  "DAO_HARVEST_V3_SETUP_ENABLED",
   "OPERATOR_AUTOMATION_MANIFEST_PATH",
   "DATABASE_URL",
   "REDIS_URL",
@@ -53,6 +55,19 @@ const commonFields = {
       .optional(),
   ),
   DAO_HARVEST_V2_SETUP_ENABLED: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.enum(["true", "false"]).optional(),
+  ),
+  DAO_HARVEST_V3_MANIFEST_PATH: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z
+      .string()
+      .min(1)
+      .max(512)
+      .refine((value) => !value.includes("\0"), "must be a valid path")
+      .optional(),
+  ),
+  DAO_HARVEST_V3_SETUP_ENABLED: z.preprocess(
     (value) => (value === "" ? undefined : value),
     z.enum(["true", "false"]).optional(),
   ),

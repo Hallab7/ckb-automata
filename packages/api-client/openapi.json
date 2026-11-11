@@ -5641,6 +5641,74 @@
         "tags": ["transactions"]
       }
     },
+    "/v1/v1/dao-harvest-v3": {
+      "get": {
+        "operationId": "DaoHarvestV3Controller_list",
+        "parameters": [
+          { "in": "query", "name": "owner", "required": false, "schema": {} },
+          { "in": "query", "name": "cursor", "required": false, "schema": {} },
+          { "in": "query", "name": "limit", "required": false, "schema": {} }
+        ],
+        "responses": {
+          "200": {
+            "content": { "application/json": { "schema": { "type": "object" } } },
+            "description": ""
+          }
+        },
+        "summary": "List canonical DAO Harvest V3 automations",
+        "tags": ["DAO Harvest V3"]
+      }
+    },
+    "/v1/v1/dao-harvest-v3/build/{operation}": {
+      "post": {
+        "operationId": "DaoHarvestV3Controller_build",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operation",
+            "required": true,
+            "schema": {
+              "enum": [
+                "setup",
+                "sweep",
+                "close",
+                "rotate",
+                "owner-exit",
+                "owner-recovery",
+                "owner-complete"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "type": "object" } } },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": { "application/json": { "schema": { "type": "object" } } },
+            "description": ""
+          }
+        },
+        "summary": "Build a reviewed DAO Harvest V3 transaction",
+        "tags": ["DAO Harvest V3"]
+      }
+    },
+    "/v1/v1/dao-harvest-v3/{jobId}": {
+      "get": {
+        "operationId": "DaoHarvestV3Controller_get",
+        "parameters": [{ "in": "path", "name": "jobId", "required": true, "schema": {} }],
+        "responses": {
+          "200": {
+            "content": { "application/json": { "schema": { "type": "object" } } },
+            "description": ""
+          }
+        },
+        "summary": "Read one canonical DAO Harvest V3 automation",
+        "tags": ["DAO Harvest V3"]
+      }
+    },
     "/v1/webhooks": {
       "get": {
         "operationId": "WebhookController_list",

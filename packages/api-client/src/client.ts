@@ -50,6 +50,9 @@ export type ApiDaoHarvestV2List = ApiSuccess<"DaoHarvestV2Controller_list">;
 export type ApiDaoHarvestV2 = ApiSuccess<"DaoHarvestV2Controller_detail">;
 export type ApiDaoHarvestV2Quote = ApiSuccess<"DaoHarvestV2Controller_quote">;
 export type ApiDaoHarvestV2Build = ApiSuccess<"DaoHarvestV2Controller_setup">;
+export type ApiDaoHarvestV3List = ApiSuccess<"DaoHarvestV3Controller_list">;
+export type ApiDaoHarvestV3 = ApiSuccess<"DaoHarvestV3Controller_get">;
+export type ApiDaoHarvestV3Build = ApiSuccess<"DaoHarvestV3Controller_build">;
 export type ApiPendingDaoHarvest = ApiSuccess<"DaoHarvestController_registerSetup">;
 export interface ApiDaoHarvestBuild {
   readonly intent: Readonly<Record<string, unknown>>;
@@ -307,6 +310,21 @@ export class AutomataApiClient {
     body: ApiRequestBody<"DaoHarvestV2Controller_registerSetup">,
   ): Promise<ApiSuccess<"DaoHarvestV2Controller_registerSetup">> {
     return this.#post("v1/dao-harvest-v2/register-setup", body);
+  }
+
+  listDaoHarvestV3(query?: ApiQuery<"DaoHarvestV3Controller_list">): Promise<ApiDaoHarvestV3List> {
+    return this.#request("v1/dao-harvest-v3", { query });
+  }
+
+  getDaoHarvestV3(jobId: string): Promise<ApiDaoHarvestV3> {
+    return this.#request(`v1/dao-harvest-v3/${encodeURIComponent(jobId)}`);
+  }
+
+  buildDaoHarvestV3(
+    operation: "setup" | "sweep" | "close" | "rotate" | "owner-exit" | "owner-recovery" | "owner-complete",
+    body: Record<string, unknown>,
+  ): Promise<ApiDaoHarvestV3Build> {
+    return this.#post(`v1/dao-harvest-v3/build/${operation}`, body);
   }
 
   getDaoHarvestQuote(jobId: string): Promise<ApiDaoHarvestQuote> {

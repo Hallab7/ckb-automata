@@ -27,6 +27,15 @@ import {
   type VerifiedDaoHarvestV2Deployment,
 } from "./dao-harvest-v2-manifest.ts";
 import {
+  DaoHarvestV3Controller,
+  DaoHarvestV3MutationService,
+  DaoHarvestV3ReadService,
+} from "./dao-harvest-v3.ts";
+import {
+  loadVerifiedDaoHarvestV3Deployments,
+  type VerifiedDaoHarvestV3Deployment,
+} from "./dao-harvest-v3-manifest.ts";
+import {
   ActivityController,
   JobEventStreamController,
   JobEventStreamService,
@@ -41,6 +50,8 @@ import { CanonicalBlockProjector, JobProjectionRollback } from "./indexer/reorg.
 import { DaoHarvestProjectionStore } from "./indexer/dao-harvest-projection.ts";
 import { DaoHarvestV2RevisionIndexer } from "./indexer/dao-harvest-v2-indexer.ts";
 import { DaoHarvestV2ProjectionStore } from "./indexer/dao-harvest-v2-store.ts";
+import { DaoHarvestV3RevisionIndexer } from "./indexer/dao-harvest-v3-indexer.ts";
+import { DaoHarvestV3ProjectionStore } from "./indexer/dao-harvest-v3-store.ts";
 import { LiveJobReconciler } from "./indexer/reconciliation.ts";
 import { LiveIndexerRuntime } from "./indexer/runtime.ts";
 import {
@@ -75,6 +86,8 @@ import { WebhookController, WebhookService } from "./webhooks.ts";
 
 const DAO_HARVEST_V2_DEPLOYMENT = Symbol("DAO_HARVEST_V2_DEPLOYMENT");
 const DAO_HARVEST_V2_INDEXER = Symbol("DAO_HARVEST_V2_INDEXER");
+const DAO_HARVEST_V3_DEPLOYMENT = Symbol("DAO_HARVEST_V3_DEPLOYMENT");
+const DAO_HARVEST_V3_INDEXER = Symbol("DAO_HARVEST_V3_INDEXER");
 const OPERATOR_AUTOMATION_DEPLOYMENT = Symbol("OPERATOR_AUTOMATION_DEPLOYMENT");
 
 // Nest uses the class identity as the root dependency-injection module token.
@@ -102,6 +115,7 @@ Module({
     TransactionProgressController,
     DaoHarvestController,
     DaoHarvestV2Controller,
+    DaoHarvestV3Controller,
   ],
 })(AppModule);
 
@@ -146,6 +160,18 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
         },
       },
       {
+        provide: DAO_HARVEST_V3_DEPLOYMENT,
+        inject: [CkbClient],
+        useFactory: async (
+          ckbClient: CkbClient,
+        ): Promise<readonly VerifiedDaoHarvestV3Deployment[] | undefined> => {
+          const path = environment.DAO_HARVEST_V3_MANIFEST_PATH;
+          return path === undefined
+            ? undefined
+            : loadVerifiedDaoHarvestV3Deployments(path, ckbClient, environment.CKB_GENESIS_HASH);
+        },
+      },
+      {
         provide: OPERATOR_AUTOMATION_DEPLOYMENT,
         inject: [CkbClient],
         useFactory: async (
@@ -169,12 +195,14 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
           DatabaseClient,
           AuthService,
           DAO_HARVEST_V2_DEPLOYMENT,
+          DAO_HARVEST_V3_DEPLOYMENT,
           OPERATOR_AUTOMATION_DEPLOYMENT,
         ],
         useFactory: (
           databaseClient: DatabaseClient,
           auth: AuthService,
           harvestDeployments: readonly VerifiedDaoHarvestV2Deployment[] | undefined,
+          harvestV3Deployments: readonly VerifiedDaoHarvestV3Deployment[] | undefined,
           paymentDeployment: OperatorAutomationDeployment | undefined,
         ) =>
           new OperatorRegistryService(
@@ -183,7 +211,9 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
             environment,
             {
               harvestManifestHashes: new Set(
-                (harvestDeployments ?? []).map(({ manifestSha256 }) => manifestSha256),
+                [...(harvestDeployments ?? []), ...(harvestV3Deployments ?? [])].map(
+                  ({ manifestSha256 }) => manifestSha256,
+                ),
               ),
               ...(paymentDeployment === undefined
                 ? {}
@@ -255,6 +285,12 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
           new DaoHarvestV2ProjectionStore(databaseClient.database),
       },
       {
+        provide: DaoHarvestV3ProjectionStore,
+        inject: [DatabaseClient],
+        useFactory: (databaseClient: DatabaseClient) =>
+          new DaoHarvestV3ProjectionStore(databaseClient.database),
+      },
+      {
         provide: DAO_HARVEST_V2_INDEXER,
         inject: [CkbClient, DaoHarvestV2ProjectionStore, DAO_HARVEST_V2_DEPLOYMENT],
         useFactory: (
@@ -270,6 +306,38 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
                 environment.CKB_NETWORK,
                 loaded.map(({ deployment }) => deployment),
               ),
+      },
+      {
+        provide: DAO_HARVEST_V3_INDEXER,
+        inject: [CkbClient, DaoHarvestV3ProjectionStore, DAO_HARVEST_V3_DEPLOYMENT],
+        useFactory: (
+          ckbClient: CkbClient,
+          store: DaoHarvestV3ProjectionStore,
+          loaded: readonly VerifiedDaoHarvestV3Deployment[] | undefined,
+        ) =>
+          loaded === undefined
+            ? undefined
+            : new DaoHarvestV3RevisionIndexer(
+                ckbClient,
+                store,
+                environment.CKB_NETWORK,
+                loaded.map(({ deployment }) => deployment),
+              ),
+      },
+      {
+        provide: DaoHarvestV3ReadService,
+        inject: [DatabaseClient],
+        useFactory: (databaseClient: DatabaseClient) =>
+          new DaoHarvestV3ReadService(databaseClient.database, environment.CKB_NETWORK),
+      },
+      {
+        provide: DaoHarvestV3MutationService,
+        inject: [DAO_HARVEST_V3_DEPLOYMENT],
+        useFactory: (loaded: readonly VerifiedDaoHarvestV3Deployment[] | undefined) =>
+          new DaoHarvestV3MutationService(
+            undefined,
+            loaded !== undefined && environment.DAO_HARVEST_V3_SETUP_ENABLED === "true",
+          ),
       },
       {
         provide: DaoHarvestV2ReadService,
@@ -317,6 +385,7 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
           JobTransitionIndexer,
           DaoHarvestProjectionStore,
           DAO_HARVEST_V2_INDEXER,
+          DAO_HARVEST_V3_INDEXER,
           BackendTelemetry,
         ],
         useFactory: (
@@ -327,6 +396,7 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
           transitions: JobTransitionIndexer,
           daoHarvest: DaoHarvestProjectionStore,
           daoHarvestV2: DaoHarvestV2RevisionIndexer | undefined,
+          daoHarvestV3: DaoHarvestV3RevisionIndexer | undefined,
           telemetry: BackendTelemetry,
         ) =>
           new CanonicalBlockProjector(ckbClient, checkpoints, rollback, discovery, transitions, {
@@ -334,6 +404,7 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
             telemetry: telemetry.runtime,
             daoHarvest,
             ...(daoHarvestV2 === undefined ? {} : { daoHarvestV2 }),
+            ...(daoHarvestV3 === undefined ? {} : { daoHarvestV3 }),
           }),
       },
       {

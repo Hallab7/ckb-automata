@@ -31,6 +31,7 @@ import type {
   DaoHarvestV2BlockProjectionResult,
   DaoHarvestV2RevisionIndexer,
 } from "./dao-harvest-v2-indexer.ts";
+import type { DaoHarvestV3RevisionIndexer } from "./dao-harvest-v3-indexer.ts";
 import { JobCellDiscovery, type JobDiscoveryResult } from "./job-discovery.ts";
 import { JobTransitionIndexer, type JobTransitionResult } from "./job-transitions.ts";
 
@@ -52,6 +53,7 @@ export interface CanonicalBlockProjectionResult {
   readonly transitions: JobTransitionResult;
   readonly daoHarvest?: DaoHarvestProjectionResult;
   readonly daoHarvestV2?: DaoHarvestV2BlockProjectionResult;
+  readonly daoHarvestV3?: { readonly events: number; readonly snapshots: number };
   readonly checkpoint: CheckpointUpdate;
 }
 
@@ -323,6 +325,7 @@ export class CanonicalBlockProjector {
     readonly telemetry?: Pick<TelemetryRuntime, "withSpan">;
     readonly daoHarvest?: Pick<DaoHarvestProjectionStore, "projectBlock">;
     readonly daoHarvestV2?: Pick<DaoHarvestV2RevisionIndexer, "projectBlock" | "rollback">;
+    readonly daoHarvestV3?: Pick<DaoHarvestV3RevisionIndexer, "projectBlock" | "rollback">;
   };
 
   constructor(
@@ -336,6 +339,7 @@ export class CanonicalBlockProjector {
       readonly telemetry?: Pick<TelemetryRuntime, "withSpan">;
       readonly daoHarvest?: Pick<DaoHarvestProjectionStore, "projectBlock">;
       readonly daoHarvestV2?: Pick<DaoHarvestV2RevisionIndexer, "projectBlock" | "rollback">;
+      readonly daoHarvestV3?: Pick<DaoHarvestV3RevisionIndexer, "projectBlock" | "rollback">;
     } = {},
   ) {
     this.#ckbClient = ckbClient;
@@ -412,6 +416,7 @@ export class CanonicalBlockProjector {
         .filter(({ blockNumber: retainedNumber }) => retainedNumber > commonAncestor!.blockNumber)
         .map(({ blockHash: retainedHash }) => retainedHash);
       await this.#instrumentation.daoHarvestV2?.rollback(deployment.network, orphanedBlockHashes);
+      await this.#instrumentation.daoHarvestV3?.rollback(deployment.network, orphanedBlockHashes);
       rollback = await this.#rollback.rollbackToParent(
         deployment.network,
         commonAncestor.blockNumber,
@@ -453,6 +458,10 @@ export class CanonicalBlockProjector {
       "indexer.dao_harvest_v2.project",
       () => this.#instrumentation.daoHarvestV2?.projectBlock(block) ?? Promise.resolve(undefined),
     );
+    const daoHarvestV3 = await span(
+      "indexer.dao_harvest_v3.project",
+      () => this.#instrumentation.daoHarvestV3?.projectBlock(block) ?? Promise.resolve(undefined),
+    );
     const checkpoint = await span("indexer.checkpoint.record", () =>
       this.#checkpoints.record({
         networkId: deployment.network,
@@ -468,6 +477,7 @@ export class CanonicalBlockProjector {
       transitions,
       ...(daoHarvest === undefined ? {} : { daoHarvest }),
       ...(daoHarvestV2 === undefined ? {} : { daoHarvestV2 }),
+      ...(daoHarvestV3 === undefined ? {} : { daoHarvestV3 }),
       checkpoint,
     });
   }

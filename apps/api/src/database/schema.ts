@@ -405,6 +405,81 @@ export const daoHarvestV2Jobs = pgTable(
   ],
 );
 
+export const daoHarvestV3Events = pgTable(
+  "dao_harvest_v3_events",
+  {
+    networkId: varchar("network_id", { length: 64 })
+      .notNull()
+      .references(() => networks.id, { onDelete: "cascade" }),
+    eventId: varchar("event_id", { length: 160 }).notNull(),
+    jobId: hash("job_id").notNull(),
+    operation: varchar("operation", { length: 32 }).notNull(),
+    transactionHash: hash("transaction_hash").notNull(),
+    transactionIndex: uint32("transaction_index").notNull(),
+    blockNumber: uint64("block_number").notNull(),
+    blockHash: hash("block_hash").notNull(),
+    canonical: boolean("canonical").notNull().default(true),
+    projection: jsonb("projection").notNull(),
+    observedAt: timestamp("observed_at", { withTimezone: true }).defaultNow().notNull(),
+    orphanedAt: timestamp("orphaned_at", { withTimezone: true }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.networkId, table.eventId] }),
+    uniqueIndex("dao_harvest_v3_events_chain_uq").on(
+      table.networkId,
+      table.transactionHash,
+      table.transactionIndex,
+      table.operation,
+    ),
+    index("dao_harvest_v3_events_rebuild_idx").on(
+      table.networkId,
+      table.jobId,
+      table.canonical,
+      table.blockNumber,
+      table.transactionIndex,
+    ),
+    check(
+      "dao_harvest_v3_events_canonicality_ck",
+      sql`(${table.canonical} AND ${table.orphanedAt} IS NULL) OR (NOT ${table.canonical} AND ${table.orphanedAt} IS NOT NULL)`,
+    ),
+  ],
+);
+
+export const daoHarvestV3Jobs = pgTable(
+  "dao_harvest_v3_jobs",
+  {
+    networkId: varchar("network_id", { length: 64 })
+      .notNull()
+      .references(() => networks.id, { onDelete: "cascade" }),
+    jobId: hash("job_id").notNull(),
+    ownerLockHash: hash("owner_lock_hash").notNull(),
+    lifecycleState: varchar("lifecycle_state", { length: 24 }).notNull(),
+    projection: jsonb("projection").notNull(),
+    observedBlockNumber: uint64("observed_block_number").notNull(),
+    observedBlockHash: hash("observed_block_hash").notNull(),
+    observedTransactionHash: hash("observed_transaction_hash").notNull(),
+    canonical: boolean("canonical").notNull().default(true),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.networkId, table.jobId] }),
+    index("dao_harvest_v3_jobs_owner_idx").on(
+      table.networkId,
+      table.ownerLockHash,
+      table.observedBlockNumber,
+    ),
+    index("dao_harvest_v3_jobs_state_idx").on(
+      table.networkId,
+      table.lifecycleState,
+      table.observedBlockNumber,
+    ),
+    check(
+      "dao_harvest_v3_jobs_state_ck",
+      sql`${table.lifecycleState} IN ('deposited', 'withdrawing', 'completed', 'owner_withdrawing', 'recovered', 'closed')`,
+    ),
+  ],
+);
+
 export const daoHarvestTransitionAttempts = pgTable(
   "dao_harvest_transition_attempts",
   {
