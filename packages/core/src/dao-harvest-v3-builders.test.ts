@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { bytesToHex, hexToBytes, serializeWitnessArgs } from "@nervosnetwork/ckb-sdk-utils";
+import {
+  bytesToHex,
+  hexToBytes,
+  scriptToHash,
+  serializeWitnessArgs,
+} from "@nervosnetwork/ckb-sdk-utils";
 import {
   DaoHarvestPayloadV3,
   DaoHarvestPrepareCreditV3,
@@ -49,7 +54,7 @@ const payload = DaoHarvestPayloadV3.pack({
   payout_lock_hash: hashBytes("3"),
   vault_lock_code_hash: hashBytes("4"),
   compensation_lock_code_hash: hashBytes("5"),
-  dao_type_hash: hashBytes("6"),
+  dao_type_hash: [...Buffer.from(scriptToHash(lock("6")).slice(2), "hex")],
   principal_capacity: "10000000000",
   preferred_prepare_operator_lock_hash: Array(32).fill(7),
   fallback_prepare_executor_set_hash: Array(32).fill(8),
@@ -225,6 +230,17 @@ test("typed V3 builders derive every closed witness layout", () => {
   builders.forEach((builder, operation) =>
     assert.equal(builder(fixture(operation)).operation, operation),
   );
+});
+
+test("one operator accumulator may satisfy both identity and prepare roles", () => {
+  const input = fixture(1);
+  const accumulator = input.inputs.prepareAccumulator!;
+  const build = buildDaoHarvestV3PreferredPrepare({
+    ...input,
+    inputs: { ...input.inputs, identity: accumulator },
+  });
+  assert.equal(build.transaction.inputs.length, 3);
+  assert.doesNotThrow(() => verifyCompletedDaoHarvestV3Transaction(build, build.transaction, []));
 });
 
 test("owner exit protects the real DAO same-index output during wallet completion", () => {

@@ -8,6 +8,7 @@ import {
   hash32FromBytes,
   parseHash32,
   parseOutputIndex,
+  scriptIdentityHash,
   type DaoHarvestV3Operation,
   type Hash32,
   type OutPoint,
@@ -66,6 +67,7 @@ export interface DaoHarvestV3ProjectionEvent {
   readonly blockHash: Hash32;
   readonly canonical: boolean;
   readonly ownerLockHash: Hash32;
+  readonly ownerLock: ScriptIdentity | null;
   readonly payoutLockHash: Hash32;
   readonly payloadHash: Hash32;
   readonly payload: Hex;
@@ -249,6 +251,13 @@ export function extractDaoHarvestV3ProjectionEvents(
       const txHash = parseHash32(transaction.hash());
       const credit =
         creditBytes.length === 0 ? null : DaoHarvestPrepareCreditV3.unpack(creditBytes);
+      const ownerLockHash = hash32FromBytes(Uint8Array.from(payload.owner_lock_hash));
+      const ownerIdentity =
+        indices.identityInputIndex === DAO_HARVEST_V3_ABSENT_INDEX
+          ? undefined
+          : resolved.get(
+              key(previous(transaction.inputs[indices.identityInputIndex]!.previousOutput)),
+            );
       events.push(
         Object.freeze({
           eventId: `${txHash}:${transactionIndex}:${operation}`,
@@ -260,7 +269,11 @@ export function extractDaoHarvestV3ProjectionEvents(
           blockNumber,
           blockHash,
           canonical: true,
-          ownerLockHash: hash32FromBytes(Uint8Array.from(payload.owner_lock_hash)),
+          ownerLockHash,
+          ownerLock:
+            ownerIdentity !== undefined && scriptIdentityHash(ownerIdentity.lock) === ownerLockHash
+              ? ownerIdentity.lock
+              : null,
           payoutLockHash: hash32FromBytes(Uint8Array.from(payload.payout_lock_hash)),
           payloadHash: hash32FromBytes(Uint8Array.from(witness.payload_hash)),
           payload: bytesToHex(payloadBytes) as Hex,
@@ -317,5 +330,6 @@ export function rebuildDaoHarvestV3Snapshot(events: readonly DaoHarvestV3Project
   if (!latest) return null;
   if (canonical.some((event) => event.jobId !== latest.jobId))
     throw new Error("cannot rebuild a snapshot from multiple V3 jobs");
-  return Object.freeze({ ...latest, sourceEventCount: canonical.length });
+  const ownerLock = canonical.find((event) => event.ownerLock !== null)?.ownerLock ?? null;
+  return Object.freeze({ ...latest, ownerLock, sourceEventCount: canonical.length });
 }

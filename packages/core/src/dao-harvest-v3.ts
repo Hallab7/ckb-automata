@@ -110,6 +110,79 @@ export function encodeDaoHarvestV3LockArgs(input: DaoHarvestV3LockArgs): Uint8Ar
   return encoded;
 }
 
+function decodeDaoHarvestV3LockArgs(encoded: Uint8Array, name: string): readonly Uint8Array[] {
+  if (encoded.length !== DAO_HARVEST_V3_VAULT_ARGS_BYTES) {
+    throw new RangeError(`${name} must contain exactly 160 bytes`);
+  }
+  return Object.freeze(
+    Array.from({ length: 5 }, (_, index) => encoded.slice(index * 32, (index + 1) * 32)),
+  );
+}
+
+export interface DaoHarvestV3VaultLockArgs {
+  readonly jobId: Uint8Array;
+  readonly ownerLockHash: Uint8Array;
+  readonly jobLockHash: Uint8Array;
+  readonly policyScriptHash: Uint8Array;
+  readonly immutableTermsHash: Uint8Array;
+}
+export function encodeDaoHarvestV3VaultLockArgs(input: DaoHarvestV3VaultLockArgs): Uint8Array {
+  return encodeDaoHarvestV3LockArgs({
+    parts: [
+      input.jobId,
+      input.ownerLockHash,
+      input.jobLockHash,
+      input.policyScriptHash,
+      input.immutableTermsHash,
+    ],
+  });
+}
+export function decodeDaoHarvestV3VaultLockArgs(encoded: Uint8Array): DaoHarvestV3VaultLockArgs {
+  const [jobId, ownerLockHash, jobLockHash, policyScriptHash, immutableTermsHash] =
+    decodeDaoHarvestV3LockArgs(encoded, "Harvest Vault Lock args") as readonly [
+      Uint8Array,
+      Uint8Array,
+      Uint8Array,
+      Uint8Array,
+      Uint8Array,
+    ];
+  return Object.freeze({ jobId, ownerLockHash, jobLockHash, policyScriptHash, immutableTermsHash });
+}
+
+export interface DaoHarvestV3CompensationLockArgs {
+  readonly jobId: Uint8Array;
+  readonly ownerLockHash: Uint8Array;
+  readonly payoutLockHash: Uint8Array;
+  readonly policyScriptHash: Uint8Array;
+  readonly payloadHash: Uint8Array;
+}
+export function encodeDaoHarvestV3CompensationLockArgs(
+  input: DaoHarvestV3CompensationLockArgs,
+): Uint8Array {
+  return encodeDaoHarvestV3LockArgs({
+    parts: [
+      input.jobId,
+      input.ownerLockHash,
+      input.payoutLockHash,
+      input.policyScriptHash,
+      input.payloadHash,
+    ],
+  });
+}
+export function decodeDaoHarvestV3CompensationLockArgs(
+  encoded: Uint8Array,
+): DaoHarvestV3CompensationLockArgs {
+  const [jobId, ownerLockHash, payoutLockHash, policyScriptHash, payloadHash] =
+    decodeDaoHarvestV3LockArgs(encoded, "Compensation Lock args") as readonly [
+      Uint8Array,
+      Uint8Array,
+      Uint8Array,
+      Uint8Array,
+      Uint8Array,
+    ];
+  return Object.freeze({ jobId, ownerLockHash, payoutLockHash, policyScriptHash, payloadHash });
+}
+
 export interface DaoHarvestV3WitnessIndices {
   readonly jobInputIndex: number;
   readonly vaultInputIndex: number;

@@ -110,6 +110,7 @@ export interface DaoHarvestV3BuildInput {
   readonly inputs: DaoHarvestV3NamedInputs;
   readonly outputs: DaoHarvestV3NamedOutputs;
   readonly headerDeps?: readonly Hash32[];
+  readonly additionalWitnesses?: readonly Hex[];
   readonly maximumNetworkFee: IntegerInput;
   readonly allowedFundingLockHashes: readonly Hash32[];
 }
@@ -180,7 +181,7 @@ function assertContext(input: DaoHarvestV3BuildInput, ownerOperation: boolean): 
 }
 
 function flattenInputs(value: DaoHarvestV3NamedInputs): DaoHarvestV3ReviewedInput[] {
-  return [
+  const candidates = [
     value.job,
     value.vault,
     value.compensation,
@@ -189,6 +190,7 @@ function flattenInputs(value: DaoHarvestV3NamedInputs): DaoHarvestV3ReviewedInpu
     value.claimAccumulator,
     ...(value.additional ?? []),
   ].filter((item): item is DaoHarvestV3ReviewedInput => item !== undefined);
+  return candidates.filter((item, index) => candidates.indexOf(item) === index);
 }
 function flattenOutputs(
   value: DaoHarvestV3NamedOutputs,
@@ -260,7 +262,14 @@ function build(
       input.context.deployment.contracts.vaultLock.codeHash ||
     committedHash(payload.compensation_lock_code_hash) !==
       input.context.deployment.contracts.compensationLock.codeHash ||
-    committedHash(payload.dao_type_hash) !== input.context.deployment.nervosDao.codeHash
+    committedHash(payload.dao_type_hash) !==
+      parseHash32(
+        scriptToHash({
+          codeHash: input.context.deployment.nervosDao.codeHash,
+          hashType: "type",
+          args: "0x",
+        }),
+      )
   )
     throw new Error("V3 payload contract identity does not match the deployment manifest");
   const credit = bytes(input.prepareCredit);
@@ -321,6 +330,13 @@ function build(
   });
   const reviewedInputs = flattenInputs(input.inputs);
   const reviewedOutputs = flattenOutputs(input.outputs, operation);
+  const additionalWitnesses = input.additionalWitnesses ?? [];
+  if (
+    additionalWitnesses.length !== 0 &&
+    additionalWitnesses.length !== Math.max(0, reviewedInputs.length - 1)
+  ) {
+    throw new Error("V3 additional witnesses must match every reviewed input after the Job input");
+  }
   const transaction = Object.freeze<UnsignedDeadlineTransaction>({
     version: "0x0",
     cellDeps: Object.freeze([
@@ -341,7 +357,9 @@ function build(
         inputType: bytesToHex(witness),
         outputType: bytesToHex(envelope),
       }) as Hex,
-      ...Array.from({ length: Math.max(0, reviewedInputs.length - 1) }, () => "0x" as Hex),
+      ...(additionalWitnesses.length === 0
+        ? Array.from({ length: Math.max(0, reviewedInputs.length - 1) }, () => "0x" as Hex)
+        : additionalWitnesses),
     ]),
   });
   if (

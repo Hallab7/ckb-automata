@@ -1,5 +1,10 @@
 import { BadRequestException, ServiceUnavailableException } from "@nestjs/common";
-import { bytesToHex, hexToBytes, scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
+import {
+  bytesToHex,
+  hexToBytes,
+  scriptToHash,
+  serializeWitnessArgs,
+} from "@nervosnetwork/ckb-sdk-utils";
 import {
   DAO_HARVEST_VAULT_OCCUPIED_CAPACITY,
   buildDaoHarvestV3OwnerExit,
@@ -335,6 +340,16 @@ export class DaoHarvestV3TransactionAdapter implements DaoHarvestV3MutationAdapt
           ],
         },
         headerDeps: [parseHash32(depositBlock.header.hash), parseHash32(prepareBlock.header.hash)],
+        additionalWitnesses: [
+          serializeWitnessArgs({
+            lock: "",
+            inputType: bytesToHex(new Uint8Array(8)),
+            outputType: "",
+          }) as Hex,
+          "0x",
+          "0x",
+          "0x",
+        ],
       });
     }
     return Object.freeze({

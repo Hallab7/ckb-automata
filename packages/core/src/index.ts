@@ -4,6 +4,7 @@ export * from "./dao-harvest-v2-builders.ts";
 export * from "./dao-harvest-v2-transitions.ts";
 export * from "./dao-harvest-v3.ts";
 export * from "./dao-harvest-v3-builders.ts";
+export * from "./dao-harvest-v3-transitions.ts";
 
 export {
   DEFAULT_OPERATOR_TAKEOVER_DELAY_BLOCKS,
