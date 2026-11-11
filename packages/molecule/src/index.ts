@@ -78,3 +78,27 @@ export {
   type DaoHarvestWitnessV2Like,
   type DaoHarvestWitnessV2Value,
 } from "./generated/dao_harvest_v2.ts";
+
+export {
+  CompensationLockArgsV3,
+  DAO_HARVEST_V3_SCHEMA_SHA256,
+  DaoHarvestEnvelopeV3,
+  DaoHarvestPayloadV3,
+  DaoHarvestPrepareCreditV3,
+  DaoHarvestProgressV3,
+  DaoHarvestWitnessV3,
+  Byte32 as DaoHarvestV3Byte32,
+  Uint16 as DaoHarvestV3Uint16,
+  Uint32 as DaoHarvestV3Uint32,
+  Uint64 as DaoHarvestV3Uint64,
+  type DaoHarvestEnvelopeV3Like,
+  type DaoHarvestEnvelopeV3Value,
+  type DaoHarvestPayloadV3Like,
+  type DaoHarvestPayloadV3Value,
+  type DaoHarvestPrepareCreditV3Like,
+  type DaoHarvestPrepareCreditV3Value,
+  type DaoHarvestProgressV3Like,
+  type DaoHarvestProgressV3Value,
+  type DaoHarvestWitnessV3Like,
+  type DaoHarvestWitnessV3Value,
+} from "./generated/dao_harvest_v3.ts";

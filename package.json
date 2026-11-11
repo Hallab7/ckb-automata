@@ -64,6 +64,7 @@
     "schema:generate": "node scripts/generate-schemas.mjs",
     "schema:review": "node scripts/check-job-schema.mjs && node scripts/check-campaign-schema.mjs && node scripts/check-recurring-schema.mjs && node scripts/check-dao-harvest-schema.mjs && node scripts/check-dao-harvest-v2-schema.mjs && node scripts/check-dao-harvest-v3-schema.mjs",
     "recovery": "node scripts/recovery-cli.mjs",
+    "recovery:harvest:v3": "node scripts/dao-harvest-v3-recovery-cli.mjs",
     "recovery:verify:local": "node scripts/verify-recovery-cli-local.mjs",
     "secrets:check": "node scripts/check-secrets.mjs",
     "test": "node --test scripts/*.test.mjs && pnpm -r --if-present test",
