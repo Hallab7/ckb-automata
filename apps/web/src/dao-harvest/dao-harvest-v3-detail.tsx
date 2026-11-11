@@ -11,6 +11,11 @@ import {
   type ApiDaoHarvestV3Build,
   type AutomataApiClient,
 } from "@ckb-automata/api-client";
+import {
+  nervDaoOwnerAction,
+  nervDaoPositionLabel,
+  type NervDaoOwnerAction,
+} from "@ckb-automata/nervdao-integration";
 import { Button, Dialog, InlineNotice } from "@ckb-automata/ui";
 
 import { useWalletSession } from "../ccc/session.tsx";
@@ -25,7 +30,7 @@ import {
 } from "../setup/dao-harvest-v3-review.ts";
 import { harvestV2Amount } from "./v2-presentation.ts";
 
-type OwnerOperation = "owner-exit" | "owner-recovery";
+type OwnerOperation = NervDaoOwnerAction;
 interface PreparedAction {
   readonly build: ApiDaoHarvestV3Build;
   readonly body: Record<string, unknown>;
@@ -235,9 +240,7 @@ function V3OwnerAction({
 }
 
 function status(job: ApiDaoHarvestV3) {
-  if (["completed", "recovered", "closed"].includes(job.state)) return "Completed";
-  if (["withdrawing", "owner_withdrawing"].includes(job.state)) return "Processing";
-  return "Waiting";
+  return nervDaoPositionLabel(job.state);
 }
 
 export function DaoHarvestV3Detail({ jobId }: Readonly<{ jobId: string }>) {
@@ -321,12 +324,7 @@ export function DaoHarvestV3Detail({ jobId }: Readonly<{ jobId: string }>) {
     );
 
   const owner = session.status === "ready" && session.ownerLockHash === job.ownerLockHash;
-  const operation: OwnerOperation | undefined =
-    job.state === "deposited"
-      ? "owner-exit"
-      : job.state === "withdrawing" && job.cells.prepareAccumulator
-        ? "owner-recovery"
-        : undefined;
+  const operation = nervDaoOwnerAction(job.state, job.cells.prepareAccumulator !== null);
   return (
     <article aria-labelledby="harvest-v3-title" className="app-page harvest-detail">
       <header className="app-page-header harvest-detail__header">

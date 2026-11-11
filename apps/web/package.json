@@ -12,6 +12,7 @@
     "typecheck": "next typegen && tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@ckb-automata/nervdao-integration": "workspace:*",
     "@ckb-automata/api-client": "workspace:*",
     "@ckb-automata/core": "workspace:*",
     "@ckb-automata/ui": "workspace:*",

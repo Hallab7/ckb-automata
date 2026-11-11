@@ -342,6 +342,9 @@ importers:
       '@ckb-automata/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@ckb-automata/nervdao-integration':
+        specifier: workspace:*
+        version: link:../../packages/nervdao-integration
       '@ckb-automata/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -431,6 +434,8 @@ importers:
         specifier: 0.23.0
         version: 0.23.0
 
+  packages/nervdao-integration: {}
+
   packages/telemetry:
     dependencies:
       '@ckb-automata/config':
@@ -515,6 +520,12 @@ importers:
       react-dom:
         specifier: 19.3.0
         version: 19.3.0(react@19.3.0)
+
+  tools/nervdao-integration-consumer:
+    dependencies:
+      '@ckb-automata/nervdao-integration':
+        specifier: workspace:*
+        version: link:../../packages/nervdao-integration
 
   tools/openapi-codegen:
     devDependencies:

@@ -1,0 +1,14 @@
+{
+  "name": "@ckb-automata/nervdao-integration",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "node --test src/**/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

@@ -11,6 +11,7 @@ const packageDirectories = [
   "packages/ui",
   "packages/config",
   "packages/testing",
+  "packages/nervdao-integration",
 ];
 const consumerDirectories = ["apps/web", "apps/api", "apps/executor", ...packageDirectories];
 
