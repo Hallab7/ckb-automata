@@ -39,6 +39,8 @@ export interface DaoHarvestV3ReadModel {
     readonly job: unknown;
     readonly daoVault: unknown;
     readonly compensation: unknown;
+    readonly prepareAccumulator: unknown;
+    readonly claimAccumulator: unknown;
   };
   readonly prepareCredit: unknown;
   readonly terminalOwnerControl: boolean;
@@ -82,6 +84,8 @@ function rowModel(row: typeof daoHarvestV3Jobs.$inferSelect): DaoHarvestV3ReadMo
       job: outPoint("jobOutPoint"),
       daoVault: outPoint("vaultOutPoint"),
       compensation: outPoint("compensationOutPoint"),
+      prepareAccumulator: outPoint("prepareAccumulatorOutPoint"),
+      claimAccumulator: outPoint("claimAccumulatorOutPoint"),
     }),
     prepareCredit: value["prepareCredit"] ?? null,
     terminalOwnerControl: value["terminalOwnerControl"] === true,

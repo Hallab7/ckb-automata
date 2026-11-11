@@ -15,12 +15,15 @@ import {
 } from "@ckb-automata/core";
 
 export const DAO_HARVEST_V2_ADAPTER_ID = "dao-harvest-v2" as const;
+export const DAO_HARVEST_V3_ADAPTER_ID = "dao-harvest-v3" as const;
 export const DAO_HARVEST_V1_ADAPTER_ID = "dao-harvest-v1" as const;
 export const DAO_HARVEST_V2_MIN_WAKE_DELAY_MS = 1_000;
 export const DAO_HARVEST_V2_MAX_WAKE_DELAY_MS = 30 * 24 * 60 * 60 * 1_000;
 
 export type DaoHarvestAdapterId =
-  typeof DAO_HARVEST_V1_ADAPTER_ID | typeof DAO_HARVEST_V2_ADAPTER_ID;
+  | typeof DAO_HARVEST_V1_ADAPTER_ID
+  | typeof DAO_HARVEST_V2_ADAPTER_ID
+  | typeof DAO_HARVEST_V3_ADAPTER_ID;
 export type DaoHarvestV2Operation =
   "preferred_prepare" | "fallback_prepare" | "preferred_claim" | "fallback_claim";
 
@@ -38,7 +41,19 @@ export function daoHarvestAdapterId(version: IntegerInput): DaoHarvestAdapterId 
   const parsed = parseSequence(version);
   if (parsed === 1n) return DAO_HARVEST_V1_ADAPTER_ID;
   if (parsed === 2n) return DAO_HARVEST_V2_ADAPTER_ID;
+  if (parsed === 3n) return DAO_HARVEST_V3_ADAPTER_ID;
   throw new RangeError("DAO harvest policy version is unsupported");
+}
+
+export function assertDaoHarvestV3ExecutorOperation(
+  operation: number,
+): asserts operation is 1 | 2 | 3 | 4 {
+  if (![1, 2, 3, 4].includes(operation)) {
+    throw new DaoHarvestV2SafetyError(
+      "V3_OWNER_OPERATION_FORBIDDEN",
+      "V3 executors may select only preferred or fallback prepare and claim operations",
+    );
+  }
 }
 
 export interface DaoHarvestV2ScheduleRecord {

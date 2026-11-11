@@ -50,9 +50,66 @@ export type ApiDaoHarvestV2List = ApiSuccess<"DaoHarvestV2Controller_list">;
 export type ApiDaoHarvestV2 = ApiSuccess<"DaoHarvestV2Controller_detail">;
 export type ApiDaoHarvestV2Quote = ApiSuccess<"DaoHarvestV2Controller_quote">;
 export type ApiDaoHarvestV2Build = ApiSuccess<"DaoHarvestV2Controller_setup">;
-export type ApiDaoHarvestV3List = ApiSuccess<"DaoHarvestV3Controller_list">;
-export type ApiDaoHarvestV3 = ApiSuccess<"DaoHarvestV3Controller_get">;
-export type ApiDaoHarvestV3Build = ApiSuccess<"DaoHarvestV3Controller_build">;
+export interface ApiDaoHarvestV3OutPoint {
+  readonly txHash: string;
+  readonly index: string;
+}
+export interface ApiDaoHarvestV3 {
+  readonly version: 3;
+  readonly jobId: string;
+  readonly ownerLockHash: string;
+  readonly state:
+    "deposited" | "withdrawing" | "owner_withdrawing" | "completed" | "recovered" | "closed";
+  readonly operation: string;
+  readonly principalCapacity: string;
+  readonly progress: { readonly cycle: string; readonly totalCycles: string };
+  readonly cells: {
+    readonly job: ApiDaoHarvestV3OutPoint | null;
+    readonly daoVault: ApiDaoHarvestV3OutPoint | null;
+    readonly compensation: ApiDaoHarvestV3OutPoint | null;
+    readonly prepareAccumulator: ApiDaoHarvestV3OutPoint | null;
+    readonly claimAccumulator: ApiDaoHarvestV3OutPoint | null;
+  };
+  readonly prepareCredit: {
+    readonly cycleIndex: string;
+    readonly preparerLockHash: string;
+    readonly preparedVaultOutputIndex: string;
+    readonly jobOutputIndex: string;
+  } | null;
+  readonly terminalOwnerControl: boolean;
+  readonly evidence: {
+    readonly canonical: true;
+    readonly blockNumber: string;
+    readonly blockHash: string;
+    readonly transactionHash: string;
+  };
+  readonly updatedAt: string;
+}
+export interface ApiDaoHarvestV3List {
+  readonly items: readonly ApiDaoHarvestV3[];
+  readonly page: { readonly limit: number; readonly nextCursor: string | null };
+}
+export interface ApiDaoHarvestV3Build {
+  readonly version: 3;
+  readonly jobId: string;
+  readonly operation: string;
+  readonly transaction: UnsignedDeadlineTransaction;
+  readonly intentHash: string;
+  readonly review: {
+    readonly protectedAmount: string;
+    readonly maximumNetworkFee: string;
+    readonly totalInput: string;
+    readonly totalOutput: string;
+  };
+  readonly completion: {
+    readonly requiredInputCount: number;
+    readonly requiredOutputCount: number;
+    readonly requiredInputCapacity: string;
+    readonly maximumFee: string;
+    readonly allowedFundingLockHashes: readonly string[];
+    readonly protectedSameIndex?: number;
+  };
+}
 export type ApiPendingDaoHarvest = ApiSuccess<"DaoHarvestController_registerSetup">;
 export interface ApiDaoHarvestBuild {
   readonly intent: Readonly<Record<string, unknown>>;
@@ -321,7 +378,8 @@ export class AutomataApiClient {
   }
 
   buildDaoHarvestV3(
-    operation: "setup" | "sweep" | "close" | "rotate" | "owner-exit" | "owner-recovery" | "owner-complete",
+    operation:
+      "setup" | "sweep" | "close" | "rotate" | "owner-exit" | "owner-recovery" | "owner-complete",
     body: Record<string, unknown>,
   ): Promise<ApiDaoHarvestV3Build> {
     return this.#post(`v1/dao-harvest-v3/build/${operation}`, body);

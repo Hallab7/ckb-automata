@@ -1,9 +1,10 @@
 import type { ClientBlock } from "@ckb-ccc/shell";
-import { hexToBytes } from "@nervosnetwork/ckb-sdk-utils";
+import { bytesToHex, hexToBytes } from "@nervosnetwork/ckb-sdk-utils";
 
 import {
   DAO_HARVEST_V3_ABSENT_INDEX,
   assertDaoHarvestV3WitnessLayout,
+  deriveDaoHarvestV3PrepareCreditHash,
   hash32FromBytes,
   parseHash32,
   parseOutputIndex,
@@ -67,6 +68,9 @@ export interface DaoHarvestV3ProjectionEvent {
   readonly ownerLockHash: Hash32;
   readonly payoutLockHash: Hash32;
   readonly payloadHash: Hash32;
+  readonly payload: Hex;
+  readonly progress: Hex;
+  readonly prepareCreditBytes: Hex | null;
   readonly principalCapacity: string;
   readonly compensationSeedCapacity: string;
   readonly lifecycleState: DaoHarvestV3Lifecycle;
@@ -75,6 +79,14 @@ export interface DaoHarvestV3ProjectionEvent {
   readonly jobOutPoint: { readonly txHash: Hash32; readonly index: string } | null;
   readonly vaultOutPoint: { readonly txHash: Hash32; readonly index: string } | null;
   readonly compensationOutPoint: { readonly txHash: Hash32; readonly index: string } | null;
+  readonly prepareAccumulatorOutPoint: {
+    readonly txHash: Hash32;
+    readonly index: string;
+  } | null;
+  readonly claimAccumulatorOutPoint: {
+    readonly txHash: Hash32;
+    readonly index: string;
+  } | null;
   readonly prepareCredit: {
     readonly cycleIndex: string;
     readonly preparerLockHash: Hash32;
@@ -194,7 +206,26 @@ export function extractDaoHarvestV3ProjectionEvents(
           ? Uint8Array.from(envelope.successor_payload)
           : Uint8Array.from(envelope.payload);
       const payload = DaoHarvestPayloadV3.unpack(payloadBytes);
-      const progress = DaoHarvestProgressV3.unpack(Uint8Array.from(envelope.progress));
+      const inputProgressBytes = Uint8Array.from(envelope.progress);
+      const inputProgress = DaoHarvestProgressV3.unpack(inputProgressBytes);
+      const creditBytes = Uint8Array.from(envelope.prepare_credit);
+      const activeProgressBytes = [1, 2].includes(operationValue)
+        ? DaoHarvestProgressV3.pack({
+            version: 3,
+            state: 1,
+            cycle_index: inputProgress.cycle_index,
+            prepare_credit_hash: [...deriveDaoHarvestV3PrepareCreditHash(creditBytes)],
+          })
+        : [3, 4, 5].includes(operationValue) &&
+            indices.jobOutputIndex !== DAO_HARVEST_V3_ABSENT_INDEX
+          ? DaoHarvestProgressV3.pack({
+              version: 3,
+              state: 0,
+              cycle_index: Number(inputProgress.cycle_index) + 1,
+              prepare_credit_hash: Array(32).fill(0),
+            })
+          : inputProgressBytes;
+      const progress = DaoHarvestProgressV3.unpack(activeProgressBytes);
       let jobId: Hash32;
       if (indices.jobOutputIndex !== DAO_HARVEST_V3_ABSENT_INDEX) {
         const jobData = JobDataV1.unpack(
@@ -216,7 +247,6 @@ export function extractDaoHarvestV3ProjectionEvents(
         jobId = hash32FromBytes(args.slice(0, 32));
       }
       const txHash = parseHash32(transaction.hash());
-      const creditBytes = Uint8Array.from(envelope.prepare_credit);
       const credit =
         creditBytes.length === 0 ? null : DaoHarvestPrepareCreditV3.unpack(creditBytes);
       events.push(
@@ -233,6 +263,9 @@ export function extractDaoHarvestV3ProjectionEvents(
           ownerLockHash: hash32FromBytes(Uint8Array.from(payload.owner_lock_hash)),
           payoutLockHash: hash32FromBytes(Uint8Array.from(payload.payout_lock_hash)),
           payloadHash: hash32FromBytes(Uint8Array.from(witness.payload_hash)),
+          payload: bytesToHex(payloadBytes) as Hex,
+          progress: bytesToHex(activeProgressBytes) as Hex,
+          prepareCreditBytes: creditBytes.length === 0 ? null : (bytesToHex(creditBytes) as Hex),
           principalCapacity: BigInt(payload.principal_capacity.toString()).toString(),
           compensationSeedCapacity: BigInt(
             payload.compensation_seed_capacity.toString(),
@@ -243,6 +276,8 @@ export function extractDaoHarvestV3ProjectionEvents(
           jobOutPoint: outputPoint(txHash, indices.jobOutputIndex),
           vaultOutPoint: outputPoint(txHash, indices.vaultOutputIndex),
           compensationOutPoint: outputPoint(txHash, indices.compensationOutputIndex),
+          prepareAccumulatorOutPoint: outputPoint(txHash, indices.prepareAccumulatorOutputIndex),
+          claimAccumulatorOutPoint: outputPoint(txHash, indices.claimAccumulatorOutputIndex),
           prepareCredit:
             credit === null
               ? null

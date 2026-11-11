@@ -9,6 +9,7 @@ import {
   type ApiDaoHarvest,
   type ApiDaoHarvestV2,
   type ApiDaoHarvestV2List,
+  type ApiDaoHarvestV3,
   type ApiPendingDaoHarvest,
 } from "@ckb-automata/api-client";
 import { Button, InlineNotice } from "@ckb-automata/ui";
@@ -40,6 +41,7 @@ export function DaoHarvestDashboard({ mode }: Readonly<{ mode: DashboardMode }>)
   const [items, setItems] = useState<readonly ApiDaoHarvest[]>([]);
   const [pendingItems, setPendingItems] = useState<readonly ApiPendingDaoHarvest[]>([]);
   const [v2Items, setV2Items] = useState<readonly ApiDaoHarvestV2[]>([]);
+  const [v3Items, setV3Items] = useState<readonly ApiDaoHarvestV3[]>([]);
   const [v2PendingItems, setV2PendingItems] = useState<ApiDaoHarvestV2List["pendingItems"]>([]);
   const [state, setState] = useState<"error" | "loading" | "ready">("loading");
   const [retry, setRetry] = useState(0);
@@ -53,13 +55,18 @@ export function DaoHarvestDashboard({ mode }: Readonly<{ mode: DashboardMode }>)
     }
     let active = true;
     setState("loading");
-    void Promise.all([client.listDaoHarvest({ limit: 20 }), client.listDaoHarvestV2({ limit: 20 })])
-      .then(([response, v2Response]) => {
+    void Promise.all([
+      client.listDaoHarvest({ limit: 20 }),
+      client.listDaoHarvestV2({ limit: 20 }),
+      client.listDaoHarvestV3({ limit: 20 }),
+    ])
+      .then(([response, v2Response, v3Response]) => {
         if (!active) return;
         setItems(response.items ?? []);
         setPendingItems(response.pendingItems ?? []);
         setV2Items(v2Response.items);
         setV2PendingItems(v2Response.pendingItems);
+        setV3Items(v3Response.items);
         setState("ready");
       })
       .catch(() => {
@@ -74,6 +81,7 @@ export function DaoHarvestDashboard({ mode }: Readonly<{ mode: DashboardMode }>)
   const visibleItems = visibleDaoAutomations(items, mode, ownerLockHash);
   const visiblePending = visibleDaoAutomations(pendingItems, mode, ownerLockHash);
   const visibleV2Items = visibleDaoAutomations(v2Items, mode, ownerLockHash);
+  const visibleV3Items = visibleDaoAutomations(v3Items, mode, ownerLockHash);
   const visibleV2PendingItems = publicOnlyDaoAutomations(v2PendingItems, mode);
 
   return (
@@ -119,6 +127,7 @@ export function DaoHarvestDashboard({ mode }: Readonly<{ mode: DashboardMode }>)
       visibleItems.length === 0 &&
       visiblePending.length === 0 &&
       visibleV2Items.length === 0 &&
+      visibleV3Items.length === 0 &&
       visibleV2PendingItems.length === 0 ? (
         <div className="harvest-dashboard__empty">
           <p>No DAO compensation automations yet.</p>
@@ -128,8 +137,35 @@ export function DaoHarvestDashboard({ mode }: Readonly<{ mode: DashboardMode }>)
       (visibleItems.length > 0 ||
         visiblePending.length > 0 ||
         visibleV2Items.length > 0 ||
+        visibleV3Items.length > 0 ||
         visibleV2PendingItems.length > 0) ? (
         <div className="harvest-dashboard__rows">
+          {visibleV3Items.map((item) => {
+            const completed = ["completed", "recovered", "closed"].includes(item.state);
+            const processing = ["withdrawing", "owner_withdrawing"].includes(item.state);
+            return (
+              <Link
+                className="harvest-row"
+                href={`/automations/dao-harvest-v3/${encodeURIComponent(item.jobId)}`}
+                key={item.jobId}
+              >
+                <div>
+                  <strong>{titles[item.jobId] ?? "Harvest compensation"}</strong>
+                  <span>Canonical V3 DAO position</span>
+                </div>
+                <div>
+                  <span className={`ui-status ui-status--${completed ? "neutral" : "info"}`}>
+                    {completed ? "Completed" : processing ? "Processing" : "Waiting"}
+                  </span>
+                  <strong>{harvestV2Amount(item.principalCapacity)}</strong>
+                  <small>
+                    {item.progress.cycle} of {item.progress.totalCycles} harvests
+                  </small>
+                </div>
+                <ArrowUpRight aria-hidden="true" size={17} />
+              </Link>
+            );
+          })}
           {visibleV2PendingItems.map((item) => (
             <div className="harvest-row harvest-row--pending" key={item.transactionHash}>
               <div>

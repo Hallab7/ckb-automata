@@ -145,6 +145,11 @@ test("extracts a canonical V3 setup and rebuilds it without database history", (
   assert.equal(result.events[0]?.operation, "setup");
   assert.equal(result.events[0]?.jobId, jobId);
   assert.equal(result.events[0]?.lifecycleState, "deposited");
+  assert.equal(result.events[0]?.payload, bytesToHex(payload));
+  assert.equal(result.events[0]?.progress, bytesToHex(progress));
+  assert.equal(result.events[0]?.prepareCreditBytes, null);
+  assert.equal(result.events[0]?.prepareAccumulatorOutPoint, null);
+  assert.equal(result.events[0]?.claimAccumulatorOutPoint, null);
   assert.equal(rebuildDaoHarvestV3Snapshot(result.events)?.transactionHash, setup.txHash);
 });
 

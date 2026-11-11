@@ -15,6 +15,8 @@ import {
 import {
   DAO_HARVEST_V1_ADAPTER_ID,
   DAO_HARVEST_V2_ADAPTER_ID,
+  DAO_HARVEST_V3_ADAPTER_ID,
+  assertDaoHarvestV3ExecutorOperation,
   assertSingleCanonicalDaoHarvestV2Successor,
   createDaoHarvestV2ExecutionPlan,
   daoHarvestAdapterId,
@@ -61,6 +63,18 @@ function record(overrides: Partial<DaoHarvestV2ScheduleRecord> = {}): DaoHarvest
     ...overrides,
   };
 }
+
+test("V3 executor selection excludes every owner-only operation", () => {
+  for (const operation of [1, 2, 3, 4]) {
+    assert.doesNotThrow(() => assertDaoHarvestV3ExecutorOperation(operation));
+  }
+  for (const operation of [0, 5, 6, 7, 8, 9, 10]) {
+    assert.throws(
+      () => assertDaoHarvestV3ExecutorOperation(operation),
+      /preferred or fallback prepare and claim/,
+    );
+  }
+});
 
 const consumedInputs = [outPoint("5"), outPoint("6"), outPoint("7"), outPoint("8")];
 
@@ -301,11 +315,12 @@ test("drops, restarts, and reorgs retry only after every input is restored", () 
   );
 });
 
-test("V1 and V2 adapter identities cannot be confused", () => {
+test("V1, V2, and V3 adapter identities cannot be confused", () => {
   assert.equal(daoHarvestAdapterId(1n), DAO_HARVEST_V1_ADAPTER_ID);
   assert.equal(daoHarvestAdapterId(2n), DAO_HARVEST_V2_ADAPTER_ID);
   assert.throws(() =>
     createDaoHarvestV2ExecutionPlan(planInput({ adapterId: DAO_HARVEST_V1_ADAPTER_ID })),
   );
-  assert.throws(() => daoHarvestAdapterId(3n));
+  assert.equal(daoHarvestAdapterId(3n), DAO_HARVEST_V3_ADAPTER_ID);
+  assert.throws(() => daoHarvestAdapterId(4n));
 });

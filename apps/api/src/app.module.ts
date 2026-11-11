@@ -31,6 +31,7 @@ import {
   DaoHarvestV3MutationService,
   DaoHarvestV3ReadService,
 } from "./dao-harvest-v3.ts";
+import { DaoHarvestV3TransactionAdapter } from "./dao-harvest-v3-adapter.ts";
 import {
   loadVerifiedDaoHarvestV3Deployments,
   type VerifiedDaoHarvestV3Deployment,
@@ -332,10 +333,21 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
       },
       {
         provide: DaoHarvestV3MutationService,
-        inject: [DAO_HARVEST_V3_DEPLOYMENT],
-        useFactory: (loaded: readonly VerifiedDaoHarvestV3Deployment[] | undefined) =>
+        inject: [CkbClient, DatabaseClient, DAO_HARVEST_V3_DEPLOYMENT],
+        useFactory: (
+          ckbClient: CkbClient,
+          databaseClient: DatabaseClient,
+          loaded: readonly VerifiedDaoHarvestV3Deployment[] | undefined,
+        ) =>
           new DaoHarvestV3MutationService(
-            undefined,
+            loaded === undefined
+              ? undefined
+              : new DaoHarvestV3TransactionAdapter(
+                  ckbClient,
+                  databaseClient.database,
+                  environment.CKB_NETWORK,
+                  loaded.map(({ deployment }) => deployment),
+                ),
             loaded !== undefined && environment.DAO_HARVEST_V3_SETUP_ENABLED === "true",
           ),
       },

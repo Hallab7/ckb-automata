@@ -35,6 +35,7 @@ test("App Router exposes every planned product route", async () => {
     "/automations",
     "/automations/:jobId",
     "/automations/dao-harvest-v2/:jobId",
+    "/automations/dao-harvest-v3/:jobId",
     "/automations/dao-harvest/:jobId",
     "/automations/new",
     "/automations/new/dao-harvest",
