@@ -100,6 +100,29 @@ export function encodeDaoHarvestV3FallbackOperatorProof(values: readonly Uint8Ar
   normalized.forEach((operator, index) => proof.set(operator, index * BYTE32_LENGTH));
   return proof;
 }
+export function decodeDaoHarvestV3FallbackOperatorProof(
+  proof: Uint8Array,
+  expectedHash: Uint8Array,
+) {
+  if (
+    proof.length === 0 ||
+    proof.length % BYTE32_LENGTH !== 0 ||
+    proof.length > MAX_DAO_HARVEST_V3_FALLBACK_OPERATORS * BYTE32_LENGTH
+  ) {
+    throw new RangeError("fallback operator proof is invalid");
+  }
+  const operators = Array.from({ length: proof.length / BYTE32_LENGTH }, (_, index) =>
+    proof.slice(index * BYTE32_LENGTH, (index + 1) * BYTE32_LENGTH),
+  );
+  const normalized = normalizeDaoHarvestV3FallbackOperators(operators);
+  if (operators.some((operator, index) => compareBytes(operator, normalized[index]!) !== 0)) {
+    throw new RangeError("fallback operator proof is not canonical");
+  }
+  if (compareBytes(deriveDaoHarvestV3FallbackOperatorSetHash(operators), expectedHash) !== 0) {
+    throw new RangeError("fallback operator proof does not match its commitment");
+  }
+  return normalized;
+}
 
 export interface DaoHarvestV3LockArgs {
   readonly parts: readonly [Uint8Array, Uint8Array, Uint8Array, Uint8Array, Uint8Array];

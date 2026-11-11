@@ -16,6 +16,7 @@ import { ConfirmationService } from "./confirmation.ts";
 import { PostgresDeadLetterStore } from "./dead-letter-store.ts";
 import { DeadLetterCoordinator } from "./dead-letter-worker.ts";
 import { DaoHarvestV2RuntimeCoordinator } from "./dao-harvest-v2-runtime.ts";
+import { DaoHarvestV3RuntimeCoordinator } from "./dao-harvest-v3-runtime.ts";
 import { EligibilityCoordinator, PostgresEligibilityJobSource } from "./eligibility-worker.ts";
 import { DEADLINE_EXECUTOR_ADAPTER } from "./policies/deadline.ts";
 import { DAO_HARVEST_EXECUTOR_ADAPTER } from "./policies/dao-harvest.ts";
@@ -69,6 +70,7 @@ export interface ExecutorModuleDependencies {
   readonly createChainClient?: (environment: AutomataEnvironment) => ExecutorChainClient;
   readonly enableDeadLetterWorkers?: boolean;
   readonly enableDaoHarvestV2Runtime?: boolean;
+  readonly enableDaoHarvestV3Runtime?: boolean;
   readonly enableBuildWorkers?: boolean;
   readonly enableConfirmationWorkers?: boolean;
   readonly enableEligibilityWorkers?: boolean;
@@ -377,6 +379,72 @@ export function createExecutorModule(
             },
           },
         ];
+  const supportsDaoHarvestV3 = new Set(
+    (environment.EXECUTOR_SUPPORTED_POLICIES ?? "").split(","),
+  ).has("dao-harvest-v3");
+  const hasDaoHarvestV3Configuration =
+    supportsDaoHarvestV3 &&
+    environment.DAO_HARVEST_V3_MANIFEST_PATH !== undefined &&
+    hasSimulationConfiguration;
+  if (dependencies.enableDaoHarvestV3Runtime === true && !hasDaoHarvestV3Configuration) {
+    throw new Error("DAO harvest V3 runtime configuration is required");
+  }
+  const daoHarvestV3Providers: Provider[] =
+    dependencies.enableDaoHarvestV3Runtime === false || !hasDaoHarvestV3Configuration
+      ? []
+      : [
+          {
+            provide: DaoHarvestV3RuntimeCoordinator,
+            inject: [EXECUTOR_ENVIRONMENT, ExecutorRuntime, EXECUTOR_LOGGER],
+            useFactory: async (
+              configured: AutomataEnvironment,
+              runtime: ExecutorRuntime,
+              logger: ExecutorEventLogger,
+            ) => {
+              const loaded = await deploymentRegistry.load(configured.CKB_GENESIS_HASH);
+              if (loaded.status !== "ok") {
+                throw new Error("executor deployment is unavailable for V3 signing identity");
+              }
+              const privateKey = configured.EXECUTOR_FEE_PRIVATE_KEY;
+              const lockArgs = configured.EXECUTOR_LOCK_ARGS;
+              const transactionFee = configured.EXECUTOR_TRANSACTION_FEE;
+              const minimumMargin = configured.EXECUTOR_MIN_MARGIN;
+              const maximumCycles = configured.EXECUTOR_MAX_CYCLES;
+              const manifestPath = configured.DAO_HARVEST_V3_MANIFEST_PATH;
+              if (
+                privateKey === undefined ||
+                lockArgs === undefined ||
+                transactionFee === undefined ||
+                minimumMargin === undefined ||
+                maximumCycles === undefined ||
+                manifestPath === undefined
+              ) {
+                throw new Error("DAO harvest V3 runtime configuration is unavailable");
+              }
+              const secp = loaded.deployment.manifest.secp256k1Blake160;
+              const ownerLock = Object.freeze({
+                codeHash: secp.codeHash,
+                hashType: secp.hashType,
+                args: lockArgs as `0x${string}`,
+              });
+              if (operatorLockArgs(privateKey) !== ownerLock.args) {
+                throw new Error("operator private key does not match the V3 owner lock");
+              }
+              return new DaoHarvestV3RuntimeCoordinator({
+                runtime,
+                logger,
+                databaseUrl: configured.DATABASE_URL,
+                network: configured.CKB_NETWORK,
+                manifestPath,
+                privateKey,
+                ownerLock,
+                transactionFee: parseShannons(transactionFee),
+                minimumMargin: parseShannons(minimumMargin),
+                maximumCycles: BigInt(maximumCycles),
+              });
+            },
+          },
+        ];
   const confirmationProviders: Provider[] =
     dependencies.enableConfirmationWorkers !== true
       ? []
@@ -512,6 +580,7 @@ export function createExecutorModule(
             adapterIds: [
               ...registered.map((adapter) => adapter.registration.id),
               ...(hasDaoHarvestV2Configuration ? ["dao-harvest-v2"] : []),
+              ...(hasDaoHarvestV3Configuration ? ["dao-harvest-v3"] : []),
             ],
             logger,
           });
@@ -521,6 +590,7 @@ export function createExecutorModule(
       ...buildProviders,
       ...simulationProviders,
       ...daoHarvestV2Providers,
+      ...daoHarvestV3Providers,
       ...confirmationProviders,
       ...deadLetterProviders,
     ],

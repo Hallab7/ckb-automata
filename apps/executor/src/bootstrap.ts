@@ -104,6 +104,7 @@ export interface ExecutorBootstrapDependencies {
   readonly createChainClient?: ExecutorModuleDependencies["createChainClient"];
   readonly enableDeadLetterWorkers?: boolean;
   readonly enableDaoHarvestV2Runtime?: boolean;
+  readonly enableDaoHarvestV3Runtime?: boolean;
   readonly enableBuildWorkers?: boolean;
   readonly enableConfirmationWorkers?: boolean;
   readonly enableEligibilityWorkers?: boolean;
@@ -147,6 +148,9 @@ export async function createExecutorApplication(
     ...(dependencies.enableDaoHarvestV2Runtime === undefined
       ? {}
       : { enableDaoHarvestV2Runtime: dependencies.enableDaoHarvestV2Runtime }),
+    ...(dependencies.enableDaoHarvestV3Runtime === undefined
+      ? {}
+      : { enableDaoHarvestV3Runtime: dependencies.enableDaoHarvestV3Runtime }),
     ...(dependencies.enableBuildWorkers === undefined
       ? {}
       : { enableBuildWorkers: dependencies.enableBuildWorkers }),

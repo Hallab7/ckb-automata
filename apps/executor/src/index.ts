@@ -48,6 +48,34 @@ export {
   type DaoHarvestV2ScheduleRecord,
 } from "./dao-harvest-v2-safety.ts";
 
+export {
+  DAO_HARVEST_V3_ADAPTER_ID,
+  DAO_HARVEST_V3_MAX_WAKE_DELAY_MS,
+  DAO_HARVEST_V3_MIN_WAKE_DELAY_MS,
+  DaoHarvestV3SafetyError,
+  assertDaoHarvestV3ExecutorOperation,
+  assertSingleCanonicalDaoHarvestV3Successor,
+  createDaoHarvestV3ExecutionPlan,
+  evaluateDaoHarvestV3Schedule,
+  reconcileDaoHarvestV3Attempt,
+  validateDaoHarvestV3Reload,
+  type DaoHarvestV3AttemptObservation,
+  type DaoHarvestV3DryRunEvidence,
+  type DaoHarvestV3ExecutionEconomics,
+  type DaoHarvestV3ExecutionPlan,
+  type DaoHarvestV3Operation,
+  type DaoHarvestV3OperatorIdentity,
+  type DaoHarvestV3ScheduleDecision,
+  type DaoHarvestV3ScheduleRecord,
+} from "./dao-harvest-v3-safety.ts";
+export {
+  loadVerifiedDaoHarvestV3ExecutorDeployments,
+  parseDaoHarvestV3ExecutorManifest,
+  type DaoHarvestV3ExecutorManifest,
+  type VerifiedDaoHarvestV3ExecutorDeployment,
+} from "./dao-harvest-v3-manifest.ts";
+export { DaoHarvestV3RuntimeCoordinator } from "./dao-harvest-v3-runtime.ts";
+
 export { ChainBuildSnapshotSource, chainScriptIdentity } from "./build-snapshot.ts";
 export { PostgresBuildAttemptStore } from "./build-store.ts";
 export { BuildCoordinator } from "./build-worker.ts";
