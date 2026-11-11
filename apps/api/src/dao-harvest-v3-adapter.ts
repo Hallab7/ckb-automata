@@ -137,6 +137,14 @@ const output = (
     data,
   });
 
+export function daoHarvestV3PolicyScriptHash(value: {
+  readonly codeHash: unknown;
+  readonly hashType: unknown;
+  readonly args: unknown;
+}) {
+  return parseHash32(scriptToHash(chainLock(value)));
+}
+
 export class DaoHarvestV3TransactionAdapter implements DaoHarvestV3MutationAdapter {
   readonly #chain: CkbReadClient;
   readonly #database: AutomataDatabase;
@@ -203,6 +211,20 @@ export class DaoHarvestV3TransactionAdapter implements DaoHarvestV3MutationAdapt
     );
     if (!deployment)
       throw new ServiceUnavailableException("the V3 contract revision is unavailable");
+    if (
+      jobCell.cellOutput.type === undefined ||
+      chainText(jobCell.cellOutput.type.codeHash, "job policy code hash") !==
+        deployment.contracts.policy.codeHash ||
+      chainText(jobCell.cellOutput.lock.codeHash, "job lock code hash") !==
+        deployment.contracts.jobLock.codeHash ||
+      chainText(vaultCell.cellOutput.lock.codeHash, "vault lock code hash") !==
+        deployment.contracts.vaultLock.codeHash ||
+      chainText(compensationCell.cellOutput.lock.codeHash, "compensation lock code hash") !==
+        deployment.contracts.compensationLock.codeHash
+    ) {
+      throw new BadRequestException("the live V3 cells do not match the selected manifest");
+    }
+    const policyScriptHash = daoHarvestV3PolicyScriptHash(jobCell.cellOutput.type);
     const job = JobDataV1.unpack(hexToBytes(jobCell.outputData.toString()));
     const identityCapacity = parseShannons(identityCell.cellOutput.capacity.toString());
     if (identityCapacity <= fee)
@@ -226,7 +248,7 @@ export class DaoHarvestV3TransactionAdapter implements DaoHarvestV3MutationAdapt
         liveOutPoints: [jobPoint, vaultPoint, compensationPoint, identityPoint].map(txPoint),
         signerLockHash: ownerLockHash,
       },
-      policyScriptHash: deployment.contracts.policy.codeHash,
+      policyScriptHash,
       ownerLockHash,
       payload: payloadBytes,
       progress: progressBytes,
