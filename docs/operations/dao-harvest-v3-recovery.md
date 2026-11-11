@@ -4,6 +4,19 @@ The V3 recovery command builds unsigned owner transactions from a versioned depl
 a public CKB RPC. It does not read a private key or contact the CKAutomata API, database, Redis, or
 executors. Sign and broadcast the exported transaction with the wallet that controls the owner lock.
 
+Use testnet funds only. DAO Harvest V3 has internal test coverage but has not completed an
+independent professional audit.
+
+Starting a withdrawal does not make funds immediately spendable. It creates a normal Nervos DAO
+withdrawal controlled by the owner wallet, and the owner must wait for normal DAO maturity before
+claiming it.
+
+Preferred operators receive the first opportunity to prepare an automated withdrawal. Approved
+backup operators may take over later. An approved operator can still submit late until the owner
+removes it, and changing operators cannot cancel a transaction already submitted. Missing the safe
+preparation window normally means waiting about 180 DAO epochs, roughly 30 days, for the next
+opportunity; canonical chain epochs determine the exact time.
+
 The manifest must use schema `ckb-automata/dao-harvest-deployment/v3` and must identify CKB testnet,
 its genesis block, every V3 code cell, the Nervos DAO dependency, and the secp256k1 dependency. The
 command rejects another network, a stale input, a non-canonical header, an immature claim, or an

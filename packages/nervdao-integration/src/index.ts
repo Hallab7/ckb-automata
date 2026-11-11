@@ -18,6 +18,18 @@ export type NervDaoOwnerAction = "owner-exit" | "owner-recovery";
 export type NervDaoPositionState =
   "deposited" | "withdrawing" | "owner_withdrawing" | "completed" | "recovered" | "closed";
 
+export const NERVDAO_HARVEST_TESTNET_NOTICE = Object.freeze({
+  title: "Testnet security preview",
+  body: "Use testnet funds only. DAO Harvest V3 has internal test coverage but has not completed an independent professional audit.",
+});
+
+export const NERVDAO_HARVEST_TIMING_NOTICES = Object.freeze([
+  "Your preferred operator gets the first chance to start each withdrawal. Approved backup operators can take over later if it does not act.",
+  "An approved operator may still start a withdrawal late until you remove it. Updating operators cannot cancel a transaction that was already submitted.",
+  "If the preparation window is missed, the next opportunity is usually about 180 DAO epochs, roughly 30 days, later. CKB chain epochs decide the exact time.",
+  "Stopping the automation starts a normal DAO withdrawal. Your funds remain locked until normal DAO maturity and do not become spendable immediately.",
+]);
+
 function hash32(value: string, name: string): string {
   if (!HASH32.test(value)) throw new TypeError(`${name} must be a lowercase 32-byte hash`);
   return value;

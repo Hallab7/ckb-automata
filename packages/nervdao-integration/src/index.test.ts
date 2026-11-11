@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  NERVDAO_HARVEST_TESTNET_NOTICE,
+  NERVDAO_HARVEST_TIMING_NOTICES,
   assertNervDaoReviewUnchanged,
   assertNervDaoTestnetIdentity,
   nervDaoOwnerAction,
@@ -55,4 +57,14 @@ test("status and owner actions derive only from canonical position state", () =>
   assert.equal(nervDaoPositionLabel("deposited"), "Waiting");
   assert.equal(nervDaoPositionLabel("withdrawing"), "Processing");
   assert.equal(nervDaoPositionLabel("closed"), "Completed");
+});
+
+test("plain-language notices disclose timing authority and testnet audit limits", () => {
+  assert.match(NERVDAO_HARVEST_TESTNET_NOTICE.body, /testnet funds only/i);
+  assert.match(NERVDAO_HARVEST_TESTNET_NOTICE.body, /professional audit/i);
+  assert.ok(NERVDAO_HARVEST_TIMING_NOTICES.some((notice) => /180 DAO epochs/.test(notice)));
+  assert.ok(NERVDAO_HARVEST_TIMING_NOTICES.some((notice) => /cannot cancel/.test(notice)));
+  assert.ok(
+    NERVDAO_HARVEST_TIMING_NOTICES.some((notice) => /do not become spendable/.test(notice)),
+  );
 });

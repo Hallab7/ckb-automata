@@ -12,6 +12,8 @@ import {
   type AutomataApiClient,
 } from "@ckb-automata/api-client";
 import {
+  NERVDAO_HARVEST_TESTNET_NOTICE,
+  NERVDAO_HARVEST_TIMING_NOTICES,
   nervDaoOwnerAction,
   nervDaoPositionLabel,
   type NervDaoOwnerAction,
@@ -217,6 +219,9 @@ function V3OwnerAction({
                 <dd>{harvestV2Amount(state.value.build.review.maximumNetworkFee)}</dd>
               </div>
             </dl>
+            <InlineNotice title={NERVDAO_HARVEST_TESTNET_NOTICE.title} tone="warning">
+              <p>{NERVDAO_HARVEST_TESTNET_NOTICE.body}</p>
+            </InlineNotice>
             <Button icon={<ShieldCheck size={17} />} onClick={() => void submit(state.value)}>
               Approve in wallet
             </Button>
@@ -363,6 +368,17 @@ export function DaoHarvestV3Detail({ jobId }: Readonly<{ jobId: string }>) {
             </a>
           </strong>
         </div>
+      </section>
+      <section className="harvest-detail__section">
+        <h2>Timing and control</h2>
+        <ul>
+          {NERVDAO_HARVEST_TIMING_NOTICES.map((notice) => (
+            <li key={notice}>{notice}</li>
+          ))}
+        </ul>
+        <InlineNotice title={NERVDAO_HARVEST_TESTNET_NOTICE.title} tone="warning">
+          <p>{NERVDAO_HARVEST_TESTNET_NOTICE.body}</p>
+        </InlineNotice>
       </section>
       {job.state === "owner_withdrawing" ? (
         <InlineNotice title="Wait for DAO maturity" tone="warning">
