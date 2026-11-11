@@ -14,7 +14,7 @@ export interface NervDaoReviewIdentity {
   readonly chain: NervDaoChainIdentity;
 }
 
-export type NervDaoOwnerAction = "owner-exit" | "owner-recovery";
+export type NervDaoOwnerAction = "owner-exit" | "owner-recovery" | "owner-complete";
 export type NervDaoPositionState =
   "deposited" | "withdrawing" | "owner_withdrawing" | "completed" | "recovered" | "closed";
 

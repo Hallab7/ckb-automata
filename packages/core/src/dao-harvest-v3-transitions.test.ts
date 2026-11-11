@@ -231,6 +231,43 @@ test("V3 transition builders produce committed prepare and claim successors", ()
   assert.equal(claimed.transaction.outputsData[1], "0x0000000000000000");
 });
 
+test("owner completion waives claim payment and uses the owner as the claim authority", () => {
+  const prepared = buildDaoHarvestV3PrepareTransition(prepareInput());
+  const envelope = DaoHarvestEnvelopeV3.unpack(
+    witnessOutputType(prepared.transaction.witnesses[0]!),
+  );
+  const credit = Uint8Array.from(envelope.prepare_credit);
+  const withdrawing = DaoHarvestProgressV3.pack({
+    version: 3,
+    state: 1,
+    cycle_index: 0,
+    prepare_credit_hash: [...deriveDaoHarvestV3PrepareCreditHash(credit)],
+  });
+  const compensationCapacity = 201n * CKB;
+  const completed = buildDaoHarvestV3ClaimTransition({
+    ...prepareInput(),
+    operation: "owner_complete",
+    progress: withdrawing,
+    job: cell("e", 400n * CKB, jobLock, policy, prepared.transaction.outputsData[0]!),
+    vault: cell("f", 10_000n * CKB, vaultLock, daoType, prepared.transaction.outputsData[1]!),
+    compensation: cell("1", compensationCapacity, compensationLock, null, "0x"),
+    prepareAccumulator: cell("2", 300n * CKB, accumulatorLock, null, "0x"),
+    prepareCredit: credit,
+    depositHeaderHash: hash("d"),
+    prepareHeaderHash: hash("e"),
+    depositAccumulatedRate: 10_000_000_000_000_000n,
+    prepareAccumulatedRate: 10_010_000_000_000_000n,
+    vaultOccupiedCapacity: 242n * CKB,
+    executionSince: (1n << 61n) | 104n,
+    nextPrepareSince: (1n << 61n) | 200n,
+  });
+  assert.equal(completed.operation, 5);
+  assert.equal(completed.transaction.inputs.length, 5);
+  assert.equal(completed.transaction.outputs.length, 5);
+  assert(BigInt(completed.transaction.outputs[2]!.capacity) > compensationCapacity);
+  assert.equal(scriptToHash(completed.transaction.outputs[4]!.lock), scriptToHash(ownerLock));
+});
+
 test("V3 transition builders fail closed on payload substitution and missing fallback proof", () => {
   const changedPayload = Uint8Array.from(payload);
   changedPayload[changedPayload.length - 1] = changedPayload.at(-1)! ^ 1;

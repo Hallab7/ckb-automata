@@ -24,6 +24,7 @@ import { calculateDaoMaximumWithdraw } from "./dao-harvest-math.ts";
 import {
   buildDaoHarvestV3FallbackClaim,
   buildDaoHarvestV3FallbackPrepare,
+  buildDaoHarvestV3OwnerCompletion,
   buildDaoHarvestV3PreferredClaim,
   buildDaoHarvestV3PreferredPrepare,
   type DaoHarvestV3Build,
@@ -79,7 +80,7 @@ export interface DaoHarvestV3PrepareTransitionInput extends CommonInput {
 }
 
 export interface DaoHarvestV3ClaimTransitionInput extends CommonInput {
-  readonly operation: "preferred_claim" | "fallback_claim";
+  readonly operation: "preferred_claim" | "fallback_claim" | "owner_complete";
   readonly prepareCredit: Uint8Array;
   readonly compensation: DaoHarvestV3TransitionCell;
   readonly prepareAccumulator: DaoHarvestV3TransitionCell;
@@ -335,7 +336,8 @@ export function buildDaoHarvestV3ClaimTransition(
   }
   assertPlain(value.compensation, "compensation cell");
   assertPlain(value.prepareAccumulator, "prepare accumulator");
-  const claimant = value.claimAccumulator ?? value.accumulator;
+  const ownerCompletion = value.operation === "owner_complete";
+  const claimant = ownerCompletion ? value.feeCell : (value.claimAccumulator ?? value.accumulator);
   assertPlain(claimant, "claim accumulator");
   const principal = parseShannons(current.payload.principal_capacity.toString());
   const maximum = calculateDaoMaximumWithdraw({
@@ -350,8 +352,9 @@ export function buildDaoHarvestV3ClaimTransition(
       ? gross
       : BigInt(current.payload.prepare_service_fee.toString());
   const afterPrepare = gross - preparePayment;
-  const claimPayment =
-    afterPrepare < BigInt(current.payload.claim_service_fee.toString())
+  const claimPayment = ownerCompletion
+    ? 0n
+    : afterPrepare < BigInt(current.payload.claim_service_fee.toString())
       ? afterPrepare
       : BigInt(current.payload.claim_service_fee.toString());
   const ownerPayment = afterPrepare - claimPayment;
@@ -369,7 +372,7 @@ export function buildDaoHarvestV3ClaimTransition(
   if (!sameOperator) {
     cells.push(claimant);
   }
-  cells.push(value.feeCell);
+  if (!cells.includes(value.feeCell)) cells.push(value.feeCell);
   const inputs = cells.map((cell, index) => txInput(cell, index === 1 ? value.executionSince : 0n));
   const outputs: UnsignedCellOutput[] = [];
   const outputsData: Hex[] = [];
@@ -416,7 +419,7 @@ export function buildDaoHarvestV3ClaimTransition(
     ),
   );
   outputsData.push("0x");
-  if (!sameOperator) {
+  if (!ownerCompletion && !sameOperator) {
     outputs.push(txOutput(BigInt(claimant.capacity) + claimPayment, claimant.lock, null));
     outputsData.push("0x");
   }
@@ -431,13 +434,22 @@ export function buildDaoHarvestV3ClaimTransition(
   const operation =
     value.operation === "preferred_claim"
       ? DAO_HARVEST_V3_OPERATIONS.PREFERRED_CLAIM
-      : DAO_HARVEST_V3_OPERATIONS.FALLBACK_CLAIM;
+      : value.operation === "fallback_claim"
+        ? DAO_HARVEST_V3_OPERATIONS.FALLBACK_CLAIM
+        : DAO_HARVEST_V3_OPERATIONS.OWNER_COMPLETE;
   const build =
     operation === DAO_HARVEST_V3_OPERATIONS.PREFERRED_CLAIM
       ? buildDaoHarvestV3PreferredClaim
-      : buildDaoHarvestV3FallbackClaim;
+      : operation === DAO_HARVEST_V3_OPERATIONS.FALLBACK_CLAIM
+        ? buildDaoHarvestV3FallbackClaim
+        : buildDaoHarvestV3OwnerCompletion;
   const prepareInput = reviewedInput(value.prepareAccumulator);
-  const identity = sameOperator ? prepareInput : reviewedInput(claimant);
+  const feeInput = reviewedInput(value.feeCell);
+  const identity = ownerCompletion
+    ? feeInput
+    : sameOperator
+      ? prepareInput
+      : reviewedInput(claimant);
   return build({
     context: context(value, cells),
     policyScriptHash: value.policyScriptHash,
@@ -451,8 +463,8 @@ export function buildDaoHarvestV3ClaimTransition(
       compensation: reviewedInput(value.compensation),
       identity,
       prepareAccumulator: prepareInput,
-      ...(!sameOperator ? { claimAccumulator: identity } : {}),
-      additional: [reviewedInput(value.feeCell)],
+      ...(!ownerCompletion && !sameOperator ? { claimAccumulator: identity } : {}),
+      ...(!ownerCompletion ? { additional: [feeInput] } : {}),
     },
     outputs: {
       ...(!terminal
@@ -485,7 +497,7 @@ export function buildDaoHarvestV3ClaimTransition(
         value.prepareAccumulator.lock,
         null,
       ),
-      ...(!sameOperator
+      ...(!ownerCompletion && !sameOperator
         ? {
             claimAccumulator: reviewedOutput(
               BigInt(claimant.capacity) + claimPayment,

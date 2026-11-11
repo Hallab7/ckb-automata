@@ -48,9 +48,14 @@ const COPY = Object.freeze({
       "Ends this automation and creates a normal DAO withdrawal controlled by your wallet. The amount becomes spendable only after normal DAO maturity.",
   },
   "owner-recovery": {
-    title: "Claim after maturity",
+    title: "Claim and stop",
     description:
-      "Claims a mature DAO withdrawal to your wallet. No completion service charge is taken; only already completed preparation work may be paid from earned compensation.",
+      "Claims a mature DAO withdrawal to your wallet and ends the automation. No completion service charge is taken; only already completed preparation work may be paid from earned compensation.",
+  },
+  "owner-complete": {
+    title: "Complete harvest",
+    description:
+      "Completes the mature withdrawal. If another cycle remains, it starts automatically; otherwise your original DAO deposit returns to normal wallet control. No completion service charge is taken.",
   },
 } satisfies Record<OwnerOperation, { readonly title: string; readonly description: string }>);
 
@@ -93,7 +98,7 @@ function V3OwnerAction({
       ownerLock,
       identityOutPoint,
       maximumNetworkFee: "100000",
-      ...(operation === "owner-recovery"
+      ...(operation === "owner-recovery" || operation === "owner-complete"
         ? { prepareAccumulatorOutPoint: job.cells.prepareAccumulator }
         : {}),
     });
@@ -330,6 +335,12 @@ export function DaoHarvestV3Detail({ jobId }: Readonly<{ jobId: string }>) {
 
   const owner = session.status === "ready" && session.ownerLockHash === job.ownerLockHash;
   const operation = nervDaoOwnerAction(job.state, job.cells.prepareAccumulator !== null);
+  const operations: readonly OwnerOperation[] =
+    operation === "owner-recovery"
+      ? ["owner-complete", "owner-recovery"]
+      : operation
+        ? [operation]
+        : [];
   return (
     <article aria-labelledby="harvest-v3-title" className="app-page harvest-detail">
       <header className="app-page-header harvest-detail__header">
@@ -392,8 +403,12 @@ export function DaoHarvestV3Detail({ jobId }: Readonly<{ jobId: string }>) {
         <h2>Owner actions</h2>
         {!owner ? (
           <p>Connect the owner wallet to review available actions.</p>
-        ) : operation ? (
-          <V3OwnerAction api={api} job={job} operation={operation} />
+        ) : operations.length > 0 ? (
+          <div className="harvest-detail__actions">
+            {operations.map((ownerOperation) => (
+              <V3OwnerAction api={api} job={job} key={ownerOperation} operation={ownerOperation} />
+            ))}
+          </div>
         ) : (
           <p>No owner action is currently available.</p>
         )}

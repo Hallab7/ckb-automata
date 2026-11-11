@@ -7,7 +7,9 @@ import {
 } from "@nervosnetwork/ckb-sdk-utils";
 import {
   DAO_HARVEST_VAULT_OCCUPIED_CAPACITY,
+  addEpochs,
   buildDaoHarvestV3Close,
+  buildDaoHarvestV3ClaimTransition,
   buildDaoHarvestV3Rotation,
   buildDaoHarvestV3Sweep,
   buildDaoHarvestV3OwnerExit,
@@ -16,17 +18,21 @@ import {
   compareEpochFractions,
   decodeDaoHarvestV3CompensationLockArgs,
   decodeAbsoluteEpochSince,
+  decodeRelativeEpochSince,
   deriveDaoHarvestV3FallbackOperatorSetHash,
   deriveDaoHarvestV3PayloadHash,
   encodeDaoHarvestV3CompensationLockArgs,
   encodeDaoHarvestV3FallbackOperatorProof,
+  encodeAbsoluteEpochSince,
   parseHash32,
   parseEpoch,
   parseOutPoint,
   parseShannons,
   scriptIdentityHash,
+  selectDaoPrepareWindow,
   type DaoHarvestV3DeploymentIdentity,
   type DaoHarvestV3ReviewedInput,
+  type DaoHarvestV3TransitionCell,
   type ScriptIdentity,
 } from "@ckb-automata/core";
 import { packClientEpoch } from "@ckb-automata/ccc";
@@ -145,6 +151,19 @@ const output = (
     data,
   });
 
+function transitionCell(
+  cell: NonNullable<Awaited<ReturnType<CkbReadClient["getCellLive"]>>>,
+  point: ReturnType<typeof parseOutPoint>,
+): DaoHarvestV3TransitionCell {
+  return Object.freeze({
+    outPoint: Object.freeze({ txHash: point.txHash, index: point.index }),
+    capacity: parseShannons(cell.cellOutput.capacity.toString()),
+    lock: chainLock(cell.cellOutput.lock),
+    type: cell.cellOutput.type === undefined ? null : chainLock(cell.cellOutput.type),
+    data: cell.outputData.toString() as Hex,
+  });
+}
+
 export function daoHarvestV3PolicyScriptHash(value: {
   readonly codeHash: unknown;
   readonly hashType: unknown;
@@ -227,7 +246,11 @@ export class DaoHarvestV3TransactionAdapter implements DaoHarvestV3MutationAdapt
     this.#deployments = deployments;
   }
   async build(operation: DaoHarvestV3BuildOperation, bodyValue: unknown): Promise<unknown> {
-    if (!["sweep", "close", "rotate", "owner-exit", "owner-recovery"].includes(operation))
+    if (
+      !["sweep", "close", "rotate", "owner-exit", "owner-recovery", "owner-complete"].includes(
+        operation,
+      )
+    )
       throw new ServiceUnavailableException(`DAO Harvest V3 ${operation} builder is not enabled`);
     const body = object(bodyValue, "request");
     const jobId = parseHash32(text(body["jobId"], "jobId"));
@@ -532,7 +555,7 @@ export class DaoHarvestV3TransactionAdapter implements DaoHarvestV3MutationAdapt
       });
     } else {
       if (Number(progress.state) !== 1 || row.lifecycleState !== "withdrawing")
-        throw new BadRequestException("owner recovery requires a withdrawing V3 position");
+        throw new BadRequestException("this owner action requires a withdrawing V3 position");
       const preparePoint = outPoint(
         body["prepareAccumulatorOutPoint"],
         "prepareAccumulatorOutPoint",
@@ -577,49 +600,99 @@ export class DaoHarvestV3TransactionAdapter implements DaoHarvestV3MutationAdapt
       const compensationCapacity = parseShannons(compensationCell.cellOutput.capacity.toString());
       const jobCapacity = parseShannons(jobCell.cellOutput.capacity.toString());
       const claimSince = BigInt(job.not_before.toString());
-      const ownerPayout = maximum - preparePayment + compensationCapacity + jobCapacity;
-      const context = {
-        ...common.context,
-        canonicalHeaderHashes: [
-          parseHash32(depositBlock.header.hash),
-          parseHash32(prepareBlock.header.hash),
-        ],
-        liveOutPoints: [...common.context.liveOutPoints, txPoint(preparePoint)],
-      };
-      build = buildDaoHarvestV3OwnerRecovery({
-        ...common,
-        context,
-        prepareCredit: creditBytes,
-        inputs: {
-          job: reviewed(jobCell, jobPoint),
-          vault: reviewed(vaultCell, vaultPoint, claimSince, maximum),
-          compensation: reviewed(compensationCell, compensationPoint),
-          identity: reviewed(identityCell, identityPoint),
-          prepareAccumulator: reviewed(prepareCell, preparePoint),
-        },
-        outputs: {
-          prepareAccumulator: output(
-            parseShannons(prepareCell.cellOutput.capacity.toString()) + preparePayment,
-            chainLock(prepareCell.cellOutput.lock),
-            null,
-          ),
-          additional: [
-            output(ownerPayout, ownerLock, null),
-            output(identityCapacity - fee, ownerLock, null),
+      if (operation === "owner-complete") {
+        const remainingRuns = BigInt(job.remaining_runs.toString());
+        const nextPrepareSince =
+          remainingRuns > 1n
+            ? encodeAbsoluteEpochSince(
+                selectDaoPrepareWindow({
+                  deposit: addEpochs(parseEpoch(packClientEpoch(tip.epoch)), 1n),
+                  tip: addEpochs(parseEpoch(packClientEpoch(tip.epoch)), 1n),
+                  bufferEpochs: decodeRelativeEpochSince(payload.prepare_buffer_epochs.toString())
+                    .number,
+                  confirmationMarginEpochs: decodeRelativeEpochSince(
+                    payload.confirmation_margin_epochs.toString(),
+                  ).number,
+                }).startsAt,
+              )
+            : undefined;
+        build = buildDaoHarvestV3ClaimTransition({
+          deployment,
+          policyScriptHash,
+          payload: payloadBytes,
+          progress: progressBytes,
+          job: transitionCell(jobCell, jobPoint),
+          vault: transitionCell(vaultCell, vaultPoint),
+          accumulator: transitionCell(identityCell, identityPoint),
+          feeCell: transitionCell(identityCell, identityPoint),
+          operatorOwnerLock: ownerLock,
+          transactionFee: fee,
+          rpcGenesisHash: await this.#chain.getGenesisHash(),
+          canonicalHeaderHashes: [
+            parseHash32(depositBlock.header.hash),
+            parseHash32(prepareBlock.header.hash),
           ],
-        },
-        headerDeps: [parseHash32(depositBlock.header.hash), parseHash32(prepareBlock.header.hash)],
-        additionalWitnesses: [
-          serializeWitnessArgs({
-            lock: "",
-            inputType: bytesToHex(new Uint8Array(8)),
-            outputType: "",
-          }) as Hex,
-          "0x",
-          "0x",
-          "0x",
-        ],
-      });
+          ownerLock,
+          operation: "owner_complete",
+          prepareCredit: creditBytes,
+          compensation: transitionCell(compensationCell, compensationPoint),
+          prepareAccumulator: transitionCell(prepareCell, preparePoint),
+          depositHeaderHash: parseHash32(depositBlock.header.hash),
+          prepareHeaderHash: parseHash32(prepareBlock.header.hash),
+          depositAccumulatedRate: accumulatedRate(depositBlock.header.dao),
+          prepareAccumulatedRate: accumulatedRate(prepareBlock.header.dao),
+          vaultOccupiedCapacity: DAO_HARVEST_VAULT_OCCUPIED_CAPACITY,
+          executionSince: claimSince,
+          ...(nextPrepareSince === undefined ? {} : { nextPrepareSince }),
+        });
+      } else {
+        const ownerPayout = maximum - preparePayment + compensationCapacity + jobCapacity;
+        const context = {
+          ...common.context,
+          canonicalHeaderHashes: [
+            parseHash32(depositBlock.header.hash),
+            parseHash32(prepareBlock.header.hash),
+          ],
+          liveOutPoints: [...common.context.liveOutPoints, txPoint(preparePoint)],
+        };
+        build = buildDaoHarvestV3OwnerRecovery({
+          ...common,
+          context,
+          prepareCredit: creditBytes,
+          inputs: {
+            job: reviewed(jobCell, jobPoint),
+            vault: reviewed(vaultCell, vaultPoint, claimSince, maximum),
+            compensation: reviewed(compensationCell, compensationPoint),
+            identity: reviewed(identityCell, identityPoint),
+            prepareAccumulator: reviewed(prepareCell, preparePoint),
+          },
+          outputs: {
+            prepareAccumulator: output(
+              parseShannons(prepareCell.cellOutput.capacity.toString()) + preparePayment,
+              chainLock(prepareCell.cellOutput.lock),
+              null,
+            ),
+            additional: [
+              output(ownerPayout, ownerLock, null),
+              output(identityCapacity - fee, ownerLock, null),
+            ],
+          },
+          headerDeps: [
+            parseHash32(depositBlock.header.hash),
+            parseHash32(prepareBlock.header.hash),
+          ],
+          additionalWitnesses: [
+            serializeWitnessArgs({
+              lock: "",
+              inputType: bytesToHex(new Uint8Array(8)),
+              outputType: "",
+            }) as Hex,
+            "0x",
+            "0x",
+            "0x",
+          ],
+        });
+      }
     }
     return Object.freeze({
       version: 3,
