@@ -376,9 +376,11 @@ function build(
     reviewedInputs.reduce((sum, item) => sum + parseShannons(item.capacity), 0n),
   );
   const totalOutput = outputCapacity(transaction.outputs);
-  if (totalOutput > totalInput) throw new Error("reviewed outputs exceed reviewed inputs");
+  const walletFundedSetup = operation === DAO_HARVEST_V3_OPERATIONS.SETUP;
+  if (!walletFundedSetup && totalOutput > totalInput)
+    throw new Error("reviewed outputs exceed reviewed inputs");
   const maximumNetworkFee = parseShannons(input.maximumNetworkFee);
-  if (totalInput - totalOutput > maximumNetworkFee)
+  if (totalInput >= totalOutput && totalInput - totalOutput > maximumNetworkFee)
     throw new Error("reviewed transaction fee exceeds its maximum");
   const normalized = {
     operation,

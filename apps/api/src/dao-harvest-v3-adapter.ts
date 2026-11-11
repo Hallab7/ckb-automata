@@ -12,22 +12,31 @@ import {
   buildDaoHarvestV3ClaimTransition,
   buildDaoHarvestV3Rotation,
   buildDaoHarvestV3Sweep,
+  buildDaoHarvestV3Setup,
   buildDaoHarvestV3OwnerExit,
   buildDaoHarvestV3OwnerRecovery,
   calculateDaoMaximumWithdraw,
   compareEpochFractions,
+  createEpoch,
   decodeDaoHarvestV3CompensationLockArgs,
   decodeAbsoluteEpochSince,
   decodeRelativeEpochSince,
   deriveDaoHarvestV3FallbackOperatorSetHash,
   deriveDaoHarvestV3PayloadHash,
+  deriveDaoHarvestV3ProgressHash,
+  deriveDaoHarvestV3VaultTermsHash,
+  deriveJobId,
   encodeDaoHarvestV3CompensationLockArgs,
   encodeDaoHarvestV3FallbackOperatorProof,
   encodeAbsoluteEpochSince,
+  encodeDaoHarvestV3VaultLockArgs,
+  encodeRelativeEpochSince,
+  hash32FromBytes,
   parseHash32,
   parseEpoch,
   parseOutPoint,
   parseShannons,
+  parseSequence,
   scriptIdentityHash,
   selectDaoPrepareWindow,
   type DaoHarvestV3DeploymentIdentity,
@@ -49,6 +58,16 @@ import { and, eq } from "drizzle-orm";
 import type { DaoHarvestV3BuildOperation, DaoHarvestV3MutationAdapter } from "./dao-harvest-v3.ts";
 
 type Hex = `0x${string}`;
+const CKB = 100_000_000n;
+const JOB_CAPACITY = 400n * CKB;
+const COMPENSATION_SEED = 201n * CKB;
+const PREPARE_SERVICE_FEE = 2n * CKB;
+const CLAIM_SERVICE_FEE = 3n * CKB;
+const MAXIMUM_NETWORK_FEE = 1n * CKB;
+const PREPARE_BUFFER_EPOCHS = 4n;
+const CONFIRMATION_MARGIN_EPOCHS = 1n;
+const MINIMUM_PRINCIPAL = 242n * CKB;
+const MAXIMUM_CYCLES = 12;
 const object = (value: unknown, name: string): Record<string, unknown> => {
   if (typeof value !== "object" || value === null || Array.isArray(value))
     throw new BadRequestException(`${name} must be an object`);
@@ -150,6 +169,21 @@ const output = (
     }),
     data,
   });
+function u64(value: bigint): Uint8Array {
+  const result = new Uint8Array(8);
+  new DataView(result.buffer).setBigUint64(0, value, true);
+  return result;
+}
+function u32(value: number): Uint8Array {
+  const result = new Uint8Array(4);
+  new DataView(result.buffer).setUint32(0, value, true);
+  return result;
+}
+function u16(value: number): Uint8Array {
+  const result = new Uint8Array(2);
+  new DataView(result.buffer).setUint16(0, value, true);
+  return result;
+}
 
 function transitionCell(
   cell: NonNullable<Awaited<ReturnType<CkbReadClient["getCellLive"]>>>,
@@ -209,7 +243,7 @@ export function daoHarvestV3TerminalClosePolicyHash(
     scriptToHash({
       codeHash: deployment.contracts.policy.codeHash,
       hashType: "data1",
-      args: deployment.contracts.jobLock.codeHash,
+      args: deployment.contracts.jobLock.codeHash as Hex,
     }),
   );
   const expectedPayloadHash = deriveDaoHarvestV3PayloadHash(
@@ -246,6 +280,7 @@ export class DaoHarvestV3TransactionAdapter implements DaoHarvestV3MutationAdapt
     this.#deployments = deployments;
   }
   async build(operation: DaoHarvestV3BuildOperation, bodyValue: unknown): Promise<unknown> {
+    if (operation === "setup") return this.#buildSetup(bodyValue);
     if (
       !["sweep", "close", "rotate", "owner-exit", "owner-recovery", "owner-complete"].includes(
         operation,
@@ -707,6 +742,255 @@ export class DaoHarvestV3TransactionAdapter implements DaoHarvestV3MutationAdapt
       review: Object.freeze({
         protectedAmount: BigInt(payload.principal_capacity.toString()).toString(),
         maximumNetworkFee: fee.toString(),
+        totalInput: build.value.totalInput.toString(),
+        totalOutput: build.value.totalOutput.toString(),
+      }),
+      completion: Object.freeze({
+        ...build.completion,
+        requiredInputCapacity: build.completion.requiredInputCapacity.toString(),
+        maximumFee: build.completion.maximumFee.toString(),
+      }),
+    });
+  }
+
+  async #buildSetup(bodyValue: unknown) {
+    const body = object(bodyValue, "request");
+    const setupKeys = new Set([
+      "creatorNonce",
+      "identityOutPoint",
+      "ownerLock",
+      "ownerLockHash",
+      "payoutLock",
+      "payoutLockHash",
+      "principal",
+      "totalCycles",
+      "preferredOperatorLockHash",
+      "fallbackOperatorLockHashes",
+    ]);
+    if (
+      Object.keys(body).length !== setupKeys.size ||
+      Object.keys(body).some((key) => !setupKeys.has(key))
+    )
+      throw new BadRequestException("DAO Harvest V3 setup contains unsupported fields");
+    const ownerLock = lock(body["ownerLock"], "ownerLock");
+    const payoutLock = lock(body["payoutLock"], "payoutLock");
+    const ownerLockHash = parseHash32(text(body["ownerLockHash"], "ownerLockHash"));
+    const payoutLockHash = parseHash32(text(body["payoutLockHash"], "payoutLockHash"));
+    if (
+      scriptIdentityHash(ownerLock) !== ownerLockHash ||
+      scriptIdentityHash(payoutLock) !== payoutLockHash
+    )
+      throw new BadRequestException("reviewed lock hashes do not match their addresses");
+    const identityPoint = outPoint(body["identityOutPoint"], "identityOutPoint");
+    const principal = decimal(body["principal"], "principal");
+    if (principal < MINIMUM_PRINCIPAL)
+      throw new BadRequestException("original amount must be at least 242 CKB");
+    const creatorNonce = parseSequence(text(body["creatorNonce"], "creatorNonce"));
+    const totalCycles = body["totalCycles"];
+    if (
+      !Number.isSafeInteger(totalCycles) ||
+      Number(totalCycles) < 1 ||
+      Number(totalCycles) > MAXIMUM_CYCLES
+    )
+      throw new BadRequestException(`number of harvests must be between 1 and ${MAXIMUM_CYCLES}`);
+    const preferredOperatorLockHash = parseHash32(
+      text(body["preferredOperatorLockHash"], "preferredOperatorLockHash"),
+    );
+    const fallbackValue = body["fallbackOperatorLockHashes"];
+    if (!Array.isArray(fallbackValue))
+      throw new BadRequestException("fallbackOperatorLockHashes must be an array");
+    const fallbackOperatorLockHashes = fallbackValue.map((value, index) =>
+      parseHash32(text(value, `fallbackOperatorLockHashes[${index}]`)),
+    );
+    let operatorProof: Uint8Array;
+    let fallbackSetHash: Uint8Array;
+    try {
+      const fallback = fallbackOperatorLockHashes.map(hexToBytes);
+      operatorProof = encodeDaoHarvestV3FallbackOperatorProof(fallback);
+      fallbackSetHash = deriveDaoHarvestV3FallbackOperatorSetHash(fallback);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : "the fallback operator set is invalid",
+      );
+    }
+    const identityCell = await this.#chain.getCellLive(identityPoint);
+    if (
+      !identityCell ||
+      identityCell.cellOutput.type !== undefined ||
+      identityCell.outputData.toString() !== "0x" ||
+      scriptIdentityHash(chainLock(identityCell.cellOutput.lock)) !== ownerLockHash
+    )
+      throw new BadRequestException("the selected owner cell is no longer available");
+    const deployment = this.#deployments[0];
+    if (!deployment)
+      throw new ServiceUnavailableException("the V3 contract revision is unavailable");
+    const jobLock: ScriptIdentity = Object.freeze({
+      codeHash: deployment.contracts.jobLock.codeHash,
+      hashType: "data1",
+      args: "0x",
+    });
+    const policy: ScriptIdentity = Object.freeze({
+      codeHash: deployment.contracts.policy.codeHash,
+      hashType: "data1",
+      args: deployment.contracts.jobLock.codeHash as Hex,
+    });
+    const vaultType: ScriptIdentity = Object.freeze({
+      codeHash: deployment.nervosDao.codeHash,
+      hashType: "type",
+      args: "0x",
+    });
+    const policyScriptHash = parseHash32(scriptToHash(policy));
+    const jobLockHash = parseHash32(scriptToHash(jobLock));
+    const daoTypeHash = parseHash32(scriptToHash(vaultType));
+    const tip = await this.#chain.getTipHeader();
+    const anticipatedDeposit = addEpochs(parseEpoch(packClientEpoch(tip.epoch)), 1n);
+    const window = selectDaoPrepareWindow({
+      deposit: anticipatedDeposit,
+      tip: anticipatedDeposit,
+      bufferEpochs: PREPARE_BUFFER_EPOCHS,
+      confirmationMarginEpochs: CONFIRMATION_MARGIN_EPOCHS,
+    });
+    const prepareBuffer = encodeRelativeEpochSince(
+      createEpoch({ number: PREPARE_BUFFER_EPOCHS, index: 0n, length: 1n }),
+    );
+    const takeoverDelay = encodeRelativeEpochSince(
+      createEpoch({ number: 0n, index: 1n, length: 20n }),
+    );
+    const confirmationMargin = encodeRelativeEpochSince(
+      createEpoch({ number: CONFIRMATION_MARGIN_EPOCHS, index: 0n, length: 1n }),
+    );
+    const payloadBytes = DaoHarvestPayloadV3.pack({
+      version: 3,
+      owner_lock_hash: [...hexToBytes(ownerLockHash)],
+      payout_lock_hash: [...hexToBytes(payoutLockHash)],
+      vault_lock_code_hash: [...hexToBytes(deployment.contracts.vaultLock.codeHash)],
+      compensation_lock_code_hash: [...hexToBytes(deployment.contracts.compensationLock.codeHash)],
+      dao_type_hash: [...hexToBytes(daoTypeHash)],
+      principal_capacity: principal.toString(),
+      preferred_prepare_operator_lock_hash: [...hexToBytes(preferredOperatorLockHash)],
+      fallback_prepare_executor_set_hash: [...fallbackSetHash],
+      prepare_service_fee: PREPARE_SERVICE_FEE.toString(),
+      claim_service_fee: CLAIM_SERVICE_FEE.toString(),
+      compensation_seed_capacity: COMPENSATION_SEED.toString(),
+      prepare_buffer_epochs: prepareBuffer.toString(),
+      takeover_delay_epochs: takeoverDelay.toString(),
+      confirmation_margin_epochs: confirmationMargin.toString(),
+      total_cycles: Number(totalCycles),
+      end_epoch_since: "0",
+    });
+    const payloadHashBytes = deriveDaoHarvestV3PayloadHash(
+      hexToBytes(policyScriptHash),
+      payloadBytes,
+    );
+    const jobIdBytes = deriveJobId({
+      genesisHash: hexToBytes(deployment.genesisHash),
+      protocolVersion: 3,
+      creationCommitment: payloadHashBytes,
+      anchor: { kind: "output_index", outputIndex: 0n },
+      creatorNonce,
+      policyScriptHash: hexToBytes(policyScriptHash),
+    });
+    const jobId = hash32FromBytes(jobIdBytes);
+    const progressBytes = DaoHarvestProgressV3.pack({
+      version: 3,
+      state: 0,
+      cycle_index: 0,
+      prepare_credit_hash: Array(32).fill(0),
+    });
+    const progressHash = deriveDaoHarvestV3ProgressHash(progressBytes);
+    const termsHash = deriveDaoHarvestV3VaultTermsHash([
+      u16(3),
+      hexToBytes(ownerLockHash),
+      hexToBytes(payoutLockHash),
+      hexToBytes(daoTypeHash),
+      u64(principal),
+      u64(PREPARE_SERVICE_FEE),
+      u64(CLAIM_SERVICE_FEE),
+      u64(COMPENSATION_SEED),
+      u64(prepareBuffer),
+      u64(takeoverDelay),
+      u64(confirmationMargin),
+      u32(Number(totalCycles)),
+      u64(0n),
+    ]);
+    const vaultLock: ScriptIdentity = Object.freeze({
+      codeHash: deployment.contracts.vaultLock.codeHash,
+      hashType: "data1",
+      args: bytesToHex(
+        encodeDaoHarvestV3VaultLockArgs({
+          jobId: jobIdBytes,
+          ownerLockHash: hexToBytes(ownerLockHash),
+          jobLockHash: hexToBytes(jobLockHash),
+          policyScriptHash: hexToBytes(policyScriptHash),
+          immutableTermsHash: termsHash,
+        }),
+      ) as Hex,
+    });
+    const compensationLock: ScriptIdentity = Object.freeze({
+      codeHash: deployment.contracts.compensationLock.codeHash,
+      hashType: "data1",
+      args: bytesToHex(
+        encodeDaoHarvestV3CompensationLockArgs({
+          jobId: jobIdBytes,
+          ownerLockHash: hexToBytes(ownerLockHash),
+          payoutLockHash: hexToBytes(payoutLockHash),
+          policyScriptHash: hexToBytes(policyScriptHash),
+          payloadHash: payloadHashBytes,
+        }),
+      ) as Hex,
+    });
+    const jobData = JobDataV1.pack({
+      version: 1,
+      flags: 0,
+      job_id: [...jobIdBytes],
+      sequence: "0",
+      state: 0,
+      trigger_kind: 2,
+      trigger_params_hash: [...progressHash],
+      policy_script_hash: [...hexToBytes(policyScriptHash)],
+      payload_hash: [...payloadHashBytes],
+      reward: "0",
+      remaining_budget: "0",
+      not_before: encodeAbsoluteEpochSince(window.startsAt).toString(),
+      not_after: "0",
+      remaining_runs: Number(totalCycles),
+      cancel_lock_hash: [...hexToBytes(ownerLockHash)],
+    });
+    const build = buildDaoHarvestV3Setup({
+      context: {
+        rpcGenesisHash: await this.#chain.getGenesisHash(),
+        deployment,
+        canonicalHeaderHashes: [],
+        liveOutPoints: [txPoint(identityPoint)],
+        signerLockHash: ownerLockHash,
+      },
+      policyScriptHash,
+      ownerLockHash,
+      payload: payloadBytes,
+      progress: progressBytes,
+      operatorProof,
+      inputs: { identity: reviewed(identityCell, identityPoint) },
+      outputs: {
+        job: output(JOB_CAPACITY, jobLock, policy, bytesToHex(jobData) as Hex),
+        vault: output(principal, vaultLock, vaultType, "0x0000000000000000"),
+        compensation: output(COMPENSATION_SEED, compensationLock, null),
+      },
+      maximumNetworkFee: MAXIMUM_NETWORK_FEE,
+      allowedFundingLockHashes: [ownerLockHash],
+    });
+    return Object.freeze({
+      version: 3,
+      jobId,
+      operation: "setup",
+      chain: Object.freeze({
+        genesisHash: deployment.genesisHash,
+        manifestSha256: deployment.manifestSha256,
+      }),
+      transaction: build.transaction,
+      intentHash: build.intentHash,
+      review: Object.freeze({
+        protectedAmount: principal.toString(),
+        maximumNetworkFee: MAXIMUM_NETWORK_FEE.toString(),
         totalInput: build.value.totalInput.toString(),
         totalOutput: build.value.totalOutput.toString(),
       }),

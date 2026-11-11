@@ -7,16 +7,25 @@ import {
   parseHash32,
   scriptIdentityHash,
   type DaoHarvestV3DeploymentIdentity,
+  type UnsignedDeadlineTransaction,
 } from "@ckb-automata/core";
 import { bytesToHex, hexToBytes, scriptToHash } from "@nervosnetwork/ckb-sdk-utils";
 import { DaoHarvestPayloadV3 } from "@ckb-automata/molecule";
 
 import {
+  DaoHarvestV3TransactionAdapter,
   daoHarvestV3PolicyScriptHash,
   daoHarvestV3RotationPayload,
   daoHarvestV3SweepAmounts,
   daoHarvestV3TerminalClosePolicyHash,
 } from "./dao-harvest-v3-adapter.ts";
+
+const hash = (character: string) => parseHash32(`0x${character.repeat(64)}`);
+const point = (character: string) => ({ txHash: hash(character), index: "0x0" as const });
+const dependency = (character: string) => ({
+  outPoint: point(character),
+  depType: "code" as const,
+});
 
 test("V3 API derives the full policy script hash rather than using its code hash", () => {
   const script = {
@@ -159,4 +168,75 @@ test("V3 terminal close accepts only the manifest-bound terminal compensation ce
   );
   assert.equal(encodeDaoHarvestV3CompensationLockArgs(args).length, 160);
   assert.equal(bytesToHex(args.payloadHash).length, 66);
+});
+
+test("V3 setup creates the exact chain-bound state and permits owner wallet funding", async () => {
+  const owner = {
+    codeHash: hash("a"),
+    hashType: "type" as const,
+    args: `0x${"12".repeat(20)}` as const,
+  };
+  const payout = {
+    codeHash: hash("a"),
+    hashType: "type" as const,
+    args: `0x${"34".repeat(20)}` as const,
+  };
+  const deployment: DaoHarvestV3DeploymentIdentity = {
+    network: "ckb_testnet",
+    genesisHash: hash("1"),
+    manifestSha256: "2".repeat(64),
+    contracts: {
+      jobLock: { codeHash: hash("3"), cellDep: dependency("3") },
+      policy: { codeHash: hash("4"), cellDep: dependency("4") },
+      vaultLock: { codeHash: hash("5"), cellDep: dependency("5") },
+      compensationLock: { codeHash: hash("6"), cellDep: dependency("6") },
+    },
+    secp256k1Blake160: { cellDep: dependency("7") },
+    nervosDao: { codeHash: hash("8"), cellDep: dependency("8") },
+  };
+  const chain = {
+    getCellLive: async () => ({
+      cellOutput: { capacity: 700n * 100_000_000n, lock: owner, type: undefined },
+      outputData: { toString: () => "0x" },
+    }),
+    getTipHeader: async () => ({
+      epoch: { integer: 13_920n, numerator: 1_151n, denominator: 1_800n },
+      hash: hash("b"),
+      number: 22_583_952n,
+    }),
+    getGenesisHash: async () => deployment.genesisHash,
+  };
+  const adapter = new DaoHarvestV3TransactionAdapter(chain as never, {} as never, "ckb_testnet", [
+    deployment,
+  ]);
+  const request = {
+    creatorNonce: "42",
+    identityOutPoint: point("c"),
+    ownerLock: owner,
+    ownerLockHash: scriptIdentityHash(owner),
+    payoutLock: payout,
+    payoutLockHash: scriptIdentityHash(payout),
+    principal: "24200000000",
+    totalCycles: 2,
+    preferredOperatorLockHash: hash("d"),
+    fallbackOperatorLockHashes: [hash("e")],
+  };
+  const result = (await adapter.build("setup", request)) as {
+    readonly version: number;
+    readonly operation: string;
+    readonly transaction: UnsignedDeadlineTransaction;
+    readonly completion: { readonly requiredInputCapacity: string };
+  };
+  assert.equal(result.version, 3);
+  assert.equal(result.operation, "setup");
+  assert.equal(result.transaction.inputs.length, 1);
+  assert.equal(result.transaction.outputs.length, 3);
+  assert.equal(BigInt(result.transaction.outputs[0]!.capacity), 400n * 100_000_000n);
+  assert.equal(BigInt(result.transaction.outputs[1]!.capacity), 242n * 100_000_000n);
+  assert.equal(BigInt(result.transaction.outputs[2]!.capacity), 201n * 100_000_000n);
+  assert.equal(result.completion.requiredInputCapacity, (700n * 100_000_000n).toString());
+  await assert.rejects(
+    () => adapter.build("setup", { ...request, ignoredDisplayValue: "not committed" }),
+    /unsupported fields/,
+  );
 });

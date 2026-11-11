@@ -254,6 +254,42 @@ test("terminal close emits the compensation-lock-only progress commitment", () =
   assert.deepEqual(envelope.progress, []);
 });
 
+test("setup permits reviewed owner funding to complete an output deficit", () => {
+  const input = fixture(0);
+  const identity = input.inputs.identity!;
+  const fundingLockHash = parseHash32(scriptToHash(lock("1")));
+  const build = buildDaoHarvestV3Setup({
+    ...input,
+    inputs: { ...input.inputs, identity: { ...identity, capacity: 1n } },
+    allowedFundingLockHashes: [owner, fundingLockHash],
+  });
+  const deficit = build.value.totalOutput - 1n;
+  const funding = reviewedInput("1");
+  const completed = {
+    ...build.transaction,
+    inputs: [...build.transaction.inputs, funding.input],
+    outputs: [
+      ...build.transaction.outputs,
+      {
+        capacity: `0x${(BigInt(funding.capacity) - deficit).toString(16)}` as const,
+        lock: lock("1"),
+        type: null,
+      },
+    ],
+    outputsData: [...build.transaction.outputsData, "0x" as const],
+    witnesses: [...build.transaction.witnesses, "0x" as const],
+  };
+  assert.doesNotThrow(() =>
+    verifyCompletedDaoHarvestV3Transaction(build, completed, [
+      {
+        outPoint: funding.input.previousOutput,
+        capacity: funding.capacity,
+        lockHash: fundingLockHash,
+      },
+    ]),
+  );
+});
+
 test("one operator accumulator may satisfy both identity and prepare roles", () => {
   const input = fixture(1);
   const accumulator = input.inputs.prepareAccumulator!;
