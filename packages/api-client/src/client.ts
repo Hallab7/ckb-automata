@@ -93,6 +93,10 @@ export interface ApiDaoHarvestV3Build {
   readonly version: 3;
   readonly jobId: string;
   readonly operation: string;
+  readonly chain: {
+    readonly genesisHash: string;
+    readonly manifestSha256: string;
+  };
   readonly transaction: UnsignedDeadlineTransaction;
   readonly intentHash: string;
   readonly review: {

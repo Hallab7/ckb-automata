@@ -29,6 +29,27 @@ const OPERATION = Object.freeze({
   "owner-recovery": 10,
 } as const);
 
+function manifestDigest(value: string): string {
+  if (!/^[0-9a-f]{64}$/.test(value)) {
+    throw new Error("The reviewed V3 deployment manifest is invalid.");
+  }
+  return value;
+}
+
+export function verifyDaoHarvestV3SignerChain(
+  build: Pick<ApiDaoHarvestV3Build, "chain">,
+  signerGenesisValue: string,
+  expectedGenesisValue: string,
+): void {
+  const signerGenesis = parseHash32(signerGenesisValue);
+  const expectedGenesis = parseHash32(expectedGenesisValue);
+  const reviewedGenesis = parseHash32(build.chain.genesisHash);
+  manifestDigest(build.chain.manifestSha256);
+  if (signerGenesis !== expectedGenesis || reviewedGenesis !== expectedGenesis) {
+    throw new Error("The connected wallet is not using the reviewed CKB testnet deployment.");
+  }
+}
+
 function transaction(value: unknown): UnsignedDeadlineTransaction {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new Error("The reviewed transaction is invalid.");
@@ -97,7 +118,9 @@ export function verifyRefreshedDaoHarvestV3Build(
     reviewed.version !== refreshed.version ||
     reviewed.jobId !== refreshed.jobId ||
     reviewed.operation !== refreshed.operation ||
-    reviewed.intentHash !== refreshed.intentHash
+    reviewed.intentHash !== refreshed.intentHash ||
+    reviewed.chain.genesisHash !== refreshed.chain.genesisHash ||
+    reviewed.chain.manifestSha256 !== refreshed.chain.manifestSha256
   ) {
     throw new Error("The harvest review changed. Build a fresh review before signing.");
   }
@@ -105,13 +128,18 @@ export function verifyRefreshedDaoHarvestV3Build(
 
 export function daoHarvestV3ReviewSnapshot(
   tip: Readonly<{ blockHash: string; blockNumber: string }>,
+  chain: ApiDaoHarvestV3Build["chain"],
 ) {
   parseHash32(tip.blockHash);
+  const genesisHash = parseHash32(chain.genesisHash);
+  const manifestSha256 = manifestDigest(chain.manifestSha256);
   if (!/^(?:0|[1-9][0-9]*)$/.test(tip.blockNumber)) {
     throw new Error("The reviewed snapshot block is invalid.");
   }
   return Object.freeze({
     ...tip,
+    genesisHash,
+    manifestSha256,
     expiresAfterBlock: (BigInt(tip.blockNumber) + CREATION_REVIEW_WINDOW_BLOCKS).toString(),
   });
 }

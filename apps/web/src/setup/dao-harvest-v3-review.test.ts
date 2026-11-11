@@ -4,6 +4,7 @@ import type { ApiDaoHarvestV3Build } from "@ckb-automata/api-client";
 import {
   daoHarvestV3ReviewSnapshot,
   normalizeDaoHarvestV3Build,
+  verifyDaoHarvestV3SignerChain,
   verifyRefreshedDaoHarvestV3Build,
 } from "./dao-harvest-v3-review.ts";
 
@@ -13,6 +14,10 @@ const build = (): ApiDaoHarvestV3Build => ({
   jobId: hash("1"),
   operation: "owner-exit",
   intentHash: hash("2"),
+  chain: {
+    genesisHash: hash("a"),
+    manifestSha256: "b".repeat(64),
+  },
   transaction: {
     version: "0x0",
     cellDeps: [],
@@ -52,13 +57,43 @@ test("a refreshed V3 review must preserve the exact intent", () => {
     () => verifyRefreshedDaoHarvestV3Build(reviewed, { ...reviewed, intentHash: hash("9") }),
     /review changed/,
   );
+  assert.throws(
+    () =>
+      verifyRefreshedDaoHarvestV3Build(reviewed, {
+        ...reviewed,
+        chain: { ...reviewed.chain, manifestSha256: "c".repeat(64) },
+      }),
+    /review changed/,
+  );
 });
 
-test("V3 review snapshots are canonical and bounded", () => {
-  assert.deepEqual(daoHarvestV3ReviewSnapshot({ blockHash: hash("4"), blockNumber: "10" }), {
-    blockHash: hash("4"),
-    blockNumber: "10",
-    expiresAfterBlock: "40",
-  });
-  assert.throws(() => daoHarvestV3ReviewSnapshot({ blockHash: hash("4"), blockNumber: "010" }));
+test("the signer, API build, and approved testnet must share one genesis", () => {
+  const reviewed = build();
+  assert.doesNotThrow(() =>
+    verifyDaoHarvestV3SignerChain(reviewed, reviewed.chain.genesisHash, reviewed.chain.genesisHash),
+  );
+  assert.throws(
+    () => verifyDaoHarvestV3SignerChain(reviewed, hash("9"), reviewed.chain.genesisHash),
+    /reviewed CKB testnet/,
+  );
+  assert.throws(
+    () => verifyDaoHarvestV3SignerChain(reviewed, reviewed.chain.genesisHash, hash("9")),
+    /reviewed CKB testnet/,
+  );
+});
+
+test("V3 review snapshots bind chain identity and remain bounded", () => {
+  assert.deepEqual(
+    daoHarvestV3ReviewSnapshot({ blockHash: hash("4"), blockNumber: "10" }, build().chain),
+    {
+      blockHash: hash("4"),
+      blockNumber: "10",
+      genesisHash: hash("a"),
+      manifestSha256: "b".repeat(64),
+      expiresAfterBlock: "40",
+    },
+  );
+  assert.throws(() =>
+    daoHarvestV3ReviewSnapshot({ blockHash: hash("4"), blockNumber: "010" }, build().chain),
+  );
 });

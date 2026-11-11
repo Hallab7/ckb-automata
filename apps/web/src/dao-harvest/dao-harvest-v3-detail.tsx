@@ -19,6 +19,7 @@ import { browserWebEnvironment } from "../environment.ts";
 import {
   daoHarvestV3ReviewSnapshot,
   normalizeDaoHarvestV3Build,
+  verifyDaoHarvestV3SignerChain,
   verifyCompletedDaoHarvestV3Review,
   verifyRefreshedDaoHarvestV3Build,
 } from "../setup/dao-harvest-v3-review.ts";
@@ -94,6 +95,11 @@ function V3OwnerAction({
   const prepare = async () => {
     setState({ status: "loading" });
     try {
+      const environment = browserWebEnvironment();
+      const signerGenesis = await session.getSignerGenesisHash();
+      if (signerGenesis !== environment.genesisHash) {
+        throw new Error("The connected wallet is not using CKB testnet.");
+      }
       const body = await requestBody();
       const [build, network] = await Promise.all([
         api.buildDaoHarvestV3(operation, body),
@@ -101,8 +107,18 @@ function V3OwnerAction({
           readonly tip: { readonly blockHash: string; readonly blockNumber: string };
         }>,
       ]);
+      verifyDaoHarvestV3SignerChain(
+        build,
+        await session.getSignerGenesisHash(),
+        environment.genesisHash,
+      );
       const normalized = normalizeDaoHarvestV3Build(build);
       const completed = await session.completeForReview(normalized.transaction);
+      verifyDaoHarvestV3SignerChain(
+        build,
+        await session.getSignerGenesisHash(),
+        environment.genesisHash,
+      );
       await verifyCompletedDaoHarvestV3Review(build, completed.transaction, session);
       setState({
         status: "ready",
@@ -110,7 +126,7 @@ function V3OwnerAction({
           build,
           body,
           completed: completed.transaction,
-          snapshot: daoHarvestV3ReviewSnapshot(network.tip),
+          snapshot: daoHarvestV3ReviewSnapshot(network.tip, build.chain),
           transactionHash: completed.hash,
         },
       });
@@ -122,12 +138,23 @@ function V3OwnerAction({
   const submit = async (prepared: PreparedAction) => {
     setState({ status: "submitting" });
     try {
+      const environment = browserWebEnvironment();
+      verifyDaoHarvestV3SignerChain(
+        prepared.build,
+        await session.getSignerGenesisHash(),
+        environment.genesisHash,
+      );
       const refreshed = await api.buildDaoHarvestV3(operation, prepared.body);
       verifyRefreshedDaoHarvestV3Build(prepared.build, refreshed);
       const signed = await session.signReviewedTransaction(
         prepared.completed,
         prepared.transactionHash,
         prepared.snapshot,
+      );
+      verifyDaoHarvestV3SignerChain(
+        prepared.build,
+        await session.getSignerGenesisHash(),
+        environment.genesisHash,
       );
       const transactionHash = await session.submitSignedTransaction(
         signed,

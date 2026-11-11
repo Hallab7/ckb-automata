@@ -356,6 +356,10 @@ export class DaoHarvestV3TransactionAdapter implements DaoHarvestV3MutationAdapt
       version: 3,
       jobId,
       operation,
+      chain: Object.freeze({
+        genesisHash: deployment.genesisHash,
+        manifestSha256: deployment.manifestSha256,
+      }),
       transaction: build.transaction,
       intentHash: build.intentHash,
       review: Object.freeze({
