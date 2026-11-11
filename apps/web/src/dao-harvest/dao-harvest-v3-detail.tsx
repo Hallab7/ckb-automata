@@ -18,11 +18,16 @@ import {
   nervDaoPositionLabel,
   type NervDaoOwnerAction,
 } from "@ckb-automata/nervdao-integration";
-import { Button, Dialog, InlineNotice } from "@ckb-automata/ui";
+import { Button, Dialog, InlineNotice, SelectField, TextField } from "@ckb-automata/ui";
 
 import { useWalletSession } from "../ccc/session.tsx";
 import { ckbTestnetTransactionUrl } from "../ccc/wallet-display.ts";
 import { browserWebEnvironment } from "../environment.ts";
+import {
+  mergePublicOperators,
+  registeredPublicOperators,
+  type PublicOperator,
+} from "../setup/operator-directory.ts";
 import {
   daoHarvestV3ReviewSnapshot,
   normalizeDaoHarvestV3Build,
@@ -32,7 +37,7 @@ import {
 } from "../setup/dao-harvest-v3-review.ts";
 import { harvestV2Amount } from "./v2-presentation.ts";
 
-type OwnerOperation = NervDaoOwnerAction;
+type OwnerOperation = NervDaoOwnerAction | "sweep" | "close" | "rotate";
 interface PreparedAction {
   readonly build: ApiDaoHarvestV3Build;
   readonly body: Record<string, unknown>;
@@ -57,6 +62,21 @@ const COPY = Object.freeze({
     description:
       "Completes the mature withdrawal. If another cycle remains, it starts automatically; otherwise your original DAO deposit returns to normal wallet control. No completion service charge is taken.",
   },
+  sweep: {
+    title: "Withdraw compensation",
+    description:
+      "Sends compensation earned so far to the saved compensation address while keeping the automation active.",
+  },
+  rotate: {
+    title: "Update operator",
+    description:
+      "Choose one active operator to act first. Other active operators remain available as backups.",
+  },
+  close: {
+    title: "Close automation",
+    description:
+      "Returns the remaining compensation and recoverable reserve after all harvests are complete.",
+  },
 } satisfies Record<OwnerOperation, { readonly title: string; readonly description: string }>);
 
 function friendlyError(reason: unknown) {
@@ -80,6 +100,9 @@ function V3OwnerAction({
 }>) {
   const session = useWalletSession();
   const copy = COPY[operation];
+  const [payoutAddress, setPayoutAddress] = useState("");
+  const [operators, setOperators] = useState<readonly PublicOperator[]>([]);
+  const [preferredOperatorId, setPreferredOperatorId] = useState("");
   const [state, setState] = useState<
     | { readonly status: "idle" | "loading" | "submitting" }
     | { readonly status: "error"; readonly message: string }
@@ -87,17 +110,65 @@ function V3OwnerAction({
     | { readonly status: "submitted"; readonly transactionHash: string }
   >({ status: "idle" });
 
+  useEffect(() => {
+    if (operation !== "rotate") return;
+    let active = true;
+    void api
+      .listOperators({ service: "dao-harvest" })
+      .then((value) => {
+        if (!active) return;
+        const available = mergePublicOperators(registeredPublicOperators(value)).filter(
+          ({ services }) => services === undefined || services.includes("dao-harvest"),
+        );
+        setOperators(available);
+        setPreferredOperatorId((current) => current || available[0]?.id || "");
+      })
+      .catch(() => {
+        if (!active) return;
+        const available = mergePublicOperators([]);
+        setOperators(available);
+        setPreferredOperatorId((current) => current || available[0]?.id || "");
+      });
+    return () => {
+      active = false;
+    };
+  }, [api, operation]);
+
   const requestBody = async () => {
     if (session.ownerLockHash !== job.ownerLockHash) throw new Error("Reconnect the owner wallet.");
     const [ownerLock, identityOutPoint] = await Promise.all([
       session.getOwnerLock(job.ownerLockHash),
       session.selectDeadlinePledge(),
     ]);
-    return Object.freeze({
+    const common = {
       jobId: job.jobId,
       ownerLock,
       identityOutPoint,
       maximumNetworkFee: "100000",
+    };
+    if (operation === "sweep" || operation === "close") {
+      const payoutLock =
+        job.payoutLockHash === job.ownerLockHash
+          ? ownerLock
+          : await session.resolveLock(payoutAddress);
+      return Object.freeze({ ...common, payoutLock });
+    }
+    if (operation === "rotate") {
+      const preferred = operators.find(({ id }) => id === preferredOperatorId);
+      if (!preferred) throw new Error("Choose an active operator.");
+      const backups = operators.filter(({ id }) => id !== preferred.id);
+      if (backups.length === 0) throw new Error("At least one backup operator is required.");
+      const [preferredLock, ...backupLocks] = await Promise.all(
+        [preferred, ...backups].map(({ address }) => session.resolveLock(address)),
+      );
+      return Object.freeze({
+        ...common,
+        preferredOperatorLockHash: session.reviewLockHash(preferredLock!),
+        fallbackOperatorLockHashes: backupLocks.map((item) => session.reviewLockHash(item)),
+      });
+    }
+    return Object.freeze({
+      ...common,
       ...(operation === "owner-recovery" || operation === "owner-complete"
         ? { prepareAccumulatorOutPoint: job.cells.prepareAccumulator }
         : {}),
@@ -185,8 +256,47 @@ function V3OwnerAction({
       trigger={<Button>{copy.title}</Button>}
     >
       <div className="harvest-action-dialog">
+        {operation === "rotate" && state.status === "idle" ? (
+          <SelectField
+            hint="Every other active operator can take over later if this operator does not act."
+            label="Preferred operator"
+            onChange={(event) => setPreferredOperatorId(event.target.value)}
+            value={preferredOperatorId}
+          >
+            <option disabled value="">
+              Choose an operator
+            </option>
+            {operators.map((operator) => (
+              <option key={operator.id} value={operator.id}>
+                {operator.name} - Active
+              </option>
+            ))}
+          </SelectField>
+        ) : null}
+        {(operation === "sweep" || operation === "close") &&
+        job.payoutLockHash !== job.ownerLockHash &&
+        state.status === "idle" ? (
+          <TextField
+            autoComplete="off"
+            hint="Enter the compensation address saved when this automation was created."
+            label="Compensation address"
+            onChange={(event) => setPayoutAddress(event.target.value)}
+            required
+            value={payoutAddress}
+          />
+        ) : null}
         {state.status === "idle" ? (
-          <Button onClick={() => void prepare()}>Review action</Button>
+          <Button
+            disabled={
+              (operation === "rotate" && !preferredOperatorId) ||
+              ((operation === "sweep" || operation === "close") &&
+                job.payoutLockHash !== job.ownerLockHash &&
+                !payoutAddress.trim())
+            }
+            onClick={() => void prepare()}
+          >
+            Review action
+          </Button>
         ) : null}
         {state.status === "loading" || state.status === "submitting" ? (
           <div aria-live="polite" className="harvest-action-dialog__loading">
@@ -335,12 +445,21 @@ export function DaoHarvestV3Detail({ jobId }: Readonly<{ jobId: string }>) {
 
   const owner = session.status === "ready" && session.ownerLockHash === job.ownerLockHash;
   const operation = nervDaoOwnerAction(job.state, job.cells.prepareAccumulator !== null);
-  const operations: readonly OwnerOperation[] =
+  const stateOperation: readonly OwnerOperation[] =
     operation === "owner-recovery"
       ? ["owner-complete", "owner-recovery"]
       : operation
         ? [operation]
         : [];
+  const maintenanceOperations: readonly OwnerOperation[] =
+    job.state === "deposited"
+      ? ["sweep", "rotate"]
+      : job.state === "withdrawing"
+        ? ["sweep"]
+        : job.state === "completed"
+          ? ["close"]
+          : [];
+  const operations = [...stateOperation, ...maintenanceOperations];
   return (
     <article aria-labelledby="harvest-v3-title" className="app-page harvest-detail">
       <header className="app-page-header harvest-detail__header">

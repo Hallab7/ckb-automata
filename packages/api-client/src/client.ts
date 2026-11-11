@@ -58,6 +58,7 @@ export interface ApiDaoHarvestV3 {
   readonly version: 3;
   readonly jobId: string;
   readonly ownerLockHash: string;
+  readonly payoutLockHash: string;
   readonly state:
     "deposited" | "withdrawing" | "owner_withdrawing" | "completed" | "recovered" | "closed";
   readonly operation: string;

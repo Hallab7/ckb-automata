@@ -31,6 +31,7 @@ export interface DaoHarvestV3ReadModel {
   readonly version: 3;
   readonly jobId: string;
   readonly ownerLockHash: string;
+  readonly payoutLockHash: string;
   readonly state: string;
   readonly operation: string;
   readonly principalCapacity: string;
@@ -73,6 +74,7 @@ function rowModel(row: typeof daoHarvestV3Jobs.$inferSelect): DaoHarvestV3ReadMo
     version: 3,
     jobId: row.jobId,
     ownerLockHash: row.ownerLockHash,
+    payoutLockHash: String(value["payoutLockHash"]),
     state: row.lifecycleState,
     operation: String(value["operation"]),
     principalCapacity: String(value["principalCapacity"]),

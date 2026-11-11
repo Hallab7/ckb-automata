@@ -7,3 +7,12 @@ test("V3 owner review and detail keep the testnet and timing disclosures visible
   assert.match(source, /NERVDAO_HARVEST_TESTNET_NOTICE/);
   assert.match(source, /NERVDAO_HARVEST_TIMING_NOTICES/);
 });
+
+test("V3 detail exposes the closed owner maintenance actions", async () => {
+  const source = await readFile(new URL("./dao-harvest-v3-detail.tsx", import.meta.url), "utf8");
+  assert.match(source, /Withdraw compensation/);
+  assert.match(source, /Update operator/);
+  assert.match(source, /Close automation/);
+  assert.match(source, /job\.payoutLockHash === job\.ownerLockHash/);
+  assert.match(source, /fallbackOperatorLockHashes/);
+});
