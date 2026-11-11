@@ -68,6 +68,16 @@ fn progress_and_layouts_are_closed_by_operation() {
     assert!(validate_witness_layout(SETUP_OPERATION, &setup));
     setup[0] = 0;
     assert!(!validate_witness_layout(SETUP_OPERATION, &setup));
+
+    for operation in [PREFERRED_PREPARE_OPERATION, FALLBACK_PREPARE_OPERATION] {
+        let mut prepare = [ABSENT_INDEX; 11];
+        for index in [0, 1, 3, 4, 6, 7, 9] {
+            prepare[index] = index as u32;
+        }
+        assert!(validate_witness_layout(operation, &prepare));
+        prepare[9] = ABSENT_INDEX;
+        assert!(!validate_witness_layout(operation, &prepare));
+    }
 }
 
 #[test]

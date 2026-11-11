@@ -73,7 +73,7 @@ pub fn validate_progress_transition(
 pub fn validate_witness_layout(operation: u8, indices: &[u32; 11]) -> bool {
     let required: &[usize] = match operation {
         SETUP_OPERATION => &[3, 6, 7, 8],
-        PREFERRED_PREPARE_OPERATION | FALLBACK_PREPARE_OPERATION => &[0, 1, 3, 6, 7],
+        PREFERRED_PREPARE_OPERATION | FALLBACK_PREPARE_OPERATION => &[0, 1, 3, 4, 6, 7, 9],
         PREFERRED_CLAIM_OPERATION => &[0, 1, 2, 3, 4, 7, 8, 9],
         FALLBACK_CLAIM_OPERATION => &[0, 1, 2, 3, 4, 5, 7, 8, 9, 10],
         OWNER_COMPLETE_OPERATION => &[0, 1, 2, 3, 4, 7, 8, 9],
