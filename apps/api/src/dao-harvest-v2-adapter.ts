@@ -725,11 +725,12 @@ export class DaoHarvestV2TransactionAdapter implements DaoHarvestV2MutationAdapt
     if (operation === "rotate" && row.lifecycleState !== "deposited") {
       throw new BadRequestException("operators can be updated only while the deposit is waiting");
     }
-    if (
-      operation === "recover" &&
-      row.lifecycleState !== "deposited" &&
-      row.lifecycleState !== "withdrawing"
-    ) {
+    if (operation === "recover" && row.lifecycleState === "deposited") {
+      throw new BadRequestException(
+        "owner recovery cannot start until the DAO deposit is in the withdrawing state",
+      );
+    }
+    if (operation === "recover" && row.lifecycleState !== "withdrawing") {
       throw new BadRequestException("this automation is not available for owner recovery");
     }
 

@@ -30,6 +30,13 @@ export function DaoHarvestDashboard({ mode }: Readonly<{ mode: DashboardMode }>)
       return undefined;
     }
   }, []);
+  const setupEnabled = useMemo(() => {
+    try {
+      return browserWebEnvironment().daoHarvestV2SetupEnabled;
+    } catch {
+      return false;
+    }
+  }, []);
   const [items, setItems] = useState<readonly ApiDaoHarvest[]>([]);
   const [pendingItems, setPendingItems] = useState<readonly ApiPendingDaoHarvest[]>([]);
   const [v2Items, setV2Items] = useState<readonly ApiDaoHarvestV2[]>([]);
@@ -81,9 +88,11 @@ export function DaoHarvestDashboard({ mode }: Readonly<{ mode: DashboardMode }>)
             <p>Original amounts stay protected while earned compensation is collected.</p>
           </div>
         </div>
-        <Link className="ui-button ui-button--secondary" href="/automations/new/dao-harvest-v2">
-          New harvest
-        </Link>
+        {setupEnabled ? (
+          <Link className="ui-button ui-button--secondary" href="/automations/new/dao-harvest-v2">
+            New harvest
+          </Link>
+        ) : null}
       </header>
       {state === "loading" ? (
         <div

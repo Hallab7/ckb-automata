@@ -89,11 +89,26 @@ test("typed environment configures the generated API client and rejects unsafe v
   };
   assert.deepEqual(parseWebEnvironment(input), {
     apiUrl: "https://api.example.test/",
+    daoHarvestV2SetupEnabled: false,
     genesisHash: TESTNET_GENESIS_HASH,
     manifestSha256: TESTNET_DEPLOYMENT_MANIFEST_SHA256,
     network: "testnet",
     sseUrl: "https://api.example.test/",
   });
+  assert.equal(
+    parseWebEnvironment({
+      ...input,
+      NEXT_PUBLIC_DAO_HARVEST_V2_SETUP_ENABLED: "true",
+    }).daoHarvestV2SetupEnabled,
+    true,
+  );
+  assert.equal(
+    parseWebEnvironment({
+      ...input,
+      NEXT_PUBLIC_DAO_HARVEST_V2_SETUP_ENABLED: "TRUE",
+    }).daoHarvestV2SetupEnabled,
+    false,
+  );
   assert.ok(createServerApiClient(input));
   assert.throws(
     () => parseWebEnvironment({ ...input, NEXT_PUBLIC_CKB_NETWORK: "mainnet" }),

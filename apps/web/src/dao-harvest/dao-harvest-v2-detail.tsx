@@ -407,6 +407,16 @@ export function DaoHarvestV2Detail({ jobId }: Readonly<{ jobId: string }>) {
         </InlineNotice>
       ) : null}
 
+      {owner && job.state === "deposited" ? (
+        <InlineNotice title="Owner recovery starts after withdrawal preparation" tone="warning">
+          <p>
+            This deployed version cannot return a waiting DAO deposit directly. You can update the
+            operator now. Recovery becomes available after the deposit enters the withdrawing state
+            and must still follow the normal DAO maturity period.
+          </p>
+        </InlineNotice>
+      ) : null}
+
       <section
         aria-label="Harvest summary"
         className="harvest-detail__summary harvest-detail__summary--four"

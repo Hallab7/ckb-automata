@@ -304,6 +304,7 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
                   databaseClient.database,
                   environment.CKB_NETWORK,
                 ),
+            { setupEnabled: environment.DAO_HARVEST_V2_SETUP_ENABLED === "true" },
           ),
       },
       {

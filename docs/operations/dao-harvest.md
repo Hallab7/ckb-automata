@@ -1,8 +1,19 @@
 # DAO Harvest Operations
 
 DAO harvest automations keep the original deposit under the on-chain vault rules. The API,
-database, Redis, and executors help with scheduling and display, but none of them is required for
-the owner to stop or exit.
+database, Redis, and executors help with scheduling and display.
+
+## V2 containment notice
+
+New V2 setup is disabled by default while the owner exit path is corrected. A deposited V2
+position cannot be refunded as one plain owner cell because the Nervos DAO requires a matching
+same-capacity withdrawing output at the same transaction index. Existing V2 positions remain
+readable, operators can continue valid preparation, and owners can rotate operators or sweep
+available compensation. Owner recovery becomes available after the position is already in the
+Withdrawing state and must follow normal DAO maturity.
+
+Do not describe a deposited V2 position as independently recoverable. The commands below document
+the earlier harvest revision; they are not V2 owner builders.
 
 ## Owner recovery
 

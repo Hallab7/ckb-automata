@@ -1,6 +1,7 @@
 import { ArrowRight, CircleCheck, Flag, Landmark, Repeat2, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 
+import { browserWebEnvironment } from "../environment.ts";
 import { TEMPLATE_CATALOG } from "./template-catalog.ts";
 
 const TEMPLATE_ICONS: Readonly<Record<"dao-harvest" | "deadline" | "recurring", LucideIcon>> = {
@@ -18,6 +19,10 @@ const CREATION_TEMPLATES = TEMPLATE_CATALOG.filter(
 );
 
 export function TemplateGallery() {
+  const setupEnabled = browserWebEnvironment().daoHarvestV2SetupEnabled;
+  const templates = setupEnabled
+    ? CREATION_TEMPLATES
+    : CREATION_TEMPLATES.filter((template) => template.id !== "dao-harvest");
   return (
     <section className="app-page template-gallery" aria-labelledby="page-title">
       <header className="app-page-header">
@@ -28,7 +33,7 @@ export function TemplateGallery() {
       </header>
 
       <div className="template-gallery__grid">
-        {CREATION_TEMPLATES.map((template) => {
+        {templates.map((template) => {
           const TemplateIcon = TEMPLATE_ICONS[template.id];
           return (
             <article

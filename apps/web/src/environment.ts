@@ -4,6 +4,7 @@ export type WebNetwork = "testnet";
 
 export interface WebEnvironment {
   readonly apiUrl: string;
+  readonly daoHarvestV2SetupEnabled: boolean;
   readonly genesisHash: string;
   readonly manifestSha256: string;
   readonly network: WebNetwork;
@@ -44,6 +45,7 @@ export function parseWebEnvironment(
   }
   return Object.freeze({
     apiUrl,
+    daoHarvestV2SetupEnabled: input["NEXT_PUBLIC_DAO_HARVEST_V2_SETUP_ENABLED"] === "true",
     genesisHash,
     manifestSha256,
     network,
@@ -63,5 +65,7 @@ export function browserWebEnvironment(): WebEnvironment {
     NEXT_PUBLIC_CKB_GENESIS_HASH: process.env.NEXT_PUBLIC_CKB_GENESIS_HASH,
     // @ts-expect-error Next.js requires direct property access for build-time public env inlining.
     NEXT_PUBLIC_DEPLOYMENT_MANIFEST_SHA256: process.env.NEXT_PUBLIC_DEPLOYMENT_MANIFEST_SHA256,
+    // @ts-expect-error Next.js requires direct property access for build-time public env inlining.
+    NEXT_PUBLIC_DAO_HARVEST_V2_SETUP_ENABLED: process.env.NEXT_PUBLIC_DAO_HARVEST_V2_SETUP_ENABLED,
   });
 }

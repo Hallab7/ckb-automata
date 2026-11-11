@@ -190,7 +190,8 @@ test("V2 reads replace a confirmed pending submission with its canonical project
 
 test("V2 build endpoints fail closed until a chain-aware adapter is deployed", async () => {
   const unavailable = new DaoHarvestV2MutationService();
-  assert.throws(() => unavailable.build("setup", {}), /not deployed/);
+  assert.throws(() => unavailable.build("setup", {}), /setup is disabled/);
+  assert.throws(() => unavailable.build("rotate", {}), /not deployed/);
   const available = new DaoHarvestV2MutationService({
     build: async (operation) => ({
       version: 2,
@@ -227,6 +228,24 @@ test("V2 build endpoints fail closed until a chain-aware adapter is deployed", a
     }),
   });
   assert.equal((await available.build("rotate", {})).operation, "rotate");
+  assert.equal((await available.build("recover", {})).operation, "recover");
+  assert.throws(() => available.build("setup", {}), /setup is disabled/);
+  const setupEnabled = new DaoHarvestV2MutationService(
+    {
+      build: async (operation) => ({
+        ...(await available.build("rotate", {})),
+        operation,
+      }),
+      registerSetup: async (transactionHash) => ({
+        transactionHash,
+        submittedAt: "2026-11-04T00:00:00.000Z",
+        status: "submitting",
+        lastKnownStatus: "submitted",
+      }),
+    },
+    { setupEnabled: true },
+  );
+  assert.equal((await setupEnabled.build("setup", {})).operation, "setup");
   assert.equal(
     (
       await available.registerSetup({

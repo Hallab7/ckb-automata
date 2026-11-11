@@ -307,20 +307,17 @@ test("V2 owner rotation changes only operator commitments and compensation paylo
   assert.equal(BigInt(transaction.outputs[1]!.capacity), 301n * 100_000_000n);
 });
 
-test("V2 deposited-state recovery returns job, principal, and compensation to the owner", async () => {
+test("V2 deposited-state recovery is rejected before a transaction is built", async () => {
   const fixture = ownerActionFixture();
   const setup = await fixture.initialize();
-  const result = await fixture.adapter.build("recover", {
-    jobId: setup.jobId,
-    identityOutPoint: fixture.identity,
-    ownerLock: owner,
-  });
-  const transaction = result.transaction as UnsignedDeadlineTransaction;
-  assert.equal(result.operation, "recover");
-  assert.equal(transaction.inputs.length, 4);
-  assert.equal(transaction.outputs.length, 1);
-  assert.equal(BigInt(transaction.outputs[0]!.capacity), 943n * 100_000_000n);
-  assert.equal(scriptToHash(transaction.outputs[0]!.lock), ownerLockHash);
+  await assert.rejects(
+    fixture.adapter.build("recover", {
+      jobId: setup.jobId,
+      identityOutPoint: fixture.identity,
+      ownerLock: owner,
+    }),
+    /cannot start until the DAO deposit is in the withdrawing state/,
+  );
 });
 
 test("V2 close spends only a terminal compensation cell and pays the committed payout", async () => {

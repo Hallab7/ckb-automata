@@ -422,12 +422,22 @@ export class DaoHarvestV2ReadService {
 
 export class DaoHarvestV2MutationService {
   readonly #adapter: DaoHarvestV2MutationAdapter | undefined;
+  readonly #setupEnabled: boolean;
 
-  constructor(adapter?: DaoHarvestV2MutationAdapter) {
+  constructor(
+    adapter?: DaoHarvestV2MutationAdapter,
+    options: Readonly<{ setupEnabled?: boolean }> = {},
+  ) {
     this.#adapter = adapter;
+    this.#setupEnabled = options.setupEnabled === true;
   }
 
   build(operation: DaoHarvestV2BuildOperation, body: unknown): Promise<DaoHarvestV2UnsignedBuild> {
+    if (operation === "setup" && !this.#setupEnabled) {
+      throw new ServiceUnavailableException(
+        "New DAO harvest V2 setup is disabled while owner recovery is being corrected",
+      );
+    }
     if (!this.#adapter) {
       throw new ServiceUnavailableException("DAO harvest V2 transaction building is not deployed");
     }

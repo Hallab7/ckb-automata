@@ -67,6 +67,26 @@ test("unrelated process values do not enter the parsed configuration", () => {
   assert.equal("PATH" in result, false);
 });
 
+test("V2 harvest setup is fail-closed and accepts only an explicit boolean switch", () => {
+  assert.equal(
+    parseEnvironment(validEnvironment("testnet-public")).DAO_HARVEST_V2_SETUP_ENABLED,
+    undefined,
+  );
+  assert.equal(
+    parseEnvironment({
+      ...validEnvironment("testnet-public"),
+      DAO_HARVEST_V2_SETUP_ENABLED: "true",
+    }).DAO_HARVEST_V2_SETUP_ENABLED,
+    "true",
+  );
+  assert.throws(() =>
+    parseEnvironment({
+      ...validEnvironment("testnet-public"),
+      DAO_HARVEST_V2_SETUP_ENABLED: "yes",
+    }),
+  );
+});
+
 test("optional observability metadata is validated and disabled placeholders are ignored", () => {
   const disabled = parseEnvironment({
     ...validEnvironment("local"),

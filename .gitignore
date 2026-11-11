@@ -13,3 +13,4 @@ fuzz/corpus/
 !.env.example
 !**/.env.example
 deploy/operator/operator.env
+operational-artifacts/

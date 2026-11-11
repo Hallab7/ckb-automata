@@ -54,7 +54,8 @@ test("plain activity copy distinguishes preferred and backup operators", () => {
 });
 
 test("owner actions follow live funds and lifecycle state", () => {
-  assert.deepEqual(harvestV2OwnerActions(job("deposited", "10")), ["sweep", "rotate", "recover"]);
+  assert.deepEqual(harvestV2OwnerActions(job("deposited", "10")), ["sweep", "rotate"]);
+  assert.deepEqual(harvestV2OwnerActions(job("withdrawing")), ["recover"]);
   assert.deepEqual(harvestV2OwnerActions(job("completed")), ["close"]);
   assert.deepEqual(harvestV2OwnerActions(job("closed")), []);
 });

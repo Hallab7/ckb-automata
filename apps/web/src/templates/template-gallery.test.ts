@@ -37,4 +37,15 @@ test("creation gallery stays focused on executable automation choices", async ()
   assert.match(source, /data-create-action="true"/);
   assert.doesNotMatch(source, /Guided scenarios|Demo only|NervDAO Cycle Guard|Research only/);
   assert.doesNotMatch(source, /template-card__facts/);
+  assert.match(source, /daoHarvestV2SetupEnabled/);
+  assert.match(source, /template\.id !== "dao-harvest"/);
+});
+
+test("direct V2 setup navigation fails closed with the public switch", async () => {
+  const source = await readFile(
+    new URL("../../app/(setup)/automations/new/dao-harvest-v2/page.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /!browserWebEnvironment\(\)\.daoHarvestV2SetupEnabled/);
+  assert.match(source, /New DAO harvest setup is paused/);
 });

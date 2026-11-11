@@ -90,6 +90,7 @@ export function harvestV2OwnerActions(
     actions.push("sweep");
   }
   if (job.state === "completed") actions.push("close");
-  if (job.state === "deposited" || job.state === "withdrawing") actions.push("rotate", "recover");
+  if (job.state === "deposited") actions.push("rotate");
+  if (job.state === "withdrawing") actions.push("recover");
   return Object.freeze(actions);
 }
