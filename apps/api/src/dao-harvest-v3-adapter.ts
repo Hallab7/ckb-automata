@@ -7,11 +7,18 @@ import {
 } from "@nervosnetwork/ckb-sdk-utils";
 import {
   DAO_HARVEST_VAULT_OCCUPIED_CAPACITY,
+  buildDaoHarvestV3Rotation,
+  buildDaoHarvestV3Sweep,
   buildDaoHarvestV3OwnerExit,
   buildDaoHarvestV3OwnerRecovery,
   calculateDaoMaximumWithdraw,
   compareEpochFractions,
+  decodeDaoHarvestV3CompensationLockArgs,
   decodeAbsoluteEpochSince,
+  deriveDaoHarvestV3FallbackOperatorSetHash,
+  deriveDaoHarvestV3PayloadHash,
+  encodeDaoHarvestV3CompensationLockArgs,
+  encodeDaoHarvestV3FallbackOperatorProof,
   parseHash32,
   parseEpoch,
   parseOutPoint,
@@ -145,6 +152,31 @@ export function daoHarvestV3PolicyScriptHash(value: {
   return parseHash32(scriptToHash(chainLock(value)));
 }
 
+export function daoHarvestV3SweepAmounts(compensationCapacityValue: bigint, reserveValue: bigint) {
+  const compensationCapacity = parseShannons(compensationCapacityValue);
+  const reserve = parseShannons(reserveValue);
+  if (compensationCapacity <= reserve) {
+    throw new BadRequestException("there is no earned compensation available to withdraw");
+  }
+  return Object.freeze({ reserve, payout: compensationCapacity - reserve });
+}
+
+export function daoHarvestV3RotationPayload(
+  payload: ReturnType<typeof DaoHarvestPayloadV3.unpack>,
+  preferredValue: string,
+  fallbackValues: readonly string[],
+) {
+  const preferred = parseHash32(preferredValue);
+  const fallback = fallbackValues.map((value) => hexToBytes(parseHash32(value)));
+  const proof = encodeDaoHarvestV3FallbackOperatorProof(fallback);
+  const successorPayload = DaoHarvestPayloadV3.pack({
+    ...payload,
+    preferred_prepare_operator_lock_hash: [...hexToBytes(preferred)],
+    fallback_prepare_executor_set_hash: [...deriveDaoHarvestV3FallbackOperatorSetHash(fallback)],
+  });
+  return Object.freeze({ proof, successorPayload });
+}
+
 export class DaoHarvestV3TransactionAdapter implements DaoHarvestV3MutationAdapter {
   readonly #chain: CkbReadClient;
   readonly #database: AutomataDatabase;
@@ -162,7 +194,7 @@ export class DaoHarvestV3TransactionAdapter implements DaoHarvestV3MutationAdapt
     this.#deployments = deployments;
   }
   async build(operation: DaoHarvestV3BuildOperation, bodyValue: unknown): Promise<unknown> {
-    if (operation !== "owner-exit" && operation !== "owner-recovery")
+    if (!["sweep", "rotate", "owner-exit", "owner-recovery"].includes(operation))
       throw new ServiceUnavailableException(`DAO Harvest V3 ${operation} builder is not enabled`);
     const body = object(bodyValue, "request");
     const jobId = parseHash32(text(body["jobId"], "jobId"));
@@ -256,7 +288,107 @@ export class DaoHarvestV3TransactionAdapter implements DaoHarvestV3MutationAdapt
       allowedFundingLockHashes: [ownerLockHash],
     };
     let build;
-    if (operation === "owner-exit") {
+    if (operation === "sweep") {
+      const payoutLock = lock(body["payoutLock"], "payoutLock");
+      if (
+        scriptIdentityHash(payoutLock) !== bytesToHex(Uint8Array.from(payload.payout_lock_hash))
+      ) {
+        throw new BadRequestException("payout lock does not match the committed address");
+      }
+      const compensationCapacity = parseShannons(compensationCell.cellOutput.capacity.toString());
+      const amounts = daoHarvestV3SweepAmounts(
+        compensationCapacity,
+        BigInt(payload.compensation_seed_capacity.toString()),
+      );
+      build = buildDaoHarvestV3Sweep({
+        ...common,
+        inputs: {
+          job: reviewed(jobCell, jobPoint),
+          compensation: reviewed(compensationCell, compensationPoint),
+          identity: reviewed(identityCell, identityPoint),
+        },
+        outputs: {
+          job: output(
+            parseShannons(jobCell.cellOutput.capacity.toString()),
+            chainLock(jobCell.cellOutput.lock),
+            chainLock(jobCell.cellOutput.type),
+            jobCell.outputData.toString() as Hex,
+          ),
+          compensation: output(amounts.reserve, chainLock(compensationCell.cellOutput.lock), null),
+          additional: [
+            output(amounts.payout, payoutLock, null),
+            output(identityCapacity - fee, ownerLock, null),
+          ],
+        },
+      });
+    } else if (operation === "rotate") {
+      if (Number(progress.state) !== 0 || row.lifecycleState !== "deposited") {
+        throw new BadRequestException("operators can be updated only before withdrawal starts");
+      }
+      const preferred = parseHash32(
+        text(body["preferredOperatorLockHash"], "preferredOperatorLockHash"),
+      );
+      const fallbackValue = body["fallbackOperatorLockHashes"];
+      if (!Array.isArray(fallbackValue)) {
+        throw new BadRequestException("fallbackOperatorLockHashes must be an array");
+      }
+      const fallback = fallbackValue.map((value, index) =>
+        parseHash32(text(value, `fallbackOperatorLockHashes[${index}]`)),
+      );
+      let rotation: ReturnType<typeof daoHarvestV3RotationPayload>;
+      try {
+        rotation = daoHarvestV3RotationPayload(payload, preferred, fallback);
+      } catch (error) {
+        throw new BadRequestException(
+          error instanceof Error ? error.message : "the operator set is invalid",
+        );
+      }
+      const successorHash = deriveDaoHarvestV3PayloadHash(
+        hexToBytes(policyScriptHash),
+        rotation.successorPayload,
+      );
+      const successorJob = JobDataV1.pack({
+        ...job,
+        payload_hash: [...successorHash],
+      });
+      const compensationLock = chainLock(compensationCell.cellOutput.lock);
+      const compensationArgs = decodeDaoHarvestV3CompensationLockArgs(
+        hexToBytes(compensationLock.args),
+      );
+      const successorCompensationLock = Object.freeze({
+        ...compensationLock,
+        args: bytesToHex(
+          encodeDaoHarvestV3CompensationLockArgs({
+            ...compensationArgs,
+            payloadHash: successorHash,
+          }),
+        ) as Hex,
+      });
+      build = buildDaoHarvestV3Rotation({
+        ...common,
+        operatorProof: rotation.proof,
+        successorPayload: rotation.successorPayload,
+        inputs: {
+          job: reviewed(jobCell, jobPoint),
+          compensation: reviewed(compensationCell, compensationPoint),
+          identity: reviewed(identityCell, identityPoint),
+        },
+        outputs: {
+          job: output(
+            parseShannons(jobCell.cellOutput.capacity.toString()),
+            chainLock(jobCell.cellOutput.lock),
+            chainLock(jobCell.cellOutput.type),
+            bytesToHex(successorJob) as Hex,
+          ),
+          compensation: output(
+            parseShannons(compensationCell.cellOutput.capacity.toString()),
+            successorCompensationLock,
+            null,
+          ),
+          additional: [output(identityCapacity - fee, ownerLock, null)],
+        },
+      });
+    } else if (operation === "owner-exit") {
       if (Number(progress.state) !== 0 || row.lifecycleState !== "deposited")
         throw new BadRequestException("only a deposited V3 position can start withdrawal");
       const principal = BigInt(payload.principal_capacity.toString());
