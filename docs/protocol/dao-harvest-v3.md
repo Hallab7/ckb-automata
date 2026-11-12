@@ -31,19 +31,19 @@ addressable.
 
 ## States and operations
 
-| Code | Operation | Input state | Authority | Result |
-| ---: | --- | --- | --- | --- |
-| 0 | Setup | none | owner | Job, deposited DAO vault, compensation state |
-| 1 | Preferred prepare | deposited | preferred operator | withdrawing vault and prepare credit |
-| 2 | Fallback prepare | deposited | approved fallback | withdrawing vault and prepare credit |
-| 3 | Preferred claim | withdrawing | credited preparer | next deposited cycle |
-| 4 | Fallback claim | withdrawing | fallback executor | next deposited cycle |
-| 5 | Owner completion | withdrawing | owner | next deposited cycle, no claim fee |
-| 6 | Sweep | active | owner | active state preserved; excess compensation paid |
-| 7 | Close | terminal | owner | compensation state terminated |
-| 8 | Rotate | active | owner | only operator commitments change |
-| 9 | Owner exit | deposited | owner | owner-locked withdrawing DAO cell; automation terminated |
-| 10 | Owner recovery | withdrawing | owner | mature DAO value returned; automation terminated |
+| Code | Operation         | Input state | Authority          | Result                                                   |
+| ---: | ----------------- | ----------- | ------------------ | -------------------------------------------------------- |
+|    0 | Setup             | none        | owner              | Job, deposited DAO vault, compensation state             |
+|    1 | Preferred prepare | deposited   | preferred operator | withdrawing vault and prepare credit                     |
+|    2 | Fallback prepare  | deposited   | approved fallback  | withdrawing vault and prepare credit                     |
+|    3 | Preferred claim   | withdrawing | credited preparer  | next deposited cycle                                     |
+|    4 | Fallback claim    | withdrawing | fallback executor  | next deposited cycle                                     |
+|    5 | Owner completion  | withdrawing | owner              | next deposited cycle, no claim fee                       |
+|    6 | Sweep             | active      | owner              | active state preserved; excess compensation paid         |
+|    7 | Close             | terminal    | owner              | compensation state terminated                            |
+|    8 | Rotate            | active      | owner              | only operator commitments change                         |
+|    9 | Owner exit        | deposited   | owner              | owner-locked withdrawing DAO cell; automation terminated |
+|   10 | Owner recovery    | withdrawing | owner              | mature DAO value returned; automation terminated         |
 
 Every other code and every state/operation mismatch is rejected.
 
