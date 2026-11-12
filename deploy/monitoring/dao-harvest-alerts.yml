@@ -17,6 +17,14 @@ groups:
         annotations:
           summary: A DAO harvest automation requires owner recovery
           runbook: docs/operations/dao-harvest.md#owner-recovery
+      - alert: DaoHarvestCompensationTooLow
+        expr: increase(automata_dao_harvest_low_compensation_total[15m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: DAO harvest compensation cannot cover bounded execution costs
+          runbook: docs/operations/dao-harvest.md#operator-controls
       - alert: DaoHarvestActionOverdue
         expr: automata_dao_harvest_next_action_seconds < -300
         for: 5m

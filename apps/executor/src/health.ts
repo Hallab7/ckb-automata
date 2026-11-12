@@ -1,5 +1,7 @@
 import { createServer, type Server } from "node:http";
 
+import { AutomataMetrics } from "@ckb-automata/telemetry";
+
 import type { ExecutorRuntime } from "./runtime.ts";
 
 export interface ExecutorHealthServer {
@@ -34,6 +36,7 @@ function close(server: Server): Promise<void> {
 export async function startExecutorHealthServer(
   runtime: ExecutorRuntime,
   port: number,
+  metrics = new AutomataMetrics(),
 ): Promise<ExecutorHealthServer> {
   if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) {
     throw new RangeError("executor health port must be an integer between 1 and 65535");
@@ -56,6 +59,19 @@ export async function startExecutorHealthServer(
     if (request.url === "/health/ready") {
       const report = runtime.readiness();
       json(response, report.status === "ready" ? 200 : 503, report);
+      return;
+    }
+    if (request.url === "/metrics") {
+      void metrics
+        .render()
+        .then((body) => {
+          response.writeHead(200, {
+            "cache-control": "no-store",
+            "content-type": metrics.contentType(),
+          });
+          response.end(body);
+        })
+        .catch(() => json(response, 500, { status: "metrics_unavailable" }));
       return;
     }
     json(response, 404, { status: "not_found" });

@@ -5,6 +5,7 @@ import type { Queue } from "bullmq";
 import { createCkbClient, type CkbClient } from "@ckb-automata/ccc";
 import type { AutomataEnvironment } from "@ckb-automata/config";
 import { deploymentRegistry, parseShannons } from "@ckb-automata/core";
+import { AutomataMetrics } from "@ckb-automata/telemetry";
 
 import { ExecutorAdapterRegistry, type RegisteredExecutorAdapter } from "./adapter.ts";
 import { ChainBuildSnapshotSource } from "./build-snapshot.ts";
@@ -395,11 +396,12 @@ export function createExecutorModule(
       : [
           {
             provide: DaoHarvestV3RuntimeCoordinator,
-            inject: [EXECUTOR_ENVIRONMENT, ExecutorRuntime, EXECUTOR_LOGGER],
+            inject: [EXECUTOR_ENVIRONMENT, ExecutorRuntime, EXECUTOR_LOGGER, AutomataMetrics],
             useFactory: async (
               configured: AutomataEnvironment,
               runtime: ExecutorRuntime,
               logger: ExecutorEventLogger,
+              metrics: AutomataMetrics,
             ) => {
               const loaded = await deploymentRegistry.load(configured.CKB_GENESIS_HASH);
               if (loaded.status !== "ok") {
@@ -441,6 +443,7 @@ export function createExecutorModule(
                 transactionFee: parseShannons(transactionFee),
                 minimumMargin: parseShannons(minimumMargin),
                 maximumCycles: BigInt(maximumCycles),
+                metrics,
               });
             },
           },
@@ -543,6 +546,7 @@ export function createExecutorModule(
       { provide: EXECUTOR_ENVIRONMENT, useValue: environment },
       { provide: EXECUTOR_ADAPTERS, useValue: adapters },
       { provide: EXECUTOR_LOGGER, useValue: dependencies.logger },
+      { provide: AutomataMetrics, useValue: new AutomataMetrics() },
       ...queueProviders,
       {
         provide: ExecutorAdapterRegistry,
@@ -594,6 +598,6 @@ export function createExecutorModule(
       ...confirmationProviders,
       ...deadLetterProviders,
     ],
-    exports: [ExecutorAdapterRegistry, ExecutorRuntime, EXECUTOR_QUEUES],
+    exports: [AutomataMetrics, ExecutorAdapterRegistry, ExecutorRuntime, EXECUTOR_QUEUES],
   };
 }

@@ -23,6 +23,7 @@ export const AUTOMATA_METRIC_NAMES = Object.freeze([
   "automata_webhook_deliveries_total",
   "automata_dao_harvest_transitions_total",
   "automata_dao_harvest_missed_windows_total",
+  "automata_dao_harvest_low_compensation_total",
   "automata_dao_harvest_recovery_required_total",
   "automata_dao_harvest_next_action_seconds",
 ] as const);
@@ -88,6 +89,7 @@ export class AutomataMetrics {
   readonly webhookDeliveriesTotal: Counter<"outcome">;
   readonly daoHarvestTransitionsTotal: Counter<"operation" | "outcome">;
   readonly daoHarvestMissedWindowsTotal: Counter;
+  readonly daoHarvestLowCompensationTotal: Counter;
   readonly daoHarvestRecoveryRequiredTotal: Counter;
   readonly daoHarvestNextActionSeconds: Gauge<"state">;
 
@@ -156,6 +158,10 @@ export class AutomataMetrics {
     this.daoHarvestMissedWindowsTotal = counter(registry, {
       name: "automata_dao_harvest_missed_windows_total",
       help: "DAO harvest preparation windows missed by compliant executors",
+    });
+    this.daoHarvestLowCompensationTotal = counter(registry, {
+      name: "automata_dao_harvest_low_compensation_total",
+      help: "DAO harvest transitions deferred because compensation cannot cover bounded execution costs",
     });
     this.daoHarvestRecoveryRequiredTotal = counter(registry, {
       name: "automata_dao_harvest_recovery_required_total",

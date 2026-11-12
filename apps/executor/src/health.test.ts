@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { AutomataMetrics } from "@ckb-automata/telemetry";
+
 import { startExecutorHealthServer } from "./health.ts";
 
 test("executor health listener separates liveness from dependency readiness", async () => {
@@ -16,7 +18,9 @@ test("executor health listener separates liveness from dependency readiness", as
       redis: { status: status === "ready" ? "up" : "down" },
     }),
   } as never;
-  const server = await startExecutorHealthServer(runtime, 45_181);
+  const metrics = new AutomataMetrics();
+  metrics.daoHarvestMissedWindowsTotal.inc();
+  const server = await startExecutorHealthServer(runtime, 45_181, metrics);
   try {
     const live = await fetch("http://127.0.0.1:45181/health/live");
     assert.equal(live.status, 200);
@@ -33,6 +37,10 @@ test("executor health listener separates liveness from dependency readiness", as
     const ready = await fetch("http://127.0.0.1:45181/health/ready");
     assert.equal(ready.status, 200);
     assert.equal(((await ready.json()) as { instanceId: string }).instanceId, "operator-a");
+
+    const rendered = await fetch("http://127.0.0.1:45181/metrics");
+    assert.equal(rendered.status, 200);
+    assert.match(await rendered.text(), /automata_dao_harvest_missed_windows_total 1/);
   } finally {
     await server.close();
   }

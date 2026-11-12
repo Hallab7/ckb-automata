@@ -2,7 +2,7 @@ import type { INestApplicationContext, LoggerService } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 
 import { parseEnvironment, type AutomataEnvironment } from "@ckb-automata/config";
-import { CorrelatedLogger, type LogWriter } from "@ckb-automata/telemetry";
+import { AutomataMetrics, CorrelatedLogger, type LogWriter } from "@ckb-automata/telemetry";
 
 import { createExecutorModule, type ExecutorModuleDependencies } from "./app.module.ts";
 import { startExecutorHealthServer, type ExecutorHealthServer } from "./health.ts";
@@ -202,7 +202,11 @@ export async function startExecutor(
     throw new Error("public executor instance identity is required");
   }
   try {
-    const healthServer = await startExecutorHealthServer(result.runtime, Number(rawPort));
+    const healthServer = await startExecutorHealthServer(
+      result.runtime,
+      Number(rawPort),
+      result.app.get(AutomataMetrics),
+    );
     for (const signal of ["SIGINT", "SIGTERM"] as const) {
       process.once(signal, () => void healthServer.close());
     }

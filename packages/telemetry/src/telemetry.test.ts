@@ -27,6 +27,7 @@ test("publishes every Section 18 metric with bounded labels", async () => {
   metrics.webhookDeliveriesTotal.inc({ outcome: "delivered" });
   metrics.daoHarvestTransitionsTotal.inc({ operation: "prepare", outcome: "confirmed" });
   metrics.daoHarvestMissedWindowsTotal.inc();
+  metrics.daoHarvestLowCompensationTotal.inc();
   metrics.daoHarvestRecoveryRequiredTotal.inc();
   metrics.daoHarvestNextActionSeconds.set({ state: "deposited" }, 3600);
 

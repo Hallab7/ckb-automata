@@ -46,17 +46,21 @@ import {
   DaoHarvestWitnessV3,
   JobDataV1,
 } from "@ckb-automata/molecule";
+import type { AutomataMetrics } from "@ckb-automata/telemetry";
 
 import { chainScriptIdentity } from "./build-snapshot.ts";
 import {
   DAO_HARVEST_V3_ADAPTER_ID,
+  DaoHarvestV3SafetyError,
   assertDaoHarvestV3ExecutorOperation,
   createDaoHarvestV3ExecutionPlan,
   evaluateDaoHarvestV3Schedule,
   validateDaoHarvestV3Reload,
+  type DaoHarvestV3Operation,
   type DaoHarvestV3OperatorIdentity,
   type DaoHarvestV3ScheduleRecord,
 } from "./dao-harvest-v3-safety.ts";
+import { DaoHarvestV3Monitoring } from "./dao-harvest-v3-monitoring.ts";
 import {
   loadVerifiedDaoHarvestV3ExecutorDeployments,
   type VerifiedDaoHarvestV3ExecutorDeployment,
@@ -103,7 +107,7 @@ interface CurrentState {
 interface SubmittedAttempt {
   readonly transactionHash: Hash32;
   readonly jobId: Hash32;
-  readonly operation: string;
+  readonly operation: DaoHarvestV3Operation;
 }
 
 function object(value: unknown, name: string): Record<string, unknown> {
@@ -242,6 +246,7 @@ export class DaoHarvestV3RuntimeCoordinator implements OnApplicationBootstrap, O
   readonly #minimumMargin: bigint;
   readonly #maximumCycles: bigint;
   readonly #identity: DaoHarvestV3OperatorIdentity;
+  readonly #monitoring: DaoHarvestV3Monitoring;
   readonly #attempts = new Map<Hash32, SubmittedAttempt>();
   readonly #provisions = new Map<Hash32, Hash32>();
   #deployments: readonly VerifiedDaoHarvestV3ExecutorDeployment[] | undefined;
@@ -260,6 +265,7 @@ export class DaoHarvestV3RuntimeCoordinator implements OnApplicationBootstrap, O
     readonly transactionFee: bigint;
     readonly minimumMargin: bigint;
     readonly maximumCycles: bigint;
+    readonly metrics: AutomataMetrics;
   }) {
     this.#runtime = options.runtime;
     this.#logger = options.logger;
@@ -273,6 +279,7 @@ export class DaoHarvestV3RuntimeCoordinator implements OnApplicationBootstrap, O
       options.transactionFee < V3_NETWORK_FEE_CAP ? options.transactionFee : V3_NETWORK_FEE_CAP;
     this.#minimumMargin = options.minimumMargin;
     this.#maximumCycles = options.maximumCycles;
+    this.#monitoring = new DaoHarvestV3Monitoring(options.metrics);
     const ownerLockHash = parseHash32(scriptToHash(options.ownerLock));
     this.#identity = Object.freeze({
       ownerLockHash,
@@ -304,35 +311,56 @@ export class DaoHarvestV3RuntimeCoordinator implements OnApplicationBootstrap, O
         await this.#reconcile();
         const deployments = await this.#loadedDeployments();
         const rows = await this.#rows();
-        for (const row of rows) {
-          if (this.#stopped) break;
-          try {
-            const state = await this.#reload(row, deployments);
-            const tip = await this.#runtime.getTipHeader();
-            const tipEpoch = packClientEpoch(tip.epoch);
-            const accumulatorLock = operatorAccumulatorLock(
-              state.deployment,
-              this.#identity.ownerLockHash,
-              state.policyScriptHash,
-            );
-            const identity = Object.freeze({
-              ...this.#identity,
-              accumulatorLockHash: parseHash32(scriptToHash(accumulatorLock)),
-            });
-            const decision = evaluateDaoHarvestV3Schedule(state.schedule, tipEpoch, identity);
-            if (decision.status !== "ready") continue;
-            if (this.#attempts.has(state.schedule.jobId)) continue;
-            await this.#execute(state, decision.operation, identity, tipEpoch, accumulatorLock);
-          } catch (error) {
-            this.#logger.error(
-              "executor.dao_harvest_v3.job_failed",
-              "V3 harvest job was not submitted",
-              {
-                jobId: row.jobId,
-                reason: error instanceof Error ? error.message : "unknown failure",
-              },
-            );
+        this.#monitoring.beginScan();
+        try {
+          for (const row of rows) {
+            if (this.#stopped) break;
+            let attemptedOperation: DaoHarvestV3Operation | undefined;
+            let attemptedSchedule: DaoHarvestV3ScheduleRecord | undefined;
+            try {
+              const state = await this.#reload(row, deployments);
+              const tip = await this.#runtime.getTipHeader();
+              const tipEpoch = packClientEpoch(tip.epoch);
+              const accumulatorLock = operatorAccumulatorLock(
+                state.deployment,
+                this.#identity.ownerLockHash,
+                state.policyScriptHash,
+              );
+              const identity = Object.freeze({
+                ...this.#identity,
+                accumulatorLockHash: parseHash32(scriptToHash(accumulatorLock)),
+              });
+              const decision = evaluateDaoHarvestV3Schedule(state.schedule, tipEpoch, identity);
+              this.#monitoring.observe(state.schedule, decision);
+              if (decision.status !== "ready") continue;
+              if (this.#attempts.has(state.schedule.jobId)) continue;
+              attemptedOperation = decision.operation;
+              attemptedSchedule = state.schedule;
+              await this.#execute(state, decision.operation, identity, tipEpoch, accumulatorLock);
+            } catch (error) {
+              if (attemptedOperation !== undefined) {
+                this.#monitoring.recordTransition(attemptedOperation, "failed");
+                if (
+                  error instanceof DaoHarvestV3SafetyError &&
+                  error.code === "EXECUTOR_UNPROFITABLE"
+                ) {
+                  if (attemptedSchedule !== undefined) {
+                    this.#monitoring.lowCompensation(attemptedSchedule);
+                  }
+                }
+              }
+              this.#logger.error(
+                "executor.dao_harvest_v3.job_failed",
+                "V3 harvest job was not submitted",
+                {
+                  jobId: row.jobId,
+                  reason: error instanceof Error ? error.message : "unknown failure",
+                },
+              );
+            }
           }
+        } finally {
+          this.#monitoring.finishScan();
         }
       });
     } catch (error) {
@@ -887,6 +915,7 @@ export class DaoHarvestV3RuntimeCoordinator implements OnApplicationBootstrap, O
       const response = await this.#runtime.getTransactionStatus(attempt.transactionHash);
       if (!response || response.status === "rejected") {
         this.#attempts.delete(jobId);
+        this.#monitoring.recordTransition(attempt.operation, "failed");
         this.#logger.error("executor.dao_harvest_v3.dropped", "V3 harvest transition was dropped", {
           jobId,
           operation: attempt.operation,
@@ -894,6 +923,7 @@ export class DaoHarvestV3RuntimeCoordinator implements OnApplicationBootstrap, O
         });
       } else if (response.status === "committed") {
         this.#attempts.delete(jobId);
+        this.#monitoring.recordTransition(attempt.operation, "confirmed");
         this.#logger.info("executor.dao_harvest_v3.committed", "V3 harvest transition committed", {
           jobId,
           operation: attempt.operation,
