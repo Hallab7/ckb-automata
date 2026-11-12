@@ -24,6 +24,12 @@ export interface DaoHarvestV3DeploymentManifest {
   readonly genesisHash: Hash32;
   readonly sourceRevision: string;
   readonly predecessorManifests: readonly string[];
+  readonly deployment: {
+    readonly transactionHash: Hash32;
+    readonly blockHash: Hash32;
+    readonly blockNumber: string;
+    readonly confirmations: string;
+  };
   readonly secp256k1Blake160: {
     readonly codeHash: Hash32;
     readonly hashType: "type";
@@ -98,6 +104,19 @@ function contract(value: unknown, name: string): AuditedContract {
     sizeBytes: Number(sizeBytes),
   });
 }
+function deployment(value: unknown) {
+  const item = object(value, "deployment");
+  const blockNumber = text(item["blockNumber"], "deployment.blockNumber");
+  const confirmations = text(item["confirmations"], "deployment.confirmations");
+  if (!/^0x(?:0|[1-9a-f][0-9a-f]*)$/.test(blockNumber) || !/^[1-9][0-9]*$/.test(confirmations))
+    throw new TypeError("V3 deployment evidence is invalid");
+  return Object.freeze({
+    transactionHash: parseHash32(text(item["transactionHash"], "deployment.transactionHash")),
+    blockHash: parseHash32(text(item["blockHash"], "deployment.blockHash")),
+    blockNumber,
+    confirmations,
+  });
+}
 export function parseDaoHarvestV3DeploymentManifest(
   value: unknown,
 ): DaoHarvestV3DeploymentManifest {
@@ -131,6 +150,7 @@ export function parseDaoHarvestV3DeploymentManifest(
     genesisHash: parseHash32(text(item["genesisHash"], "genesisHash")),
     sourceRevision,
     predecessorManifests: Object.freeze(predecessors as string[]),
+    deployment: deployment(item["deployment"]),
     secp256k1Blake160: system(item["secp256k1Blake160"], "secp256k1Blake160"),
     nervosDao: system(item["nervosDao"], "nervosDao"),
     contracts: Object.freeze({

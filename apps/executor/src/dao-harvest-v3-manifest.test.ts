@@ -11,6 +11,12 @@ test("hosted executor accepts schema-3 manifests and rejects unaudited metadata"
     genesisHash: `0x${"1".repeat(64)}`,
     sourceRevision: "1".repeat(40),
     predecessorManifests: [],
+    deployment: {
+      transactionHash: `0x${"8".repeat(64)}`,
+      blockHash: `0x${"9".repeat(64)}`,
+      blockNumber: "0x10",
+      confirmations: "5",
+    },
     secp256k1Blake160: {
       codeHash: `0x${"2".repeat(64)}`,
       hashType: "type",
@@ -40,6 +46,11 @@ test("hosted executor accepts schema-3 manifests and rejects unaudited metadata"
   const parsed = parseDaoHarvestV3ExecutorManifest(base);
   assert.equal(parsed.schemaVersion, 3);
   assert.equal(parsed.contracts.jobLock.hashType, "data1");
+  assert.equal(parsed.deployment.confirmations, "5");
+  assert.throws(
+    () => parseDaoHarvestV3ExecutorManifest({ ...base, deployment: undefined }),
+    /deployment must be an object/,
+  );
   assert.throws(
     () =>
       parseDaoHarvestV3ExecutorManifest({
