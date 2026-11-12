@@ -380,7 +380,11 @@ function build(
   if (!walletFundedSetup && totalOutput > totalInput)
     throw new Error("reviewed outputs exceed reviewed inputs");
   const maximumNetworkFee = parseShannons(input.maximumNetworkFee);
-  if (totalInput >= totalOutput && totalInput - totalOutput > maximumNetworkFee)
+  if (
+    !walletFundedSetup &&
+    totalInput >= totalOutput &&
+    totalInput - totalOutput > maximumNetworkFee
+  )
     throw new Error("reviewed transaction fee exceeds its maximum");
   const normalized = {
     operation,

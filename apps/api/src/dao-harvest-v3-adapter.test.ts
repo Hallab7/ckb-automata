@@ -231,6 +231,19 @@ test("V3 setup creates the exact chain-bound state and permits owner wallet fund
   assert.equal(BigInt(result.transaction.outputs[1]!.capacity), 242n * 100_000_000n);
   assert.equal(BigInt(result.transaction.outputs[2]!.capacity), 201n * 100_000_000n);
   assert.equal(result.completion.requiredInputCapacity, (700n * 100_000_000n).toString());
+  const surplusResult = await new DaoHarvestV3TransactionAdapter(
+    {
+      ...chain,
+      getCellLive: async () => ({
+        cellOutput: { capacity: 2_160n * 100_000_000n, lock: owner, type: undefined },
+        outputData: { toString: () => "0x" },
+      }),
+    } as never,
+    {} as never,
+    "ckb_testnet",
+    [deployment],
+  ).build("setup", request);
+  assert.doesNotThrow(() => JSON.stringify(surplusResult));
   await assert.rejects(
     () => adapter.build("setup", { ...request, ignoredDisplayValue: "not committed" }),
     /unsupported fields/,
