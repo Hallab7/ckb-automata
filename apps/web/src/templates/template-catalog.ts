@@ -45,7 +45,7 @@ export const TEMPLATE_CATALOG: readonly TemplateCatalogItem[] = Object.freeze([
     risk: "Demo records are illustrative and do not prove public testnet execution.",
   }),
   Object.freeze({
-    action: Object.freeze({ href: "/automations/new/dao-harvest-v2", label: "Set up harvest" }),
+    action: Object.freeze({ href: "/automations/new/dao-harvest-v3", label: "Set up harvest" }),
     approval:
       "Your wallet approves a limited testnet policy that preserves the original DAO amount.",
     capability: "executable",

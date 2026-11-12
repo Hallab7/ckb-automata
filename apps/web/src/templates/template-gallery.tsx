@@ -19,7 +19,7 @@ const CREATION_TEMPLATES = TEMPLATE_CATALOG.filter(
 );
 
 export function TemplateGallery() {
-  const setupEnabled = browserWebEnvironment().daoHarvestV2SetupEnabled;
+  const setupEnabled = browserWebEnvironment().daoHarvestV3SetupEnabled;
   const templates = setupEnabled
     ? CREATION_TEMPLATES
     : CREATION_TEMPLATES.filter((template) => template.id !== "dao-harvest");

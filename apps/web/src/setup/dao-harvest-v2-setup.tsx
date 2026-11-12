@@ -7,6 +7,7 @@ import {
   ApiClientError,
   createApiClient,
   type ApiDaoHarvestV2Build,
+  type ApiDaoHarvestV3Build,
 } from "@ckb-automata/api-client";
 import { Button, InlineNotice, TextField } from "@ckb-automata/ui";
 
@@ -26,10 +27,19 @@ import {
   verifyCompletedDaoHarvestV2Review,
   verifyRefreshedDaoHarvestV2Build,
 } from "./dao-harvest-v2-review.ts";
+import {
+  daoHarvestV3ReviewSnapshot,
+  normalizeDaoHarvestV3Build,
+  verifyCompletedDaoHarvestV3Review,
+  verifyDaoHarvestV3SignerChain,
+  verifyRefreshedDaoHarvestV3Build,
+} from "./dao-harvest-v3-review.ts";
 import { DAO_HARVEST_SETUP_STEPS, type SetupDraft, type SetupErrors } from "./setup-flow.ts";
 import { SetupStepper, type SetupStepRenderContext } from "./setup-stepper.tsx";
 import { OperatorSelectionFields } from "./operator-selection-fields.tsx";
-import { DEFAULT_OPERATOR_DRAFT } from "./operator-directory.ts";
+import { DEFAULT_OPERATOR_DRAFT, PUBLIC_OPERATORS } from "./operator-directory.ts";
+
+type HarvestRevision = 2 | 3;
 
 const INITIAL_DRAFT: SetupDraft = Object.freeze({
   ...DEFAULT_OPERATOR_DRAFT,
@@ -44,10 +54,11 @@ const MINIMUM_CKB = 242n;
 
 interface ReadyReview {
   readonly body: Record<string, unknown>;
-  readonly build: ApiDaoHarvestV2Build;
+  readonly build: ApiDaoHarvestV2Build | ApiDaoHarvestV3Build;
   readonly completed: ReturnType<typeof normalizeDaoHarvestV2Build>["transaction"];
   readonly key: string;
-  readonly snapshot: ReturnType<typeof daoHarvestV2ReviewSnapshot>;
+  readonly snapshot:
+    ReturnType<typeof daoHarvestV2ReviewSnapshot> | ReturnType<typeof daoHarvestV3ReviewSnapshot>;
   readonly transactionHash: string;
 }
 
@@ -106,19 +117,31 @@ async function setupBody(
   draft: SetupDraft,
   session: ReturnType<typeof useWalletSession>,
   creatorNonce: string,
+  revision: HarvestRevision,
 ) {
   if (!session.ownerLockHash) throw new Error("Connect the owner wallet first.");
   const customOperators = draft["operatorMode"] === "custom";
+  const automaticPreferred = PUBLIC_OPERATORS[0];
+  const automaticBackup = PUBLIC_OPERATORS[1];
+  if (revision === 3 && (!automaticPreferred || !automaticBackup)) {
+    throw new Error("The testnet operator set is unavailable.");
+  }
   const [identityOutPoint, ownerLock, payoutLock, preferredOperatorLock, backupOperatorLock] =
     await Promise.all([
       session.selectDeadlinePledge(),
       session.getOwnerLock(session.ownerLockHash),
       session.resolveLock(draft["payoutAddress"] ?? ""),
-      customOperators
-        ? session.resolveLock(draft["preferredOperatorAddress"] ?? "")
+      customOperators || revision === 3
+        ? session.resolveLock(
+            customOperators
+              ? (draft["preferredOperatorAddress"] ?? "")
+              : automaticPreferred!.address,
+          )
         : Promise.resolve(undefined),
-      customOperators
-        ? session.resolveLock(draft["backupOperatorAddress"] ?? "")
+      customOperators || revision === 3
+        ? session.resolveLock(
+            customOperators ? (draft["backupOperatorAddress"] ?? "") : automaticBackup!.address,
+          )
         : Promise.resolve(undefined),
     ]);
   return Object.freeze({
@@ -132,10 +155,15 @@ async function setupBody(
     totalCycles: cycles(draft),
     ...(preferredOperatorLock === undefined || backupOperatorLock === undefined
       ? {}
-      : {
-          preferredOperatorLockHash: session.reviewLockHash(preferredOperatorLock),
-          backupOperatorLockHashes: [session.reviewLockHash(backupOperatorLock)],
-        }),
+      : revision === 3
+        ? {
+            preferredOperatorLockHash: session.reviewLockHash(preferredOperatorLock),
+            fallbackOperatorLockHashes: [session.reviewLockHash(backupOperatorLock)],
+          }
+        : {
+            preferredOperatorLockHash: session.reviewLockHash(preferredOperatorLock),
+            backupOperatorLockHashes: [session.reviewLockHash(backupOperatorLock)],
+          }),
   });
 }
 
@@ -295,10 +323,12 @@ function HarvestV2Details(context: SetupStepRenderContext) {
 function HarvestV2Review({
   context,
   onState,
+  revision,
   state,
 }: Readonly<{
   context: SetupStepRenderContext;
   onState: (state: ReviewState) => void;
+  revision: HarvestRevision;
   state: ReviewState;
 }>) {
   const session = useWalletSession();
@@ -311,17 +341,42 @@ function HarvestV2Review({
     }
     let active = true;
     onState({ status: "loading" });
-    void setupBody(context.draft, session, creatorNonce)
+    void setupBody(context.draft, session, creatorNonce, revision)
       .then(async (body) => {
         const [build, network] = await Promise.all([
-          api().buildDaoHarvestV2("setup", body),
+          revision === 3
+            ? api().buildDaoHarvestV3("setup", body)
+            : api().buildDaoHarvestV2("setup", body),
           api().network() as Promise<{
             readonly tip: { readonly blockHash: string; readonly blockNumber: string };
           }>,
         ]);
-        const normalized = normalizeDaoHarvestV2Build(build);
+        if (revision === 3) {
+          const environment = browserWebEnvironment();
+          verifyDaoHarvestV3SignerChain(
+            build as ApiDaoHarvestV3Build,
+            await session.getSignerGenesisHash(),
+            environment.genesisHash,
+          );
+        }
+        const normalized =
+          revision === 3
+            ? normalizeDaoHarvestV3Build(build as ApiDaoHarvestV3Build)
+            : normalizeDaoHarvestV2Build(build as ApiDaoHarvestV2Build);
         const completed = await session.completeForReview(normalized.transaction);
-        await verifyCompletedDaoHarvestV2Review(build, completed.transaction, session);
+        if (revision === 3) {
+          await verifyCompletedDaoHarvestV3Review(
+            build as ApiDaoHarvestV3Build,
+            completed.transaction,
+            session,
+          );
+        } else {
+          await verifyCompletedDaoHarvestV2Review(
+            build as ApiDaoHarvestV2Build,
+            completed.transaction,
+            session,
+          );
+        }
         return { body, build, completed, network };
       })
       .then(({ body, build, completed, network }) => {
@@ -333,7 +388,10 @@ function HarvestV2Review({
             build,
             completed: completed.transaction,
             key,
-            snapshot: daoHarvestV2ReviewSnapshot(network.tip),
+            snapshot:
+              revision === 3
+                ? daoHarvestV3ReviewSnapshot(network.tip, (build as ApiDaoHarvestV3Build).chain)
+                : daoHarvestV2ReviewSnapshot(network.tip),
             transactionHash: completed.hash,
           },
         });
@@ -344,7 +402,7 @@ function HarvestV2Review({
     return () => {
       active = false;
     };
-  }, [context.draft, creatorNonce, key, onState, session]);
+  }, [context.draft, creatorNonce, key, onState, revision, session]);
 
   if (state.status === "loading" || state.status === "idle")
     return (
@@ -362,7 +420,10 @@ function HarvestV2Review({
         <p>{state.status === "error" ? state.message : "Build a fresh review."}</p>
       </InlineNotice>
     );
-  const review = state.value.build.review;
+  const build = state.value.build;
+  const review = build.review;
+  const v3 = revision === 3 ? (build as ApiDaoHarvestV3Build).review : undefined;
+  const v2 = revision === 2 ? (build as ApiDaoHarvestV2Build).review : undefined;
   return (
     <div className="setup-review">
       <div>
@@ -375,27 +436,33 @@ function HarvestV2Review({
       <dl className="setup-review__values">
         <div>
           <dt>Original amount</dt>
-          <dd>{harvestV2Amount(review.originalAmount)}</dd>
+          <dd>{harvestV2Amount(v3?.protectedAmount ?? v2!.originalAmount)}</dd>
         </div>
-        <div>
-          <dt>Expected compensation</dt>
-          <dd>{harvestV2Amount(review.expectedCompensation)}</dd>
-        </div>
-        <div>
-          <dt>Maximum service charges</dt>
-          <dd>{harvestV2Amount(review.completedWorkCharges.maximumTotal)}</dd>
-        </div>
+        {v2 ? (
+          <>
+            <div>
+              <dt>Expected compensation</dt>
+              <dd>{harvestV2Amount(v2.expectedCompensation)}</dd>
+            </div>
+            <div>
+              <dt>Maximum service charges</dt>
+              <dd>{harvestV2Amount(v2.completedWorkCharges.maximumTotal)}</dd>
+            </div>
+          </>
+        ) : null}
         <div>
           <dt>Maximum network fee</dt>
           <dd>{harvestV2Amount(review.maximumNetworkFee)}</dd>
         </div>
-        <div>
-          <dt>Recoverable reserve</dt>
-          <dd>{harvestV2Amount(review.recoverableReserve)}</dd>
-        </div>
+        {v2 ? (
+          <div>
+            <dt>Recoverable reserve</dt>
+            <dd>{harvestV2Amount(v2.recoverableReserve)}</dd>
+          </div>
+        ) : null}
         <div className="setup-review__total">
           <dt>Total amount to deposit</dt>
-          <dd>{harvestV2Amount(review.totalLockedAmount)}</dd>
+          <dd>{harvestV2Amount(v3?.totalOutput ?? v2!.totalLockedAmount)}</dd>
         </div>
       </dl>
       <InlineNotice title="Your original amount is protected" tone="success">
@@ -410,8 +477,13 @@ function HarvestV2Review({
 
 function HarvestV2Approval({
   context,
+  revision,
   reviewState,
-}: Readonly<{ context: SetupStepRenderContext; reviewState: ReviewState }>) {
+}: Readonly<{
+  context: SetupStepRenderContext;
+  revision: HarvestRevision;
+  reviewState: ReviewState;
+}>) {
   const session = useWalletSession();
   const [state, setState] = useState<
     | { status: "idle" | "submitting" }
@@ -436,20 +508,49 @@ function HarvestV2Approval({
   const submit = async () => {
     setState({ status: "submitting" });
     try {
-      const refreshed = await api().buildDaoHarvestV2("setup", review.body);
-      verifyRefreshedDaoHarvestV2Build(review.build, refreshed);
+      const refreshed =
+        revision === 3
+          ? await api().buildDaoHarvestV3("setup", review.body)
+          : await api().buildDaoHarvestV2("setup", review.body);
+      if (revision === 3) {
+        const environment = browserWebEnvironment();
+        verifyDaoHarvestV3SignerChain(
+          refreshed as ApiDaoHarvestV3Build,
+          await session.getSignerGenesisHash(),
+          environment.genesisHash,
+        );
+        verifyRefreshedDaoHarvestV3Build(
+          review.build as ApiDaoHarvestV3Build,
+          refreshed as ApiDaoHarvestV3Build,
+        );
+      } else {
+        verifyRefreshedDaoHarvestV2Build(
+          review.build as ApiDaoHarvestV2Build,
+          refreshed as ApiDaoHarvestV2Build,
+        );
+      }
       const signed = await session.signReviewedTransaction(
         review.completed,
         review.transactionHash,
         review.snapshot,
       );
+      if (revision === 3) {
+        const environment = browserWebEnvironment();
+        verifyDaoHarvestV3SignerChain(
+          refreshed as ApiDaoHarvestV3Build,
+          await session.getSignerGenesisHash(),
+          environment.genesisHash,
+        );
+      }
       const transactionHash = await session.submitSignedTransaction(signed, review.transactionHash);
       writeAutomationTitle(window.localStorage, review.build.jobId, automationTitle(context.draft));
       let registration: "registered" | "retry" = "registered";
-      try {
-        await api().registerDaoHarvestV2Setup({ transactionHash });
-      } catch {
-        registration = "retry";
+      if (revision === 2) {
+        try {
+          await api().registerDaoHarvestV2Setup({ transactionHash });
+        } catch {
+          registration = "retry";
+        }
       }
       setState({ status: "submitted", registration, transactionHash });
     } catch (reason) {
@@ -467,7 +568,7 @@ function HarvestV2Approval({
           <h2>Your harvest automation is confirming</h2>
         </div>
         <p>It appears in Automations while CKB testnet confirms it.</p>
-        {state.registration === "retry" ? (
+        {revision === 2 && state.registration === "retry" ? (
           <InlineNotice title="Transaction submitted" tone="warning">
             <p>
               The transaction succeeded, but its temporary list entry still needs to be registered.
@@ -534,7 +635,7 @@ function HarvestV2Approval({
   );
 }
 
-export function DaoHarvestV2Setup() {
+function DaoHarvestSetup({ revision }: Readonly<{ revision: HarvestRevision }>) {
   const session = useWalletSession();
   const [reviewState, setReviewState] = useState<ReviewState>({ status: "idle" });
   const updateReview = useCallback((value: ReviewState) => setReviewState(value), []);
@@ -557,12 +658,17 @@ export function DaoHarvestV2Setup() {
         context.step === "details" ? (
           <HarvestV2Details {...context} />
         ) : context.step === "review" ? (
-          <HarvestV2Review context={context} onState={updateReview} state={reviewState} />
+          <HarvestV2Review
+            context={context}
+            onState={updateReview}
+            revision={revision}
+            state={reviewState}
+          />
         ) : context.step === "approval" ? (
-          <HarvestV2Approval context={context} reviewState={reviewState} />
+          <HarvestV2Approval context={context} revision={revision} reviewState={reviewState} />
         ) : null
       }
-      storageId="v2"
+      storageId={`v${revision}`}
       steps={DAO_HARVEST_SETUP_STEPS}
       template="dao-harvest"
       validateStep={(step, draft) =>
@@ -575,4 +681,12 @@ export function DaoHarvestV2Setup() {
       }
     />
   );
+}
+
+export function DaoHarvestV2Setup() {
+  return <DaoHarvestSetup revision={2} />;
+}
+
+export function DaoHarvestV3Setup() {
+  return <DaoHarvestSetup revision={3} />;
 }

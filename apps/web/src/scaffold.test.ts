@@ -40,6 +40,7 @@ test("App Router exposes every planned product route", async () => {
     "/automations/new",
     "/automations/new/dao-harvest",
     "/automations/new/dao-harvest-v2",
+    "/automations/new/dao-harvest-v3",
     "/automations/new/deadline",
     "/automations/new/recurring",
     "/demo",
@@ -91,6 +92,7 @@ test("typed environment configures the generated API client and rejects unsafe v
   assert.deepEqual(parseWebEnvironment(input), {
     apiUrl: "https://api.example.test/",
     daoHarvestV2SetupEnabled: false,
+    daoHarvestV3SetupEnabled: false,
     genesisHash: TESTNET_GENESIS_HASH,
     manifestSha256: TESTNET_DEPLOYMENT_MANIFEST_SHA256,
     network: "testnet",
@@ -109,6 +111,13 @@ test("typed environment configures the generated API client and rejects unsafe v
       NEXT_PUBLIC_DAO_HARVEST_V2_SETUP_ENABLED: "TRUE",
     }).daoHarvestV2SetupEnabled,
     false,
+  );
+  assert.equal(
+    parseWebEnvironment({
+      ...input,
+      NEXT_PUBLIC_DAO_HARVEST_V3_SETUP_ENABLED: "true",
+    }).daoHarvestV3SetupEnabled,
+    true,
   );
   assert.ok(createServerApiClient(input));
   assert.throws(

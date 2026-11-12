@@ -17,7 +17,7 @@ test("template availability matches implemented product boundaries", () => {
   const executable = TEMPLATE_CATALOG.filter((template) => template.capability === "executable");
   assert.deepEqual(
     executable.map((template) => template.action.href),
-    ["/automations/new/deadline", "/automations/new/recurring", "/automations/new/dao-harvest-v2"],
+    ["/automations/new/deadline", "/automations/new/recurring", "/automations/new/dao-harvest-v3"],
   );
   assert.ok(
     TEMPLATE_CATALOG.filter((template) => template.capability !== "executable").every(
@@ -37,7 +37,7 @@ test("creation gallery stays focused on executable automation choices", async ()
   assert.match(source, /data-create-action="true"/);
   assert.doesNotMatch(source, /Guided scenarios|Demo only|NervDAO Cycle Guard|Research only/);
   assert.doesNotMatch(source, /template-card__facts/);
-  assert.match(source, /daoHarvestV2SetupEnabled/);
+  assert.match(source, /daoHarvestV3SetupEnabled/);
   assert.match(source, /template\.id !== "dao-harvest"/);
 });
 
@@ -48,4 +48,26 @@ test("direct V2 setup navigation fails closed with the public switch", async () 
   );
   assert.match(source, /!browserWebEnvironment\(\)\.daoHarvestV2SetupEnabled/);
   assert.match(source, /New DAO harvest setup is paused/);
+});
+
+test("direct V3 setup navigation fails closed until every release gate passes", async () => {
+  const source = await readFile(
+    new URL("../../app/(setup)/automations/new/dao-harvest-v3/page.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /!browserWebEnvironment\(\)\.daoHarvestV3SetupEnabled/);
+  assert.match(source, /independent security review must be complete/);
+});
+
+test("V3 setup uses its closed request, review, and signer-bound submission path", async () => {
+  const source = await readFile(
+    new URL("../setup/dao-harvest-v2-setup.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /buildDaoHarvestV3\("setup", body\)/);
+  assert.match(source, /fallbackOperatorLockHashes/);
+  assert.match(source, /verifyCompletedDaoHarvestV3Review/);
+  assert.match(source, /verifyDaoHarvestV3SignerChain/);
+  assert.match(source, /verifyRefreshedDaoHarvestV3Build/);
+  assert.match(source, /storageId={`v\$\{revision\}`}/);
 });
