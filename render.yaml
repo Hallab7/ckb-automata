@@ -35,6 +35,10 @@ services:
         value: ../../deploy/manifests/dao-harvest-v2-testnet.json
       - key: DAO_HARVEST_V2_SETUP_ENABLED
         value: "false"
+      - key: DAO_HARVEST_V3_MANIFEST_PATH
+        value: ../../deploy/manifests/dao-harvest-v3-testnet-v0.3.0.json
+      - key: DAO_HARVEST_V3_SETUP_ENABLED
+        value: "true"
       - key: OPERATOR_AUTOMATION_MANIFEST_PATH
         value: ../../deploy/manifests/operator-automation-testnet.json
       - key: DATABASE_URL
@@ -81,6 +85,8 @@ services:
         value: ../../deploy/manifests/dao-harvest-v2-testnet.json
       - key: DAO_HARVEST_V2_SETUP_ENABLED
         value: "false"
+      - key: DAO_HARVEST_V3_MANIFEST_PATH
+        value: ../../deploy/manifests/dao-harvest-v3-testnet-v0.3.0.json
       - key: OPERATOR_AUTOMATION_MANIFEST_PATH
         value: ../../deploy/manifests/operator-automation-testnet.json
       - key: DATABASE_URL
@@ -97,7 +103,7 @@ services:
       - key: EXECUTOR_INSTANCE_ID
         value: operator-a
       - key: EXECUTOR_SUPPORTED_POLICIES
-        value: deadline,recurring,dao-harvest,dao-harvest-v2
+        value: deadline,recurring,dao-harvest,dao-harvest-v2,dao-harvest-v3
       - key: EXECUTOR_LOCK_ARGS
         sync: false
       - key: EXECUTOR_TRANSACTION_FEE
@@ -141,6 +147,8 @@ services:
         value: ../../deploy/manifests/dao-harvest-v2-testnet.json
       - key: DAO_HARVEST_V2_SETUP_ENABLED
         value: "false"
+      - key: DAO_HARVEST_V3_MANIFEST_PATH
+        value: ../../deploy/manifests/dao-harvest-v3-testnet-v0.3.0.json
       - key: OPERATOR_AUTOMATION_MANIFEST_PATH
         value: ../../deploy/manifests/operator-automation-testnet.json
       - key: DATABASE_URL
@@ -157,7 +165,7 @@ services:
       - key: EXECUTOR_INSTANCE_ID
         value: operator-b
       - key: EXECUTOR_SUPPORTED_POLICIES
-        value: deadline,recurring,dao-harvest,dao-harvest-v2
+        value: deadline,recurring,dao-harvest,dao-harvest-v2,dao-harvest-v3
       - key: EXECUTOR_LOCK_ARGS
         sync: false
       - key: EXECUTOR_TRANSACTION_FEE
