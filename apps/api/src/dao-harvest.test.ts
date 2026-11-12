@@ -88,6 +88,14 @@ test("DAO harvest API publishes read, quote, and unsigned mutation routes", asyn
     ]) {
       assert.ok(document.paths[path], `missing OpenAPI path ${path}`);
     }
+    for (const path of [
+      "/v1/dao-harvest-v3",
+      "/v1/dao-harvest-v3/{jobId}",
+      "/v1/dao-harvest-v3/build/{operation}",
+    ]) {
+      assert.ok(document.paths[path], `missing OpenAPI path ${path}`);
+    }
+    assert.equal(document.paths["/v1/v1/dao-harvest-v3"], undefined);
     const schema = document.paths["/v1/dao-harvest/{jobId}"]?.get?.responses?.["200"];
     assert.match(JSON.stringify(schema), /principal/);
     assert.match(JSON.stringify(schema), /prepareStartSince/);
@@ -114,6 +122,11 @@ test("DAO harvest API publishes read, quote, and unsigned mutation routes", asyn
       code: "INVALID_DAO_HARVEST_V2_QUERY",
       message: "limit must be a positive integer",
     });
+    const invalidV3Query = await fastify.inject({
+      method: "GET",
+      url: "/v1/dao-harvest-v3?limit=0",
+    });
+    assert.equal(invalidV3Query.statusCode, 400);
   } finally {
     await app.close();
   }

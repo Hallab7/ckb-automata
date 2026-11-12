@@ -192,7 +192,7 @@ Injectable()(DaoHarvestV3ReadService);
 Injectable()(DaoHarvestV3MutationService);
 Inject(DaoHarvestV3ReadService)(DaoHarvestV3Controller, undefined, 0);
 Inject(DaoHarvestV3MutationService)(DaoHarvestV3Controller, undefined, 1);
-Controller("v1/dao-harvest-v3")(DaoHarvestV3Controller);
+Controller("dao-harvest-v3")(DaoHarvestV3Controller);
 ApiTags("DAO Harvest V3")(DaoHarvestV3Controller);
 
 const listDescriptor = Object.getOwnPropertyDescriptor(DaoHarvestV3Controller.prototype, "list")!;
