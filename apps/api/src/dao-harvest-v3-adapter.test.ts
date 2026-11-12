@@ -220,6 +220,7 @@ test("V3 setup creates the exact chain-bound state and permits owner wallet fund
   const result = (await adapter.build("setup", request)) as {
     readonly version: number;
     readonly operation: string;
+    readonly intentHash: string;
     readonly transaction: UnsignedDeadlineTransaction;
     readonly completion: { readonly requiredInputCapacity: string };
   };
@@ -231,6 +232,21 @@ test("V3 setup creates the exact chain-bound state and permits owner wallet fund
   assert.equal(BigInt(result.transaction.outputs[1]!.capacity), 242n * 100_000_000n);
   assert.equal(BigInt(result.transaction.outputs[2]!.capacity), 201n * 100_000_000n);
   assert.equal(result.completion.requiredInputCapacity, (700n * 100_000_000n).toString());
+  const nextBlockResult = (await new DaoHarvestV3TransactionAdapter(
+    {
+      ...chain,
+      getTipHeader: async () => ({
+        epoch: { integer: 13_920n, numerator: 1_152n, denominator: 1_800n },
+        hash: hash("f"),
+        number: 22_583_953n,
+      }),
+    } as never,
+    {} as never,
+    "ckb_testnet",
+    [deployment],
+  ).build("setup", request)) as typeof result;
+  assert.equal(nextBlockResult.intentHash, result.intentHash);
+  assert.deepEqual(nextBlockResult.transaction, result.transaction);
   const surplusResult = await new DaoHarvestV3TransactionAdapter(
     {
       ...chain,

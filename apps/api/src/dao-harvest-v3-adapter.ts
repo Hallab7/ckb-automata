@@ -843,7 +843,12 @@ export class DaoHarvestV3TransactionAdapter implements DaoHarvestV3MutationAdapt
     const jobLockHash = parseHash32(scriptToHash(jobLock));
     const daoTypeHash = parseHash32(scriptToHash(vaultType));
     const tip = await this.#chain.getTipHeader();
-    const anticipatedDeposit = addEpochs(parseEpoch(packClientEpoch(tip.epoch)), 1n);
+    const tipEpoch = parseEpoch(packClientEpoch(tip.epoch));
+    const anticipatedDeposit = createEpoch({
+      number: tipEpoch.number + 1n,
+      index: 0n,
+      length: 1n,
+    });
     const window = selectDaoPrepareWindow({
       deposit: anticipatedDeposit,
       tip: anticipatedDeposit,
