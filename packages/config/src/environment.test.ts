@@ -169,12 +169,12 @@ test("executor identity and supported policies are explicit and bounded", () => 
   const configured = parseEnvironment({
     ...validEnvironment("testnet-public"),
     EXECUTOR_INSTANCE_ID: "operator-a",
-    EXECUTOR_SUPPORTED_POLICIES: "deadline,recurring,dao-harvest,dao-harvest-v2",
+    EXECUTOR_SUPPORTED_POLICIES: "deadline,recurring,dao-harvest,dao-harvest-v2,dao-harvest-v3",
   });
   assert.equal(configured.EXECUTOR_INSTANCE_ID, "operator-a");
   assert.equal(
     configured.EXECUTOR_SUPPORTED_POLICIES,
-    "deadline,recurring,dao-harvest,dao-harvest-v2",
+    "deadline,recurring,dao-harvest,dao-harvest-v2,dao-harvest-v3",
   );
 
   for (const invalid of [
