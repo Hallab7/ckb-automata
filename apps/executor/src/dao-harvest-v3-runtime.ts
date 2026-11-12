@@ -157,6 +157,31 @@ function operation(value: ReturnType<typeof DaoHarvestWitnessV3.unpack>): number
   return parsed;
 }
 
+export function rebuildDaoHarvestV3Progress(
+  operationValue: number,
+  inputProgress: Uint8Array,
+  credit: Uint8Array,
+): Uint8Array {
+  const progress = DaoHarvestProgressV3.unpack(inputProgress);
+  if ([1, 2].includes(operationValue)) {
+    return DaoHarvestProgressV3.pack({
+      version: 3,
+      state: 1,
+      cycle_index: progress.cycle_index,
+      prepare_credit_hash: [...deriveDaoHarvestV3PrepareCreditHash(credit)],
+    });
+  }
+  if ([3, 4, 5].includes(operationValue)) {
+    return DaoHarvestProgressV3.pack({
+      version: 3,
+      state: 0,
+      cycle_index: Number(progress.cycle_index) + 1,
+      prepare_credit_hash: Array(32).fill(0),
+    });
+  }
+  return inputProgress;
+}
+
 function activeState(source: ClientTransactionResponse) {
   const decoded = outputType(source);
   const inputPayload = Uint8Array.from(decoded.envelope.payload);
@@ -165,22 +190,7 @@ function activeState(source: ClientTransactionResponse) {
   const operationValue = operation(decoded.witness);
   const payloadBytes =
     operationValue === 8 ? Uint8Array.from(decoded.envelope.successor_payload) : inputPayload;
-  const progressValue = DaoHarvestProgressV3.unpack(inputProgress);
-  const progressBytes = [1, 2].includes(operationValue)
-    ? DaoHarvestProgressV3.pack({
-        version: 2,
-        state: 1,
-        cycle_index: progressValue.cycle_index,
-        prepare_credit_hash: [...deriveDaoHarvestV3PrepareCreditHash(credit)],
-      })
-    : [3, 4, 5].includes(operationValue)
-      ? DaoHarvestProgressV3.pack({
-          version: 2,
-          state: 0,
-          cycle_index: Number(progressValue.cycle_index) + 1,
-          prepare_credit_hash: Array(32).fill(0),
-        })
-      : inputProgress;
+  const progressBytes = rebuildDaoHarvestV3Progress(operationValue, inputProgress, credit);
   return Object.freeze({
     ...decoded,
     operationValue,
