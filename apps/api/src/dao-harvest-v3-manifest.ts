@@ -104,7 +104,7 @@ function contract(value: unknown, name: string): AuditedContract {
     sizeBytes: Number(sizeBytes),
   });
 }
-function deployment(value: unknown) {
+function parseDeploymentEvidence(value: unknown) {
   const item = object(value, "deployment");
   const blockNumber = text(item["blockNumber"], "deployment.blockNumber");
   const confirmations = text(item["confirmations"], "deployment.confirmations");
@@ -150,7 +150,7 @@ export function parseDaoHarvestV3DeploymentManifest(
     genesisHash: parseHash32(text(item["genesisHash"], "genesisHash")),
     sourceRevision,
     predecessorManifests: Object.freeze(predecessors as string[]),
-    deployment: deployment(item["deployment"]),
+    deployment: parseDeploymentEvidence(item["deployment"]),
     secp256k1Blake160: system(item["secp256k1Blake160"], "secp256k1Blake160"),
     nervosDao: system(item["nervosDao"], "nervosDao"),
     contracts: Object.freeze({
@@ -188,7 +188,7 @@ async function loadOne(
       throw new Error(`${name} V3 code cell does not match the audited manifest`);
   }
   const manifestSha256 = createHash("sha256").update(bytes).digest("hex");
-  const deployment: DaoHarvestV3DeploymentIdentity = Object.freeze({
+  const identity: DaoHarvestV3DeploymentIdentity = Object.freeze({
     network: "ckb_testnet",
     genesisHash: manifest.genesisHash,
     manifestSha256,
@@ -201,7 +201,7 @@ async function loadOne(
       compensationLock: manifest.contracts.compensationLock,
     }),
   });
-  return Object.freeze({ deployment, manifest, manifestSha256 });
+  return Object.freeze({ deployment: identity, manifest, manifestSha256 });
 }
 export async function loadVerifiedDaoHarvestV3Deployments(
   path: string,

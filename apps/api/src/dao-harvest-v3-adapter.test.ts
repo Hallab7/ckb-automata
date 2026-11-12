@@ -95,25 +95,21 @@ test("V3 rotation changes only operator commitments", () => {
 });
 
 test("V3 terminal close accepts only the manifest-bound terminal compensation cell", () => {
-  const dep = (character: string) => ({
-    outPoint: { txHash: parseHash32(`0x${character.repeat(64)}`), index: "0x0" as const },
-    depType: "code" as const,
-  });
   const deployment = {
     network: "ckb_testnet",
     genesisHash: parseHash32(`0x${"1".repeat(64)}`),
     manifestSha256: "2".repeat(64),
     contracts: {
-      jobLock: { codeHash: parseHash32(`0x${"3".repeat(64)}`), cellDep: dep("3") },
-      policy: { codeHash: parseHash32(`0x${"4".repeat(64)}`), cellDep: dep("4") },
-      vaultLock: { codeHash: parseHash32(`0x${"5".repeat(64)}`), cellDep: dep("5") },
+      jobLock: { codeHash: parseHash32(`0x${"3".repeat(64)}`), cellDep: dependency("3") },
+      policy: { codeHash: parseHash32(`0x${"4".repeat(64)}`), cellDep: dependency("4") },
+      vaultLock: { codeHash: parseHash32(`0x${"5".repeat(64)}`), cellDep: dependency("5") },
       compensationLock: {
         codeHash: parseHash32(`0x${"6".repeat(64)}`),
-        cellDep: dep("6"),
+        cellDep: dependency("6"),
       },
     },
-    secp256k1Blake160: { cellDep: dep("8") },
-    nervosDao: { codeHash: parseHash32(`0x${"7".repeat(64)}`), cellDep: dep("7") },
+    secp256k1Blake160: { cellDep: dependency("8") },
+    nervosDao: { codeHash: parseHash32(`0x${"7".repeat(64)}`), cellDep: dependency("7") },
   } satisfies DaoHarvestV3DeploymentIdentity;
   const owner = parseHash32(`0x${"8".repeat(64)}`);
   const payout = parseHash32(`0x${"9".repeat(64)}`);

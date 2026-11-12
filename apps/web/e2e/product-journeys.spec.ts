@@ -64,9 +64,12 @@ test("explains protected harvest charges and operator takeover in plain language
   await page.getByLabel("Original amount (CKB)").fill("1000");
   await page.getByRole("radio", { name: "Several harvests" }).click();
   await page.getByLabel("Number of harvests").fill("3");
-  await expect(page.getByText("Preferred operator", { exact: true })).toBeVisible();
-  await expect(page.getByText("Backup operator", { exact: true })).toBeVisible();
-  await expect(page.getByText("Recoverable reserve", { exact: true })).toBeVisible();
+  const preferredOperator = page.getByLabel("Preferred operator");
+  await expect(preferredOperator).toHaveValue("none");
+  await preferredOperator.selectOption("operator-a");
+  await expect(
+    page.getByText(/other active operator becomes the backup automatically/i),
+  ).toBeVisible();
   await expect(page.getByText(/service charges come only from earned compensation/i)).toBeVisible();
   await expect(page.getByText(/block number|epoch/i)).toHaveCount(0);
   await expectNoHorizontalOverflow(page);

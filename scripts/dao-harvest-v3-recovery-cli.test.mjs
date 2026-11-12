@@ -27,6 +27,7 @@ const dep = (character) => ({
 });
 const ownerLock = { codeHash: hash("1"), hashType: "type", args: "0x1234" };
 const ownerHash = scriptIdentityHash(ownerLock);
+const daoTypeHash = scriptIdentityHash({ codeHash: hash("6"), hashType: "type", args: "0x" });
 const manifest = {
   schema: "ckb-automata/dao-harvest-deployment/v3",
   network: "ckb_testnet",
@@ -47,7 +48,7 @@ const payload = DaoHarvestPayloadV3.pack({
   payout_lock_hash: hashBytes("3"),
   vault_lock_code_hash: hashBytes("4"),
   compensation_lock_code_hash: hashBytes("5"),
-  dao_type_hash: hashBytes("6"),
+  dao_type_hash: [...Buffer.from(daoTypeHash.slice(2), "hex")],
   principal_capacity: "1000",
   preferred_prepare_operator_lock_hash: Array(32).fill(7),
   fallback_prepare_executor_set_hash: Array(32).fill(8),
