@@ -2,6 +2,7 @@ import type { ClientBlock } from "@ckb-ccc/shell";
 
 import {
   parseBlockNumber,
+  type DaoHarvestV3DeploymentIdentity,
   type OperatorAutomationDeployment,
   type RegisteredDeployment,
 } from "@ckb-automata/core";
@@ -10,6 +11,7 @@ import type { CkbReadClient } from "../ckb-client.ts";
 import type { DaoHarvestV2Deployment } from "../dao-harvest-v2-adapter.ts";
 import type { CanonicalCheckpointStore } from "./checkpoints.ts";
 import type { DaoHarvestV2RevisionIndexer } from "./dao-harvest-v2-indexer.ts";
+import type { DaoHarvestV3RevisionIndexer } from "./dao-harvest-v3-indexer.ts";
 import type { JobCellDiscovery } from "./job-discovery.ts";
 import type { JobTransitionIndexer } from "./job-transitions.ts";
 
@@ -30,6 +32,10 @@ interface LiveJobReconcilerOptions {
   readonly daoHarvestV2?: {
     readonly deployments: readonly DaoHarvestV2Deployment[];
     readonly indexer: Pick<DaoHarvestV2RevisionIndexer, "projectBlock">;
+  };
+  readonly daoHarvestV3?: {
+    readonly deployments: readonly DaoHarvestV3DeploymentIdentity[];
+    readonly indexer: Pick<DaoHarvestV3RevisionIndexer, "projectBlock">;
   };
   readonly operatorDeployment?: OperatorAutomationDeployment;
 }
@@ -65,7 +71,10 @@ export class LiveJobReconciler {
   readonly #transitions: Pick<JobTransitionIndexer, "indexBlock">;
   readonly #logger: ReconciliationLogger;
   readonly #options: Required<Pick<LiveJobReconcilerOptions, "enabled" | "pollIntervalMs">> &
-    Pick<LiveJobReconcilerOptions, "loadDeployment" | "daoHarvestV2" | "operatorDeployment">;
+    Pick<
+      LiveJobReconcilerOptions,
+      "loadDeployment" | "daoHarvestV2" | "daoHarvestV3" | "operatorDeployment"
+    >;
   #lastScanned: bigint | undefined;
   #running = false;
   #stopped = true;
@@ -93,6 +102,7 @@ export class LiveJobReconciler {
       loadDeployment: options.loadDeployment,
       pollIntervalMs,
       ...(options.daoHarvestV2 === undefined ? {} : { daoHarvestV2: options.daoHarvestV2 }),
+      ...(options.daoHarvestV3 === undefined ? {} : { daoHarvestV3: options.daoHarvestV3 }),
       ...(options.operatorDeployment === undefined
         ? {}
         : { operatorDeployment: options.operatorDeployment }),
@@ -197,6 +207,34 @@ export class LiveJobReconciler {
               searchMode: "prefix" as const,
             },
           ])),
+      ...(this.#options.daoHarvestV3 === undefined
+        ? []
+        : this.#options.daoHarvestV3.deployments.flatMap((harvestDeployment) => [
+            {
+              script: {
+                codeHash: harvestDeployment.contracts.jobLock.codeHash,
+                hashType: "data1" as const,
+                args: "0x" as const,
+              },
+              searchMode: "exact" as const,
+            },
+            {
+              script: {
+                codeHash: harvestDeployment.contracts.vaultLock.codeHash,
+                hashType: "data1" as const,
+                args: "0x" as const,
+              },
+              searchMode: "prefix" as const,
+            },
+            {
+              script: {
+                codeHash: harvestDeployment.contracts.compensationLock.codeHash,
+                hashType: "data1" as const,
+                args: "0x" as const,
+              },
+              searchMode: "prefix" as const,
+            },
+          ])),
     ];
     for (const { script, searchMode } of scripts) {
       let cursor: string | undefined;
@@ -257,6 +295,7 @@ export class LiveJobReconciler {
     await this.#discovery.projectBlock(block, deployment);
     await this.#transitions.indexBlock(block, deployment);
     await this.#options.daoHarvestV2?.indexer.projectBlock(block);
+    await this.#options.daoHarvestV3?.indexer.projectBlock(block);
   }
 
   #schedule(delayMs: number): void {

@@ -446,6 +446,8 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
           JobTransitionIndexer,
           DAO_HARVEST_V2_INDEXER,
           DAO_HARVEST_V2_DEPLOYMENT,
+          DAO_HARVEST_V3_INDEXER,
+          DAO_HARVEST_V3_DEPLOYMENT,
           OPERATOR_AUTOMATION_DEPLOYMENT,
           BackendTelemetry,
         ],
@@ -456,6 +458,8 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
           transitions: JobTransitionIndexer,
           daoHarvestV2: DaoHarvestV2RevisionIndexer | undefined,
           daoHarvestV2Deployment: readonly VerifiedDaoHarvestV2Deployment[] | undefined,
+          daoHarvestV3: DaoHarvestV3RevisionIndexer | undefined,
+          daoHarvestV3Deployment: readonly VerifiedDaoHarvestV3Deployment[] | undefined,
           operatorDeployment: OperatorAutomationDeployment | undefined,
           telemetry: BackendTelemetry,
         ) =>
@@ -475,6 +479,14 @@ export function createAppModule(environment: AutomataEnvironment): DynamicModule
                   daoHarvestV2: {
                     deployments: daoHarvestV2Deployment.map(({ deployment }) => deployment),
                     indexer: daoHarvestV2,
+                  },
+                }),
+            ...(daoHarvestV3 === undefined || daoHarvestV3Deployment === undefined
+              ? {}
+              : {
+                  daoHarvestV3: {
+                    deployments: daoHarvestV3Deployment.map(({ deployment }) => deployment),
+                    indexer: daoHarvestV3,
                   },
                 }),
           }),
