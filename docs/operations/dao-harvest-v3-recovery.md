@@ -17,16 +17,17 @@ removes it, and changing operators cannot cancel a transaction already submitted
 preparation window normally means waiting about 180 DAO epochs, roughly 30 days, for the next
 opportunity; canonical chain epochs determine the exact time.
 
-The manifest must use schema `ckb-automata/dao-harvest-deployment/v3` and must identify CKB testnet,
-its genesis block, every V3 code cell, the Nervos DAO dependency, and the secp256k1 dependency. The
-command rejects another network, a stale input, a non-canonical header, an immature claim, or an
-owner lock that differs from the payload commitment.
+The manifest must use `schemaVersion: 3`, include its release and deployment evidence, and identify
+CKB testnet, its genesis block, every V3 code cell, the Nervos DAO dependency, and the secp256k1
+dependency. The command derives the manifest SHA-256 digest from the exact file bytes. It rejects
+another network, a stale input, a non-canonical header, an immature claim, or an owner lock that
+differs from the payload commitment.
 
 ## Start withdrawal
 
 ```powershell
 pnpm recovery:harvest:v3 owner-exit `
-  --manifest deploy/manifests/dao-harvest-v3-testnet.json `
+  --manifest deploy/manifests/dao-harvest-v3-testnet-v0.3.0.json `
   --rpc-url https://testnet.ckb.dev `
   --owner-lock owner-lock.json `
   --job TX_HASH:INDEX `
@@ -47,7 +48,7 @@ index. Funds remain subject to normal Nervos DAO maturity after this transaction
 
 ```powershell
 pnpm recovery:harvest:v3 owner-recovery `
-  --manifest deploy/manifests/dao-harvest-v3-testnet.json `
+  --manifest deploy/manifests/dao-harvest-v3-testnet-v0.3.0.json `
   --rpc-url https://testnet.ckb.dev `
   --owner-lock owner-lock.json `
   --job TX_HASH:INDEX `
