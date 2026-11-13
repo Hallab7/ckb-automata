@@ -40,6 +40,7 @@ import {
   scriptIdentityHash,
   selectDaoPrepareWindow,
   type DaoHarvestV3DeploymentIdentity,
+  type DaoHarvestV3Build,
   type DaoHarvestV3ReviewedInput,
   type DaoHarvestV3TransitionCell,
   type ScriptIdentity,
@@ -263,6 +264,38 @@ export function daoHarvestV3TerminalClosePolicyHash(
   return policyScriptHash;
 }
 
+export function formatDaoHarvestV3BuildResponse(input: {
+  readonly jobId: string;
+  readonly operation: DaoHarvestV3BuildOperation;
+  readonly deployment: DaoHarvestV3DeploymentIdentity;
+  readonly protectedAmount: bigint;
+  readonly maximumNetworkFee: bigint;
+  readonly build: DaoHarvestV3Build;
+}) {
+  return Object.freeze({
+    version: 3 as const,
+    jobId: input.jobId,
+    operation: input.operation,
+    chain: Object.freeze({
+      genesisHash: input.deployment.genesisHash,
+      manifestSha256: input.deployment.manifestSha256,
+    }),
+    transaction: input.build.transaction,
+    intentHash: input.build.intentHash,
+    review: Object.freeze({
+      protectedAmount: input.protectedAmount.toString(),
+      maximumNetworkFee: input.maximumNetworkFee.toString(),
+      totalInput: input.build.value.totalInput.toString(),
+      totalOutput: input.build.value.totalOutput.toString(),
+    }),
+    completion: Object.freeze({
+      ...input.build.completion,
+      requiredInputCapacity: input.build.completion.requiredInputCapacity.toString(),
+      maximumFee: input.build.completion.maximumFee.toString(),
+    }),
+  });
+}
+
 export class DaoHarvestV3TransactionAdapter implements DaoHarvestV3MutationAdapter {
   readonly #chain: CkbReadClient;
   readonly #database: AutomataDatabase;
@@ -365,7 +398,7 @@ export class DaoHarvestV3TransactionAdapter implements DaoHarvestV3MutationAdapt
       const identityCapacity = parseShannons(identityCell.cellOutput.capacity.toString());
       if (identityCapacity <= fee)
         throw new BadRequestException("the selected wallet cell cannot cover the network fee");
-      return buildDaoHarvestV3Close({
+      const build = buildDaoHarvestV3Close({
         context: {
           rpcGenesisHash: await this.#chain.getGenesisHash(),
           deployment,
@@ -393,6 +426,14 @@ export class DaoHarvestV3TransactionAdapter implements DaoHarvestV3MutationAdapt
         },
         maximumNetworkFee: fee,
         allowedFundingLockHashes: [ownerLockHash],
+      });
+      return formatDaoHarvestV3BuildResponse({
+        jobId,
+        operation,
+        deployment,
+        protectedAmount: BigInt(payload.principal_capacity.toString()),
+        maximumNetworkFee: fee,
+        build,
       });
     }
     const jobPoint = outPoint(projection["jobOutPoint"], "jobOutPoint");
@@ -729,27 +770,13 @@ export class DaoHarvestV3TransactionAdapter implements DaoHarvestV3MutationAdapt
         });
       }
     }
-    return Object.freeze({
-      version: 3,
+    return formatDaoHarvestV3BuildResponse({
       jobId,
       operation,
-      chain: Object.freeze({
-        genesisHash: deployment.genesisHash,
-        manifestSha256: deployment.manifestSha256,
-      }),
-      transaction: build.transaction,
-      intentHash: build.intentHash,
-      review: Object.freeze({
-        protectedAmount: BigInt(payload.principal_capacity.toString()).toString(),
-        maximumNetworkFee: fee.toString(),
-        totalInput: build.value.totalInput.toString(),
-        totalOutput: build.value.totalOutput.toString(),
-      }),
-      completion: Object.freeze({
-        ...build.completion,
-        requiredInputCapacity: build.completion.requiredInputCapacity.toString(),
-        maximumFee: build.completion.maximumFee.toString(),
-      }),
+      deployment,
+      protectedAmount: BigInt(payload.principal_capacity.toString()),
+      maximumNetworkFee: fee,
+      build,
     });
   }
 

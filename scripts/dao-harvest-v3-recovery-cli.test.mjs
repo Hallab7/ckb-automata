@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import {
   DaoHarvestPayloadV3,
   DaoHarvestPrepareCreditV3,
@@ -16,7 +18,10 @@ import {
   parseHash32,
   scriptIdentityHash,
 } from "../packages/core/src/index.ts";
-import { executeDaoHarvestV3RecoveryCli } from "./dao-harvest-v3-recovery-cli-lib.mjs";
+import {
+  executeDaoHarvestV3RecoveryCli,
+  loadDaoHarvestV3RecoveryManifest,
+} from "./dao-harvest-v3-recovery-cli-lib.mjs";
 
 const hash = (character) => parseHash32(`0x${character.repeat(64)}`);
 const hashBytes = (character) => [...Buffer.from(hash(character).slice(2), "hex")];
@@ -25,21 +30,36 @@ const dep = (character) => ({
   outPoint: { txHash: hash(character), index: "0x0" },
   depType: "code",
 });
+const contract = (character) => ({
+  codeHash: hash(character),
+  hashType: "data1",
+  binarySha256: character.repeat(64),
+  sizeBytes: 1,
+  cellDep: dep(character),
+});
 const ownerLock = { codeHash: hash("1"), hashType: "type", args: "0x1234" };
 const ownerHash = scriptIdentityHash(ownerLock);
 const daoTypeHash = scriptIdentityHash({ codeHash: hash("6"), hashType: "type", args: "0x" });
 const manifest = {
-  schema: "ckb-automata/dao-harvest-deployment/v3",
+  schemaVersion: 3,
+  releaseVersion: "0.3.0",
   network: "ckb_testnet",
   genesisHash: hash("a"),
-  manifestSha256: "b".repeat(64),
-  secp256k1Blake160: { cellDep: dep("1") },
-  nervosDao: { codeHash: hash("6"), cellDep: dep("6") },
+  sourceRevision: "b".repeat(40),
+  predecessorManifests: [],
+  deployment: {
+    transactionHash: hash("c"),
+    blockHash: hash("d"),
+    blockNumber: "0x1",
+    confirmations: "1",
+  },
+  secp256k1Blake160: { codeHash: hash("1"), hashType: "type", cellDep: dep("1") },
+  nervosDao: { codeHash: hash("6"), hashType: "type", cellDep: dep("6") },
   contracts: {
-    jobLock: { codeHash: hash("2"), cellDep: dep("2") },
-    policy: { codeHash: hash("3"), cellDep: dep("3") },
-    vaultLock: { codeHash: hash("4"), cellDep: dep("4") },
-    compensationLock: { codeHash: hash("5"), cellDep: dep("5") },
+    jobLock: contract("2"),
+    policy: contract("3"),
+    vaultLock: contract("4"),
+    compensationLock: contract("5"),
   },
 };
 const payload = DaoHarvestPayloadV3.pack({
@@ -214,6 +234,38 @@ test("fresh-checkout owner exit export is service-independent and preserves DAO 
   }
 });
 
+test("recovery loader accepts the published V3 release manifest and derives its byte digest", async () => {
+  const path = new URL("../deploy/manifests/dao-harvest-v3-testnet-v0.3.0.json", import.meta.url);
+  const bytes = await readFile(path);
+  const loaded = await loadDaoHarvestV3RecoveryManifest(path);
+  assert.equal(loaded.network, "ckb_testnet");
+  assert.equal(loaded.genesisHash, JSON.parse(bytes.toString("utf8")).genesisHash);
+  assert.equal(loaded.manifestSha256, createHash("sha256").update(bytes).digest("hex"));
+  assert.equal(loaded.contracts.jobLock.cellDep.depType, "code");
+
+  const paths = await files();
+  try {
+    const args = [
+      "owner-exit",
+      ...common(paths, join(paths.directory, "published-manifest.json"), deposited),
+    ];
+    args[args.indexOf("--manifest") + 1] = fileURLToPath(path);
+    let reachedRpc = false;
+    await assert.rejects(
+      executeDaoHarvestV3RecoveryCli(args, {
+        fetchImpl: async () => {
+          reachedRpc = true;
+          throw new Error("published manifest reached RPC");
+        },
+      }),
+      /published manifest reached RPC/,
+    );
+    assert.equal(reachedRpc, true);
+  } finally {
+    await rm(paths.directory, { recursive: true, force: true });
+  }
+});
+
 test("mature owner recovery exports without CKAutomata services and rejects immature tips", async () => {
   const paths = await files();
   const claimSince = encodeAbsoluteEpochSince(createEpoch({ number: 380n, index: 0n, length: 0n }));
@@ -258,10 +310,7 @@ test("recovery export fails closed on stale outpoints and mismatched manifests",
       ),
       /stale/,
     );
-    await writeFile(
-      paths.manifestPath,
-      JSON.stringify({ ...manifest, schema: "ckb-automata/dao-harvest-deployment/v2" }),
-    );
+    await writeFile(paths.manifestPath, JSON.stringify({ ...manifest, schemaVersion: 2 }));
     await assert.rejects(
       executeDaoHarvestV3RecoveryCli(
         ["owner-exit", ...common(paths, join(paths.directory, "bad.json"), deposited)],

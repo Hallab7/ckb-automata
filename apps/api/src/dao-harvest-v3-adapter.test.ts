@@ -19,6 +19,7 @@ import {
   daoHarvestV3SweepAmounts,
   daoHarvestV3TerminalClosePolicyHash,
 } from "./dao-harvest-v3-adapter.ts";
+import { normalizeDaoHarvestV3Build } from "../../web/src/setup/dao-harvest-v3-review.ts";
 
 const hash = (character: string) => parseHash32(`0x${character.repeat(64)}`);
 const point = (character: string) => ({ txHash: hash(character), index: "0x0" as const });
@@ -164,6 +165,125 @@ test("V3 terminal close accepts only the manifest-bound terminal compensation ce
   );
   assert.equal(encodeDaoHarvestV3CompensationLockArgs(args).length, 160);
   assert.equal(bytesToHex(args.payloadHash).length, 66);
+});
+
+test("V3 terminal close uses the API response contract accepted by the web review", async () => {
+  const owner = { codeHash: hash("a"), hashType: "type" as const, args: "0x12" as const };
+  const payout = { codeHash: hash("a"), hashType: "type" as const, args: "0x34" as const };
+  const deployment: DaoHarvestV3DeploymentIdentity = {
+    network: "ckb_testnet",
+    genesisHash: hash("1"),
+    manifestSha256: "2".repeat(64),
+    contracts: {
+      jobLock: { codeHash: hash("3"), cellDep: dependency("3") },
+      policy: { codeHash: hash("4"), cellDep: dependency("4") },
+      vaultLock: { codeHash: hash("5"), cellDep: dependency("5") },
+      compensationLock: { codeHash: hash("6"), cellDep: dependency("6") },
+    },
+    secp256k1Blake160: { cellDep: dependency("7") },
+    nervosDao: { codeHash: hash("8"), cellDep: dependency("8") },
+  };
+  const ownerLockHash = scriptIdentityHash(owner);
+  const payoutLockHash = scriptIdentityHash(payout);
+  const payloadBytes = DaoHarvestPayloadV3.pack({
+    version: 3,
+    owner_lock_hash: [...hexToBytes(ownerLockHash)],
+    payout_lock_hash: [...hexToBytes(payoutLockHash)],
+    vault_lock_code_hash: [...hexToBytes(deployment.contracts.vaultLock.codeHash)],
+    compensation_lock_code_hash: [...hexToBytes(deployment.contracts.compensationLock.codeHash)],
+    dao_type_hash: [
+      ...hexToBytes(
+        scriptIdentityHash({
+          codeHash: deployment.nervosDao.codeHash,
+          hashType: "type",
+          args: "0x",
+        }),
+      ),
+    ],
+    principal_capacity: "100",
+    preferred_prepare_operator_lock_hash: Array(32).fill(10),
+    fallback_prepare_executor_set_hash: Array(32).fill(11),
+    prepare_service_fee: "8",
+    claim_service_fee: "9",
+    compensation_seed_capacity: "10",
+    prepare_buffer_epochs: "1152921504606846977",
+    takeover_delay_epochs: "1152921504606846977",
+    confirmation_margin_epochs: "1152921504606846977",
+    total_cycles: 1,
+    end_epoch_since: "0",
+  });
+  const policyScriptHash = parseHash32(
+    scriptToHash({
+      codeHash: deployment.contracts.policy.codeHash,
+      hashType: "data1",
+      args: deployment.contracts.jobLock.codeHash,
+    }),
+  );
+  const compensationLock = {
+    codeHash: deployment.contracts.compensationLock.codeHash,
+    hashType: "data1" as const,
+    args: bytesToHex(
+      encodeDaoHarvestV3CompensationLockArgs({
+        jobId: new Uint8Array(32),
+        ownerLockHash: hexToBytes(ownerLockHash),
+        payoutLockHash: hexToBytes(payoutLockHash),
+        policyScriptHash: hexToBytes(policyScriptHash),
+        payloadHash: deriveDaoHarvestV3PayloadHash(hexToBytes(policyScriptHash), payloadBytes),
+      }),
+    ) as `0x${string}`,
+  };
+  const compensationPoint = point("c");
+  const identityPoint = point("d");
+  const row = {
+    lifecycleState: "completed",
+    ownerLockHash,
+    projection: {
+      payload: bytesToHex(payloadBytes),
+      compensationOutPoint: compensationPoint,
+    },
+  };
+  const database = {
+    select: () => ({
+      from: () => ({
+        where: () => ({ limit: async () => [row] }),
+      }),
+    }),
+  };
+  const chain = {
+    getCellLive: async (outPoint: { readonly txHash: string }) => {
+      if (outPoint.txHash === compensationPoint.txHash)
+        return {
+          cellOutput: { capacity: 100n, lock: compensationLock, type: undefined },
+          outputData: { toString: () => "0x" },
+        };
+      if (outPoint.txHash === identityPoint.txHash)
+        return {
+          cellOutput: { capacity: 20n, lock: owner, type: undefined },
+          outputData: { toString: () => "0x" },
+        };
+      return null;
+    },
+    getGenesisHash: async () => deployment.genesisHash,
+  };
+  const response = (await new DaoHarvestV3TransactionAdapter(
+    chain as never,
+    database as never,
+    "ckb_testnet",
+    [deployment],
+  ).build("close", {
+    jobId: hash("e"),
+    ownerLock: owner,
+    identityOutPoint: identityPoint,
+    maximumNetworkFee: "1",
+    payoutLock: payout,
+  })) as Parameters<typeof normalizeDaoHarvestV3Build>[0];
+  assert.equal(response.operation, "close");
+  assert.equal(response.chain.manifestSha256, deployment.manifestSha256);
+  assert.equal(response.review.protectedAmount, "100");
+  assert.doesNotThrow(() => JSON.stringify(response));
+  const normalized = normalizeDaoHarvestV3Build(response);
+  assert.equal(normalized.operation, 7);
+  assert.equal(normalized.value.maximumNetworkFee, 1n);
 });
 
 test("V3 setup creates the exact chain-bound state and permits owner wallet funding", async () => {

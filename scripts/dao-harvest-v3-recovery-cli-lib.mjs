@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer";
+import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import {
@@ -64,35 +65,76 @@ function dep(value, name) {
   const outPoint = parseOutPoint(value.outPoint);
   return Object.freeze({ outPoint: txPoint(outPoint), depType: value.depType });
 }
-function contract(value, name) {
+function releaseContract(value, name) {
   if (!value || typeof value !== "object") throw new TypeError(`${name} is missing`);
+  if (
+    value.hashType !== "data1" ||
+    !/^[0-9a-f]{64}$/.test(value.binarySha256 ?? "") ||
+    !Number.isSafeInteger(value.sizeBytes) ||
+    value.sizeBytes < 1
+  )
+    throw new TypeError(`${name} audit metadata is invalid`);
+  const cellDep = dep(value.cellDep, `${name}.cellDep`);
+  if (cellDep.depType !== "code") throw new TypeError(`${name}.cellDep must be a code dep`);
+  return Object.freeze({
+    codeHash: parseHash32(value.codeHash),
+    cellDep,
+  });
+}
+
+function system(value, name) {
+  if (!value || typeof value !== "object" || value.hashType !== "type")
+    throw new TypeError(`${name} is invalid`);
   return Object.freeze({
     codeHash: parseHash32(value.codeHash),
     cellDep: dep(value.cellDep, `${name}.cellDep`),
   });
 }
 
-async function loadManifest(path) {
-  const value = JSON.parse(await readFile(path, "utf8"));
+export async function loadDaoHarvestV3RecoveryManifest(path) {
+  const bytes = await readFile(path);
+  const value = JSON.parse(bytes.toString("utf8"));
+  const predecessors = value?.predecessorManifests;
   if (
-    value?.schema !== "ckb-automata/dao-harvest-deployment/v3" ||
+    value?.schemaVersion !== 3 ||
     value?.network !== "ckb_testnet" ||
-    !/^[0-9a-f]{64}$/.test(value.manifestSha256 ?? "")
+    !/^v?[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?$/.test(value?.releaseVersion ?? "") ||
+    !/^[0-9a-f]{40}$/.test(value?.sourceRevision ?? "") ||
+    !Array.isArray(predecessors) ||
+    predecessors.length > 8 ||
+    predecessors.some(
+      (entry) =>
+        typeof entry !== "string" ||
+        !/^dao-harvest-v3-testnet-v[0-9]+\.[0-9]+\.[0-9]+\.json$/.test(entry),
+    ) ||
+    new Set(predecessors).size !== predecessors.length ||
+    !value?.deployment ||
+    typeof value.deployment !== "object"
   )
     throw new TypeError("V3 deployment manifest is invalid or not versioned");
+  if (
+    !/^0x(?:0|[1-9a-f][0-9a-f]*)$/.test(value.deployment.blockNumber ?? "") ||
+    !/^[1-9][0-9]*$/.test(value.deployment.confirmations ?? "")
+  )
+    throw new TypeError("V3 deployment evidence is invalid");
+  parseHash32(value.deployment.transactionHash);
+  parseHash32(value.deployment.blockHash);
   return Object.freeze({
     network: "ckb_testnet",
     genesisHash: parseHash32(value.genesisHash),
-    manifestSha256: value.manifestSha256,
+    manifestSha256: createHash("sha256").update(bytes).digest("hex"),
     secp256k1Blake160: {
-      cellDep: dep(value.secp256k1Blake160?.cellDep, "secp256k1Blake160.cellDep"),
+      cellDep: system(value.secp256k1Blake160, "secp256k1Blake160").cellDep,
     },
-    nervosDao: contract(value.nervosDao, "nervosDao"),
+    nervosDao: system(value.nervosDao, "nervosDao"),
     contracts: Object.freeze({
-      jobLock: contract(value.contracts?.jobLock, "contracts.jobLock"),
-      policy: contract(value.contracts?.policy, "contracts.policy"),
-      vaultLock: contract(value.contracts?.vaultLock, "contracts.vaultLock"),
-      compensationLock: contract(value.contracts?.compensationLock, "contracts.compensationLock"),
+      jobLock: releaseContract(value.contracts?.jobLock, "contracts.jobLock"),
+      policy: releaseContract(value.contracts?.policy, "contracts.policy"),
+      vaultLock: releaseContract(value.contracts?.vaultLock, "contracts.vaultLock"),
+      compensationLock: releaseContract(
+        value.contracts?.compensationLock,
+        "contracts.compensationLock",
+      ),
     }),
   });
 }
@@ -187,7 +229,7 @@ export async function executeDaoHarvestV3RecoveryCli(
   const { operation, values } = options(argv);
   if (typeof fetchImpl !== "function") throw new TypeError("fetch is required");
   const [deployment, ownerLock] = await Promise.all([
-    loadManifest(required(values, "manifest")),
+    loadDaoHarvestV3RecoveryManifest(required(values, "manifest")),
     readFile(required(values, "owner-lock"), "utf8").then((body) =>
       script(JSON.parse(body), "owner lock"),
     ),
